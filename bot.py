@@ -59,6 +59,10 @@ class CheckStatus(StatesGroup):
     waiting_for_id = State()
     waiting_for_password = State()
 
+class CheckArchive(StatesGroup):
+    waiting_for_id = State()
+    waiting_for_password = State()
+
 class UpdatePayment(StatesGroup):
     waiting_for_new_paid = State()
 
@@ -91,7 +95,8 @@ async def init_db():
                 total_price INTEGER,
                 paid_amount INTEGER,
                 status TEXT,
-                photo_id TEXT
+                photo_id TEXT,
+                archived BOOLEAN DEFAULT FALSE
             )
         """)
         
@@ -133,13 +138,18 @@ async def check_client(client_id: int) -> bool:
 async def create_order(client_id: int, items: str, total_price: int, paid_amount: int, photo_id: str) -> int:
     async with pool.acquire() as db:
         return await db.fetchval(
-            "INSERT INTO orders (client_id, items, total_price, paid_amount, status, photo_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+            "INSERT INTO orders (client_id, items, total_price, paid_amount, status, photo_id, archived) VALUES ($1, $2, $3, $4, $5, $6, FALSE) RETURNING id",
             client_id, items, total_price, paid_amount, "Заказ принят в обработку", photo_id
         )
 
 async def get_all_orders():
     async with pool.acquire() as db:
-        rows = await db.fetch("SELECT id, items, status FROM orders")
+        rows = await db.fetch("SELECT id, items, status FROM orders WHERE archived = FALSE")
+        return [tuple(r) for r in rows]
+
+async def get_archived_orders():
+    async with pool.acquire() as db:
+        rows = await db.fetch("SELECT id, items, status FROM orders WHERE archived = TRUE")
         return [tuple(r) for r in rows]
 
 async def get_all_clients():
@@ -152,13 +162,21 @@ async def get_client_orders(client_id: int, password: str):
         user = await db.fetchrow("SELECT id FROM clients WHERE id = $1 AND password = $2", client_id, password)
         if not user:
             return None
-                
-        rows = await db.fetch("SELECT id, items, total_price, paid_amount, status, photo_id FROM orders WHERE client_id = $1", client_id)
+        rows = await db.fetch("SELECT id, items, total_price, paid_amount, status, photo_id FROM orders WHERE client_id = $1 AND archived = FALSE", client_id)
+        return [tuple(r) for r in rows]
+
+async def get_client_archived_orders(client_id: int, password: str):
+    async with pool.acquire() as db:
+        user = await db.fetchrow("SELECT id FROM clients WHERE id = $1 AND password = $2", client_id, password)
+        if not user:
+            return None
+        rows = await db.fetch("SELECT id, items, total_price, paid_amount, status, photo_id FROM orders WHERE client_id = $1 AND archived = TRUE", client_id)
         return [tuple(r) for r in rows]
 
 async def update_order_status(order_id: int, new_status: str):
     async with pool.acquire() as db:
-        await db.execute("UPDATE orders SET status = $1 WHERE id = $2", new_status, order_id)
+        archived = (new_status == "Выдано")
+        await db.execute("UPDATE orders SET status = $1, archived = $2 WHERE id = $3", new_status, archived, order_id)
 
 async def update_order_payment(order_id: int, paid_amount: int):
     async with pool.acquire() as db:
@@ -180,10 +198,21 @@ async def get_client_tg_id_by_order(order_id: int):
             return res['user_tg_id']
         return None
 
+async def delete_order_db(order_id: int):
+    async with pool.acquire() as db:
+        await db.execute("DELETE FROM orders WHERE id = $1", order_id)
+
+async def unarchive_order_db(order_id: int):
+    async with pool.acquire() as db:
+        await db.execute("UPDATE orders SET archived = FALSE WHERE id = $1", order_id)
+
 # --- KEYBOARDS ---
 def get_start_kb():
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📦 Отследить заказы")]],
+        keyboard=[
+            [KeyboardButton(text="📦 Отследить заказы")],
+            [KeyboardButton(text="🗃 Архив заказов")]
+        ],
         resize_keyboard=True
     )
 
@@ -193,7 +222,8 @@ def get_admin_kb():
             [KeyboardButton(text="👥 Список клиентов")],
             [KeyboardButton(text="👤 Создать клиента"), KeyboardButton(text="➕ Добавить заказ")],
             [KeyboardButton(text="🔄 Изменить статус заказа")],
-            [KeyboardButton(text="💰 Изменить оплату по заказу")]
+            [KeyboardButton(text="💰 Изменить оплату по заказу")],
+            [KeyboardButton(text="🗃 Архив заказов (Админ)")]
         ],
         resize_keyboard=True
     )
@@ -213,7 +243,8 @@ STATUSES = [
     "Заказ начал сортировку на складе США",
     "Заказ отправлен из США на наш склад в Россию",
     "Заказ проходит таможенное оформление",
-    "Заказ прибыл в магазин и готов к выдаче"
+    "Заказ прибыл в магазин и готов к выдаче",
+    "Выдано"
 ]
 
 def get_status_kb(order_id):
@@ -222,6 +253,13 @@ def get_status_kb(order_id):
         kb.inline_keyboard.append([
             InlineKeyboardButton(text=status, callback_data=f"setstatus_{order_id}_{i}")
         ])
+    return kb
+
+def get_admin_archive_kb(order_id):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Восстановить (Убрать из архива)", callback_data=f"unarchive_{order_id}")],
+        [InlineKeyboardButton(text="🗑 Удалить навсегда", callback_data=f"delete_{order_id}")]
+    ])
     return kb
 
 def get_skip_photo_kb():
@@ -241,7 +279,7 @@ async def start_handler(message: Message, state: FSMContext):
     if await is_admin(message.from_user.id):
         await message.answer("Добро пожаловать в панель администратора!", reply_markup=get_admin_kb())
     else:
-        await message.answer("Добро пожаловать в Личный Кабинет! Нажмите кнопку ниже, чтобы проверить свои заказы.", reply_markup=get_start_kb())
+        await message.answer("Добро пожаловать в Личный Кабинет! Выберите действие ниже.", reply_markup=get_start_kb())
 
 @router.message(Command("admin_login"))
 async def admin_login_start(message: Message, state: FSMContext):
@@ -379,7 +417,18 @@ async def add_order_photo(message: Message, state: FSMContext):
           
     await message.answer(msg, reply_markup=get_admin_kb())
     await state.clear()
-
+    
+    # Notify user via bot if tg id is linked
+    client_tg_id = await get_client_tg_id_by_order(order_id)
+    if client_tg_id:
+        try:
+            notify_msg = f"🎉 **У вас новый заказ!**\n\n🆔 Заказ #{order_id}\n🛒 Позиции:\n{data['items']}\n\n💰 Стоимость: {data['total_price']}\n✅ Оплачено: {data['paid_amount']}"
+            if photo_id:
+                await bot.send_photo(chat_id=client_tg_id, photo=photo_id, caption=notify_msg, parse_mode="Markdown")
+            else:
+                await bot.send_message(chat_id=client_tg_id, text=notify_msg, parse_mode="Markdown")
+        except Exception as e:
+            logging.error(f"Не удалось уведомить пользователя о новом заказе: {e}")
 
 # --- ADMIN: UPDATE STATUS ---
 @router.message(F.text == "🔄 Изменить статус заказа")
@@ -391,7 +440,7 @@ async def change_status_start(message: Message, state: FSMContext):
     if not orders:
         await message.answer("Нет активных заказов.")
         return
-    await message.answer("Выберите заказ для изменения статуса:", reply_markup=get_orders_kb(orders, "status"))
+    await message.answer("Выберите заказ для изменения статуса (Архивные здесь не отображаются):", reply_markup=get_orders_kb(orders, "status"))
 
 @router.callback_query(F.data.startswith("status_"))
 async def select_order_for_status(callback: CallbackQuery):
@@ -410,7 +459,12 @@ async def set_order_status(callback: CallbackQuery):
     new_status = STATUSES[status_idx]
     
     await update_order_status(order_id, new_status)
-    await callback.message.edit_text(f"✅ Статус заказа #{order_id} изменен на:\n'{new_status}'.")
+    
+    if new_status == "Выдано":
+        await callback.message.edit_text(f"✅ Статус заказа #{order_id} изменен на:\n'{new_status}'.\n\n🗃 Заказ автоматически перемещен в Архив.")
+    else:
+        await callback.message.edit_text(f"✅ Статус заказа #{order_id} изменен на:\n'{new_status}'.")
+        
     await callback.answer("Статус обновлен")
     
     client_tg_id = await get_client_tg_id_by_order(order_id)
@@ -455,6 +509,47 @@ async def update_payment_value(message: Message, state: FSMContext):
     await message.answer(f"✅ Сумма оплаты по заказу #{order_id} обновлена до {new_paid}.", reply_markup=get_admin_kb())
     await state.clear()
 
+# --- ADMIN: ARCHIVE LIST ---
+@router.message(F.text == "🗃 Архив заказов (Админ)")
+async def admin_archive_list(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+    
+    archived_orders = await get_archived_orders()
+    if not archived_orders:
+        await message.answer("Архив пуст.")
+        return
+        
+    await message.answer("🗃 Выберите архивный заказ для действий:", reply_markup=get_orders_kb(archived_orders, "archiveadmin"))
+
+@router.callback_query(F.data.startswith("archiveadmin_"))
+async def select_archived_order(callback: CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return
+    order_id = int(callback.data.split("_")[1])
+    await callback.message.edit_text(
+        f"🗃 **Архивный заказ #{order_id}**\n\nВыберите действие:",
+        reply_markup=get_admin_archive_kb(order_id),
+        parse_mode="Markdown"
+    )
+
+@router.callback_query(F.data.startswith("unarchive_"))
+async def action_unarchive_order(callback: CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return
+    order_id = int(callback.data.split("_")[1])
+    await unarchive_order_db(order_id)
+    await callback.message.edit_text(f"✅ Заказ #{order_id} успешно восстановлен из архива.")
+    await callback.answer("Восстановлено")
+
+@router.callback_query(F.data.startswith("delete_"))
+async def action_delete_order(callback: CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        return
+    order_id = int(callback.data.split("_")[1])
+    await delete_order_db(order_id)
+    await callback.message.edit_text(f"🗑 Заказ #{order_id} был окончательно удален из базы.")
+    await callback.answer("Удалено")
 
 # --- CLIENT INTERFACE ---
 @router.message(F.text == "📦 Отследить заказы")
@@ -486,7 +581,7 @@ async def check_status_password(message: Message, state: FSMContext):
         await message.answer(f"Привет! Вы вошли в личный кабинет (ID: {client_id}).\n\nУ вас пока нет активных заказов.", reply_markup=get_start_kb())
     else:
         await bind_client_tg_id(client_id, message.from_user.id)
-        await message.answer(f"✅ **Личный кабинет #{client_id}**\n\nНайдено заказов: {len(orders)}", parse_mode="Markdown")
+        await message.answer(f"✅ **Личный кабинет #{client_id}**\n\nАктивных заказов: {len(orders)}", parse_mode="Markdown")
         for order in orders:
             order_id, items, total_price, paid_amount, status, photo_id = order
             debt = total_price - paid_amount
@@ -503,7 +598,54 @@ async def check_status_password(message: Message, state: FSMContext):
             else:
                 await message.answer(response, parse_mode="Markdown")
                 
-        await message.answer("Все заказы загружены.", reply_markup=get_start_kb())
+        await message.answer("Все активные заказы загружены.", reply_markup=get_start_kb())
+            
+    await state.clear()
+
+# CLIENT: ARCHIVE
+@router.message(F.text == "🗃 Архив заказов")
+async def check_archive_start(message: Message, state: FSMContext):
+    await message.answer("Введите ваш Номер клиента (ID) для доступа к Архиву:", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(CheckArchive.waiting_for_id)
+
+@router.message(CheckArchive.waiting_for_id)
+async def check_archive_id(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("Номер клиента должен быть числом.")
+        return
+    await state.update_data(client_id=int(message.text))
+    await message.answer("Введите ваш Пароль:")
+    await state.set_state(CheckArchive.waiting_for_password)
+
+@router.message(CheckArchive.waiting_for_password)
+async def check_archive_password(message: Message, state: FSMContext):
+    data = await state.get_data()
+    client_id = data['client_id']
+    password = message.text
+    
+    orders = await get_client_archived_orders(client_id, password)
+    
+    if orders is None:
+        await message.answer("❌ Ошибка: Неверный ID клиента или пароль.", reply_markup=get_start_kb())
+    elif len(orders) == 0:
+        await message.answer(f"🗃 Ваш архив заказов пуст.", reply_markup=get_start_kb())
+    else:
+        await message.answer(f"🗃 **Архив заказов #{client_id}**\n\nВыданных заказов: {len(orders)}", parse_mode="Markdown")
+        for order in orders:
+            order_id, items, total_price, paid_amount, status, photo_id = order
+            
+            response = f"📦 **Архивный заказ #{order_id}**\n\n"
+            response += f"🛒 **Позиции:**\n{items}\n\n"
+            response += f"💵 **Общая стоимость:** {total_price}\n"
+            response += f"✅ **Оплачено:** {paid_amount}\n\n"
+            response += f"🚚 **Финальный статус:**\n_{status}_"
+            
+            if photo_id:
+                await message.answer_photo(photo=photo_id, caption=response, parse_mode="Markdown")
+            else:
+                await message.answer(response, parse_mode="Markdown")
+                
+        await message.answer("Все архивные заказы загружены.", reply_markup=get_start_kb())
             
     await state.clear()
 
