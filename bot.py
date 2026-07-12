@@ -4,6 +4,10 @@ import os
 import random
 import string
 import asyncpg
+import json
+import math
+import re
+import xml.etree.ElementTree as ET
 from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -15,12 +19,15 @@ from aiogram.types import (
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+import aiohttp
 from aiohttp import web
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 ADMIN_IDS = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+SCRAPER_API_KEY = os.getenv("SCRAPER_API_KEY")
 
 if not BOT_TOKEN:
     raise ValueError("Не найден BOT_TOKEN в файле .env")
@@ -47,6 +54,21 @@ async def start_webserver():
     await site.start()
     logging.info("🌐 Веб-сервер запущен на порту 7860 (Hugging Face health check)")
 
+# --- CURRENCY ---
+async def get_usd_rate():
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://www.cbr.ru/scripts/XML_daily.asp") as resp:
+                xml_data = await resp.text()
+                root = ET.fromstring(xml_data)
+                for valute in root.findall("Valute"):
+                    if valute.attrib["ID"] == "R01235":
+                        value_str = valute.find("Value").text
+                        return float(value_str.replace(",", "."))
+    except Exception as e:
+        logging.error(f"Error fetching CBRF rate: {e}")
+    return 100.0
+
 # --- FSM ---
 class CreateOrder(StatesGroup):
     waiting_for_client_id = State()
@@ -65,6 +87,9 @@ class CheckArchive(StatesGroup):
 
 class UpdatePayment(StatesGroup):
     waiting_for_new_paid = State()
+
+class ParseLink(StatesGroup):
+    waiting_for_weight = State()
 
 # --- DATABASE ---
 async def init_db():
@@ -648,6 +673,142 @@ async def check_archive_password(message: Message, state: FSMContext):
         await message.answer("Все архивные заказы загружены.", reply_markup=get_start_kb())
             
     await state.clear()
+
+# --- LINK PARSER ---
+@router.message(F.text.regexp(r'https?://'))
+async def handle_link(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is not None:
+        return
+
+    url = message.text.strip()
+    if not url.startswith("http"):
+        return
+
+    await message.answer("🔍 Секунду, анализирую ссылку (загружаю страницу и запускаю ИИ)...")
+    
+    if not SCRAPER_API_KEY or not OPENAI_API_KEY:
+        await message.answer("❌ API ключи не настроены в .env")
+        return
+        
+    try:
+        scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url}&country_code=us&render=true"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(scraper_url, timeout=40) as resp:
+                if resp.status != 200:
+                    await message.answer(f"❌ Ошибка парсера: {resp.status}")
+                    return
+                html = await resp.text()
+    except Exception as e:
+        await message.answer(f"❌ Ошибка загрузки страницы: {e}")
+        return
+
+    prompt = """
+    Analyze the following HTML of a product page (e.g. eBay, Funko, Mercari). 
+    Find:
+    1. "name": Product Name (short)
+    2. "price": Product price in USD (float, no symbol). E.g. 49.99
+    3. "shipping": US Domestic shipping cost in USD (float). If free or not specified, output 0.0.
+    4. "weight": Product weight in kg (float). Look for weight in lbs/oz and convert to kg (1 lb = 0.45 kg, 1 oz = 0.028 kg). If absolutely not found, output null.
+    
+    Output valid JSON ONLY, exactly like this:
+    {"name": "Funko Pop Batman", "price": 49.99, "shipping": 5.99, "weight": 0.5}
+    """
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
+            payload = {
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": html[:35000]} # truncate
+                ],
+                "response_format": {"type": "json_object"}
+            }
+            async with session.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=30) as resp:
+                ai_data = await resp.json()
+                if "error" in ai_data:
+                    await message.answer(f"❌ Ошибка ИИ: {ai_data['error']['message']}")
+                    return
+                result_str = ai_data["choices"][0]["message"]["content"]
+                result = json.loads(result_str)
+    except Exception as e:
+        await message.answer(f"❌ Ошибка обработки ИИ: {e}")
+        return
+        
+    price = float(result.get("price", 0.0) or 0.0)
+    shipping = float(result.get("shipping", 0.0) or 0.0)
+    weight = result.get("weight")
+    name = result.get("name", "Товар")
+    
+    if not price:
+        await message.answer("❌ Нейросеть не смогла найти цену товара на странице.")
+        return
+
+    await state.update_data(
+        name=name,
+        price=price,
+        shipping=shipping,
+        weight=weight
+    )
+
+    if weight is None:
+        await message.answer(f"📦 **{name}**\n💵 Цена: ${price} + Доставка США: ${shipping}\n\n⚖️ Вес товара не найден на странице.\nПожалуйста, напишите примерный вес товара в **кг** (например, 0.5):", parse_mode="Markdown")
+        await state.set_state(ParseLink.waiting_for_weight)
+    else:
+        await calculate_and_send_result(message, state, float(weight))
+
+@router.message(ParseLink.waiting_for_weight)
+async def process_weight(message: Message, state: FSMContext):
+    try:
+        weight = float(message.text.replace(",", "."))
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите число (например: 0.5 или 1.2).")
+        return
+        
+    await calculate_and_send_result(message, state, weight)
+    
+async def calculate_and_send_result(message: Message, state: FSMContext, weight: float):
+    data = await state.get_data()
+    await state.clear()
+    
+    name = data['name']
+    price = data['price']
+    shipping = data['shipping']
+    
+    base_price = price + shipping
+    
+    if base_price <= 50:
+        commission = base_price * 0.25
+    elif base_price <= 100:
+        commission = base_price * 0.20
+    else:
+        commission = base_price * 0.15
+        
+    delivery_rf_rub = weight * 1200.0
+    
+    cbrf_rate = await get_usd_rate()
+    rate = cbrf_rate + 2.0
+    
+    total_usd = base_price + commission
+    total_rub = (total_usd * rate) + delivery_rf_rub
+    
+    final_price_rub = math.ceil(total_rub / 50.0) * 50
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Заказать (Funko Stop Manager)", url="https://t.me/Funko_Stop")] 
+    ])
+    
+    response = f"📦 **{name}**\n\n"
+    response += f"💵 Цена на сайте: ${price}\n"
+    response += f"🚚 Доставка по США: ${shipping}\n"
+    response += f"⚖️ Вес: {weight} кг\n\n"
+    response += f"💰 **Итого к оплате: ~{final_price_rub} ₽**\n"
+    response += f"_(Включая доставку в РФ и комиссию сервиса. Курс: {rate:.2f} ₽/$)_\n\n"
+    response += f"⚠️ Цена ориентировочная. Для точного расчета и оформления заказа напишите менеджеру."
+    
+    await message.answer(response, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=kb)
 
 # --- MAIN ---
 async def main():
