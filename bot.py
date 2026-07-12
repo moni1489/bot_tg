@@ -721,9 +721,13 @@ async def handle_link(message: Message, state: FSMContext):
     # Убираем лишний код (скрипты и стили), чтобы сэкономить лимиты (токены) бесплатного Groq
     clean_html = re.sub(r'<script.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
     clean_html = re.sub(r'<style.*?</style>', '', clean_html, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Чтобы уместить всю страницу в бесплатные лимиты, вырезаем ВООБЩЕ все HTML-теги, оставляем только чистый текст
+    text_content = re.sub(r'<[^>]+>', ' ', clean_html)
+    text_content = re.sub(r'\s+', ' ', text_content).strip()
 
     prompt = """
-    Analyze the following HTML of a product page (e.g. eBay, Funko, Mercari). 
+    Analyze the following extracted text from a product page (e.g. eBay, Funko, Mercari). 
     Find:
     1. "name": Product Name (short)
     2. "price": MAIN Product price in USD (float, no symbol). E.g. 49.99. WARNING: Ignore prices of "sponsored" or "similar" items! Find the actual price of the main item being sold.
@@ -746,7 +750,7 @@ async def handle_link(message: Message, state: FSMContext):
                 "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": prompt},
-                    {"role": "user", "content": clean_html[:15000]} # truncate
+                    {"role": "user", "content": text_content[:20000]} # send up to 20000 chars of pure text
                 ],
                 "response_format": {"type": "json_object"}
             }
