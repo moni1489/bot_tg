@@ -726,7 +726,7 @@ async def handle_link(message: Message, state: FSMContext):
     Analyze the following HTML of a product page (e.g. eBay, Funko, Mercari). 
     Find:
     1. "name": Product Name (short)
-    2. "price": Product price in USD (float, no symbol). E.g. 49.99
+    2. "price": MAIN Product price in USD (float, no symbol). E.g. 49.99. WARNING: Ignore prices of "sponsored" or "similar" items! Find the actual price of the main item being sold.
     3. "shipping": US Domestic shipping cost in USD (float). If free or not specified, output 0.0.
     4. "weight": Product weight in kg (float). Look for weight in lbs/oz and convert to kg (1 lb = 0.45 kg, 1 oz = 0.028 kg). If absolutely not found, output null.
     
@@ -743,7 +743,7 @@ async def handle_link(message: Message, state: FSMContext):
                 "X-Title": "FunkoBot"
             }
             payload = {
-                "model": "llama-3.1-8b-instant",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": clean_html[:15000]} # truncate
