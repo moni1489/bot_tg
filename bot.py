@@ -335,6 +335,17 @@ async def add_new_admin(message: Message):
     else:
         await message.answer("Использование: `/add_admin [новый_логин] [новый_пароль]`", parse_mode="Markdown")
 
+@router.message(Command("logout"))
+async def admin_logout(message: Message, state: FSMContext):
+    await state.clear()
+    async with pool.acquire() as db:
+        await db.execute("UPDATE users SET user_tg_id = NULL WHERE user_tg_id = $1 AND role = 'admin'", message.from_user.id)
+    
+    if message.from_user.id in ADMIN_IDS:
+        await message.answer("⚠️ Ваш ID прописан в конфигурационном файле (вы Супер-Админ). Для вас админка будет открыта всегда, выйти нельзя.", reply_markup=get_admin_kb())
+    else:
+        await message.answer("✅ Вы успешно вышли из панели администратора.", reply_markup=get_start_kb())
+
 # --- ADMIN: CREATE CLIENT ---
 @router.message(F.text == "👤 Создать клиента")
 async def add_client_start(message: Message, state: FSMContext):
