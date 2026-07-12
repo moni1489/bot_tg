@@ -739,14 +739,14 @@ async def handle_link(message: Message, state: FSMContext):
                 "X-Title": "FunkoBot"
             }
             payload = {
-                "model": "meta-llama/llama-3.1-8b-instruct:free",
+                "model": "llama-3.1-8b-instant",
                 "messages": [
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": html[:20000]} # truncate
                 ],
                 "response_format": {"type": "json_object"}
             }
-            async with session.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=30) as resp:
+            async with session.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=30) as resp:
                 ai_data = await resp.json()
                 if "error" in ai_data:
                     await message.answer(f"❌ Ошибка ИИ: {ai_data['error']['message']}")
