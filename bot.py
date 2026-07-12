@@ -235,8 +235,8 @@ async def unarchive_order_db(order_id: int):
 def get_start_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📦 Отследить заказы")],
-            [KeyboardButton(text="🗃 Архив заказов")]
+            [KeyboardButton(text="🧮 Калькулятор стоимости")],
+            [KeyboardButton(text="📦 Отследить заказы"), KeyboardButton(text="🗃 Архив заказов")]
         ],
         resize_keyboard=True
     )
@@ -685,6 +685,10 @@ async def check_archive_password(message: Message, state: FSMContext):
             
     await state.clear()
 
+@router.message(F.text == "🧮 Калькулятор стоимости")
+async def calculator_prompt(message: Message):
+    await message.answer("🔗 Просто пришлите мне ссылку на товар из любого американского магазина (например, с eBay или Funko.com), и я автоматически рассчитаю его итоговую стоимость с учетом доставки в РФ!")
+
 # --- LINK PARSER ---
 @router.message(F.text.regexp(r'https?://'))
 async def handle_link(message: Message, state: FSMContext):
@@ -728,16 +732,21 @@ async def handle_link(message: Message, state: FSMContext):
     
     try:
         async with aiohttp.ClientSession() as session:
-            headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
+            headers = {
+                "Authorization": f"Bearer {OPENAI_API_KEY}", 
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://t.me/Funko_Stop",
+                "X-Title": "FunkoBot"
+            }
             payload = {
-                "model": "gpt-4o-mini",
+                "model": "meta-llama/llama-3.1-8b-instruct:free",
                 "messages": [
                     {"role": "system", "content": prompt},
-                    {"role": "user", "content": html[:35000]} # truncate
+                    {"role": "user", "content": html[:20000]} # truncate
                 ],
                 "response_format": {"type": "json_object"}
             }
-            async with session.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=30) as resp:
+            async with session.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=30) as resp:
                 ai_data = await resp.json()
                 if "error" in ai_data:
                     await message.answer(f"❌ Ошибка ИИ: {ai_data['error']['message']}")
