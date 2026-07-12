@@ -708,12 +708,16 @@ async def handle_link(message: Message, state: FSMContext):
         
     try:
         scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url}&country_code=us&render=true"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(scraper_url, timeout=40) as resp:
+        timeout = aiohttp.ClientTimeout(total=80)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(scraper_url) as resp:
                 if resp.status != 200:
                     await message.answer(f"❌ Ошибка парсера: {resp.status}")
                     return
                 html = await resp.text()
+    except asyncio.TimeoutError:
+        await message.answer("❌ Ошибка: Сайт загружался слишком долго (более 80 секунд) и парсер отменил запрос. Попробуйте еще раз.")
+        return
     except Exception as e:
         await message.answer(f"❌ Ошибка загрузки страницы: {e}")
         return
