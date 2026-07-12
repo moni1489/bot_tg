@@ -717,6 +717,10 @@ async def handle_link(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer(f"❌ Ошибка загрузки страницы: {e}")
         return
+        
+    # Убираем лишний код (скрипты и стили), чтобы сэкономить лимиты (токены) бесплатного Groq
+    clean_html = re.sub(r'<script.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+    clean_html = re.sub(r'<style.*?</style>', '', clean_html, flags=re.DOTALL | re.IGNORECASE)
 
     prompt = """
     Analyze the following HTML of a product page (e.g. eBay, Funko, Mercari). 
@@ -742,7 +746,7 @@ async def handle_link(message: Message, state: FSMContext):
                 "model": "llama-3.1-8b-instant",
                 "messages": [
                     {"role": "system", "content": prompt},
-                    {"role": "user", "content": html[:20000]} # truncate
+                    {"role": "user", "content": clean_html[:15000]} # truncate
                 ],
                 "response_format": {"type": "json_object"}
             }
