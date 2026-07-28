@@ -434,18 +434,58 @@ async function syncOpenedCard(seriesSlug, cardIndex) {
 function renderCollection() {
     seriesContainer.innerHTML = '';
     let totalCollected = 0;
+    
+    // Calculate total first
+    SERIES_CONFIG.forEach(series => {
+        series.cards.forEach(card => {
+            const cardKey = `${series.slug}_${card.index}`;
+            if (userCards[cardKey] > 0) totalCollected++;
+        });
+    });
+
+    // Update global header stats
+    const totalCards = SERIES_CONFIG.length * 4;
+    const missing = totalCards - totalCollected;
+    let totalDupes = 0;
+    Object.values(userCards).forEach(count => {
+        if (count > 1) totalDupes += (count - 1);
+    });
+
+    // We can inject stats right above the container
+    const statsHtml = `
+        <div class="collection-stats">
+            <div class="stat-box">
+                <span class="stat-val">${totalCards}</span>
+                <span class="stat-label">ВСЕГО</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-val" style="color:#00ff88;">${totalCollected}</span>
+                <span class="stat-label">СОБРАНО</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-val" style="color:var(--neon-red);">${missing}</span>
+                <span class="stat-label">ОТСУТСТВУЕТ</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-val">${totalDupes}</span>
+                <span class="stat-label">ДУБЛИКАТЫ</span>
+            </div>
+        </div>
+        <br>
+    `;
+    seriesContainer.innerHTML = statsHtml;
 
     SERIES_CONFIG.forEach(series => {
         let seriesCollectedCount = 0;
-
+        
         const seriesBlock = document.createElement('div');
         seriesBlock.className = 'series-card-block';
 
         const titleRow = document.createElement('div');
         titleRow.className = 'series-title-row';
 
-        const grid = document.createElement('div');
-        grid.className = 'cards-grid-4';
+        const listView = document.createElement('div');
+        listView.className = 'cards-list-view';
 
         series.cards.forEach(card => {
             const cardKey = `${series.slug}_${card.index}`;
@@ -454,24 +494,25 @@ function renderCollection() {
 
             if (isCollected) {
                 seriesCollectedCount++;
-                totalCollected++;
             }
 
-            const slot = document.createElement('div');
-            slot.className = `slot-card ${isCollected ? 'collected' : ''}`;
+            const listItem = document.createElement('div');
+            listItem.className = 'card-list-item';
+            
+            const leftCol = document.createElement('div');
+            leftCol.className = 'card-item-left';
+            leftCol.innerHTML = `
+                <span class="card-check">${isCollected ? '✅' : '❌'}</span>
+                <span class="card-item-name" style="color: ${isCollected ? '#fff' : '#666'}">${card.name}</span>
+            `;
 
-            if (isCollected) {
-                slot.innerHTML = `
-                    <img src="${card.img}" alt="${card.name}">
-                    ${count > 1 ? `<span class="duplicate-count-tag">x${count}</span>` : ''}
-                `;
-            } else {
-                slot.innerHTML = `
-                    <div style="font-size:0.5rem; color:#666; text-align:center; padding: 4px;">${card.name}</div>
-                `;
-            }
+            const rightCol = document.createElement('div');
+            rightCol.className = `card-item-right ${count > 1 ? 'has-dupes' : ''}`;
+            rightCol.textContent = isCollected ? `${count} шт.` : '0 шт.';
 
-            grid.appendChild(slot);
+            listItem.appendChild(leftCol);
+            listItem.appendChild(rightCol);
+            listView.appendChild(listItem);
         });
 
         titleRow.innerHTML = `
@@ -480,11 +521,11 @@ function renderCollection() {
         `;
 
         seriesBlock.appendChild(titleRow);
-        seriesBlock.appendChild(grid);
+        seriesBlock.appendChild(listView);
         seriesContainer.appendChild(seriesBlock);
     });
 
-    totalProgressText.textContent = `Собрано: ${totalCollected} / 28`;
+    totalProgressText.textContent = ``;
 }
 
 initApp();
