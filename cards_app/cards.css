@@ -18,6 +18,11 @@
     -webkit-user-select: none;
 }
 
+/* Hide scrollbars globally to prevent white scrollbars on Desktop/Web */
+::-webkit-scrollbar {
+    display: none;
+}
+
 body {
     background-color: var(--bg-black);
     color: var(--text-white);
@@ -27,6 +32,9 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    /* Hide scrollbars on body */
+    -ms-overflow-style: none; 
+    scrollbar-width: none;
 }
 
 /* Phone Bezel Simulator / Main Container */
@@ -50,23 +58,34 @@ body {
 /* Header */
 .app-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    padding: 16px 20px;
+    padding: 20px 20px 10px 20px;
     background: transparent;
-    border-bottom: 1px solid var(--neon-red);
     position: relative;
     z-index: 100;
 }
 
-.header-logo-img {
-    height: 40px;
+.header-logo-obj {
+    height: 50px;
+    width: auto;
     object-fit: contain;
 }
 
-.header-icons {
+.fallback-logo {
     display: flex;
-    gap: 12px;
+    flex-direction: column;
+    align-items: center;
+    font-weight: 900;
+    font-size: 1.2rem;
+    color: #fff;
+    border: 2px solid var(--text-white);
+    padding: 5px 15px;
+    border-radius: 10px;
+}
+
+.fallback-logo .stop-badge {
+    color: var(--neon-red);
 }
 
 /* Floating Daily Gift */
@@ -121,8 +140,10 @@ body {
     flex-grow: 1;
     padding: 16px;
     animation: fadeIn 0.25s ease;
-    overflow-y: auto;
-    padding-bottom: 80px; /* Space for bottom nav */
+    overflow-y: scroll; /* allow scrolling inside */
+    padding-bottom: 90px; /* Space for bottom nav */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
 .tab-view.active {
@@ -189,9 +210,10 @@ body {
     background: radial-gradient(circle at center, #1a0005 0%, #000000 100%);
 }
 
-.pack-logo-img {
-    height: 60px;
-    object-fit: contain;
+.pack-logo-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .pack-badge {
@@ -395,12 +417,6 @@ body {
     flex-direction: column;
 }
 
-.card-back-logo {
-    height: 90px;
-    object-fit: contain;
-    margin-bottom: 8px;
-}
-
 .card-back-pattern {
     text-align: center;
     font-weight: 900;
@@ -470,21 +486,44 @@ body {
 
 /* Collection Album */
 .collection-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 20px;
+    text-align: center;
 }
 
-.total-progress {
-    font-size: 0.9rem;
-    color: var(--neon-red);
-    font-weight: 800;
+.collection-header h2 {
+    color: var(--text-white);
+    margin-bottom: 10px;
+}
+
+.collection-stats {
+    display: flex;
+    justify-content: space-around;
+    background: var(--neon-red-dim);
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid var(--neon-red);
+}
+
+.stat-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-val {
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: var(--text-white);
+}
+
+.stat-label {
+    font-size: 0.6rem;
+    color: var(--text-muted);
 }
 
 .series-card-block {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--neon-red-dim);
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.1);
     border-radius: 16px;
     padding: 16px;
     margin-bottom: 16px;
@@ -511,46 +550,44 @@ body {
     border-radius: 10px;
 }
 
-.cards-grid-4 {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+.cards-list-view {
+    display: flex;
+    flex-direction: column;
     gap: 8px;
 }
 
-.slot-card {
-    aspect-ratio: 2/3;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.02);
-    border: 1px dashed rgba(255,255,255,0.2);
+.card-list-item {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-}
-
-.slot-card.collected {
-    border: 1px solid var(--neon-red);
-    background: #0a0002;
-}
-
-.slot-card img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.duplicate-count-tag {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    background: var(--neon-red);
-    color: #fff;
-    font-size: 0.6rem;
-    font-weight: 900;
-    padding: 2px 6px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.05);
     border-radius: 8px;
+}
+
+.card-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.card-check {
+    font-size: 1rem;
+}
+
+.card-item-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.card-item-right {
+    font-size: 0.8rem;
+    font-weight: 900;
+    color: var(--text-muted);
+}
+
+.card-item-right.has-dupes {
+    color: var(--neon-red);
 }
 
 /* Tasks & Ref Box */
@@ -635,13 +672,14 @@ body {
     left: 0;
     width: 100%;
     height: 70px;
-    background: #000;
+    background: var(--bg-black);
     border-top: 1px solid var(--neon-red);
     display: flex;
     justify-content: space-around;
     align-items: center;
     border-radius: 0 0 20px 20px;
     padding-bottom: 10px;
+    z-index: 100;
 }
 
 .nav-btn {
