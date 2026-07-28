@@ -68,11 +68,20 @@ async def get_card_profile(request):
         cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
         user_cards = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in cards_rows}
         
+        bot_username = "Funko_Stop_bot"
+        try:
+            bot_info = await bot.get_me()
+            if bot_info and bot_info.username:
+                bot_username = bot_info.username
+        except Exception:
+            pass
+
         return web.json_response({
             "packs_count": packs_count,
             "last_daily_pack": last_daily,
             "user_cards": user_cards,
-            "completed_tasks": completed_tasks
+            "completed_tasks": completed_tasks,
+            "bot_username": bot_username
         })
 
 async def claim_task_reward(request):
@@ -99,7 +108,8 @@ async def claim_task_reward(request):
                 return web.json_response({"success": False, "message": "Задание уже выполнено"})
                 
             completed.append(task_id)
-            new_count = user["packs_count"] + 1
+            reward_count = 3 if task_id == 'order_2000' else 1
+            new_count = user["packs_count"] + reward_count
             
             await db.execute(
                 "UPDATE card_users SET packs_count = $1, completed_tasks = $2 WHERE telegram_id = $3", 
