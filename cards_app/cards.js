@@ -2,6 +2,8 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
     tg.expand();
     tg.ready();
+    tg.setHeaderColor('#000000');
+    tg.setBackgroundColor('#000000');
 }
 
 // User state
@@ -9,13 +11,15 @@ let userData = {
     telegram_id: tg?.initDataUnsafe?.user?.id || 12345678,
     first_name: tg?.initDataUnsafe?.user?.first_name || 'Игрок',
     username: tg?.initDataUnsafe?.user?.username || 'player',
-    packs_count: 3,
+    packs_count: 5,
     last_daily_pack: null,
+    completed_tasks: [],
     ref_code: 'ref_' + (tg?.initDataUnsafe?.user?.id || 12345678)
 };
 
-let userCards = {}; // { "breaking_bad_1": 2, ... }
+let userCards = {}; 
 let isOpening = false;
+let dailyTimerInterval = null;
 
 // 7 Series Configurations
 const SERIES_CONFIG = [
@@ -109,11 +113,15 @@ const seriesContainer = document.getElementById('series-container');
 const totalProgressText = document.getElementById('total-progress-text');
 const refLinkInput = document.getElementById('ref-link-input');
 const copyRefBtn = document.getElementById('copy-ref-btn');
+const dailyGiftBtn = document.getElementById('daily-gift-btn');
+const dailyTimer = document.getElementById('daily-timer');
 
 // Init
 async function initApp() {
     setupNavigation();
     setupRefLink();
+    setupDailyPackButton();
+    setupTasks();
     await fetchProfile();
     renderCollection();
     updateUI();
@@ -126,6 +134,7 @@ function updateUI() {
     } else {
         openPackBtn.style.opacity = '1';
     }
+    updateTaskButtons();
 }
 
 function setupNavigation() {
@@ -147,10 +156,162 @@ function setupRefLink() {
     if (copyRefBtn) {
         copyRefBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(link);
-            copyRefBtn.textContent = 'Скопировано!';
+            copyRefBtn.textContent = 'Скопировано';
             setTimeout(() => copyRefBtn.textContent = 'Копировать', 2000);
         });
     }
+}
+
+// Tasks System
+function setupTasks() {
+    document.querySelectorAll('.btn-task[data-task]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (btn.classList.contains('completed')) return;
+            
+            const taskId = btn.getAttribute('data-task');
+            
+            // Simulating redirection for Telegram Sub
+            if (taskId === 'tg_sub') {
+                window.open('https://t.me/Funko_Stop', '_blank');
+            }
+            
+            try {
+                const res = await fetch('/api/cards/tasks/claim', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegram_id: userData.telegram_id, task_id: taskId })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    userData.packs_count = data.packs_count;
+                    userData.completed_tasks = data.completed_tasks;
+                    updateUI();
+                    
+                    if (window.confetti) {
+                        confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
+                    }
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                console.error("Task claim error", e);
+                // Fallback offline simulation
+                userData.packs_count++;
+                userData.completed_tasks.push(taskId);
+                updateUI();
+            }
+        });
+    });
+}
+
+function updateTaskButtons() {
+    document.querySelectorAll('.btn-task[data-task]').forEach(btn => {
+        const taskId = btn.getAttribute('data-task');
+        if (userData.completed_tasks.includes(taskId)) {
+            btn.textContent = 'ВЫПОЛНЕНО';
+            btn.classList.add('completed');
+        }
+    });
+}
+
+// Daily Pack Claiming
+function setupDailyPackButton() {
+    if (!dailyGiftBtn) return;
+    
+    // Check click on the floating button, navigate to tasks instead if user wants?
+    // Wait, the user said "кнопку чтобы перекидывало на задания", but for the actual daily gift:
+    dailyGiftBtn.addEventListener('click', async () => {
+        
+        // Let's check if it's ready first
+        const isReady = dailyTimer.textContent === "ГОТОВО";
+        if (!isReady) {
+            // Navigate to tasks tab when clicked and not ready
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
+            
+            const tasksNavBtn = document.querySelector('.nav-btn[data-target="view-community"]');
+            if (tasksNavBtn) tasksNavBtn.classList.add('active');
+            document.getElementById('view-community').classList.remove('hidden');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/cards/claim_daily', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegram_id: userData.telegram_id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                userData.packs_count = data.packs_count;
+                userData.last_daily_pack = new Date().toISOString();
+                updateUI();
+                startDailyCountdown(86400);
+                
+                if (window.confetti) {
+                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.5 } });
+                }
+            } else {
+                if (data.seconds_left) {
+                    startDailyCountdown(data.seconds_left);
+                }
+                alert(data.message || "Ежедневный пак пока недоступен.");
+            }
+        } catch (e) {
+            // Local fallback simulation
+            userData.packs_count++;
+            userData.last_daily_pack = new Date().toISOString();
+            updateUI();
+            startDailyCountdown(86400);
+        }
+    });
+}
+
+function checkDailyTimer() {
+    if (!userData.last_daily_pack) {
+        dailyTimer.textContent = "ГОТОВО";
+        dailyTimer.style.color = "#00ff88";
+        dailyTimer.style.borderColor = "#00ff88";
+        return;
+    }
+
+    const last = new Date(userData.last_daily_pack).getTime();
+    const now = new Date().getTime();
+    const diffSeconds = Math.floor((now - last) / 1000);
+
+    if (diffSeconds >= 86400) {
+        dailyTimer.textContent = "ГОТОВО";
+        dailyTimer.style.color = "#00ff88";
+        dailyTimer.style.borderColor = "#00ff88";
+    } else {
+        startDailyCountdown(86400 - diffSeconds);
+    }
+}
+
+function startDailyCountdown(secondsLeft) {
+    if (dailyTimerInterval) clearInterval(dailyTimerInterval);
+
+    dailyTimer.style.color = "#ff0022";
+    dailyTimer.style.borderColor = "#ff0022";
+
+    function tick() {
+        if (secondsLeft <= 0) {
+            clearInterval(dailyTimerInterval);
+            dailyTimer.textContent = "ГОТОВО";
+            dailyTimer.style.color = "#00ff88";
+            dailyTimer.style.borderColor = "#00ff88";
+            return;
+        }
+        const h = Math.floor(secondsLeft / 3600).toString().padStart(2, '0');
+        const m = Math.floor((secondsLeft % 3600) / 60).toString().padStart(2, '0');
+        const s = (secondsLeft % 60).toString().padStart(2, '0');
+        dailyTimer.textContent = `${h}:${m}:${s}`;
+        secondsLeft--;
+    }
+
+    tick();
+    dailyTimerInterval = setInterval(tick, 1000);
 }
 
 // API Calls
@@ -160,14 +321,19 @@ async function fetchProfile() {
         if (res.ok) {
             const data = await res.json();
             userData.packs_count = data.packs_count;
+            userData.last_daily_pack = data.last_daily_pack;
             userCards = data.user_cards || {};
+            userData.completed_tasks = data.completed_tasks || [];
+            checkDailyTimer();
+            updateUI();
         }
     } catch (e) {
         console.log("Using default profile");
+        checkDailyTimer();
     }
 }
 
-// Roll Card (Drop Rates: Common 60%, Rare 25%, Epic 12%, Legendary 3%)
+// Roll Card
 function rollRandomCard() {
     const rand = Math.random() * 100;
     let selectedRarity = 'common';
@@ -176,7 +342,6 @@ function rollRandomCard() {
     else if (rand <= 40) selectedRarity = 'rare';
     else selectedRarity = 'common';
 
-    // Filter matching cards across all series
     const matching = [];
     SERIES_CONFIG.forEach(s => {
         s.cards.forEach(c => {
@@ -186,15 +351,14 @@ function rollRandomCard() {
         });
     });
 
-    const chosen = matching[Math.floor(Math.random() * matching.length)];
-    return chosen;
+    return matching[Math.floor(Math.random() * matching.length)];
 }
 
 // Pack Opening Flow
 openPackBtn.addEventListener('click', async () => {
     if (isOpening) return;
     if (userData.packs_count <= 0) {
-        alert("У вас закончились паки! Выполняйте задания или приглашайте друзей.");
+        alert("У вас закончились паки! Заберите ежедневный пак или выполняйте задания.");
         return;
     }
 
@@ -202,7 +366,6 @@ openPackBtn.addEventListener('click', async () => {
     userData.packs_count--;
     updateUI();
 
-    // 1. Shake Pack
     boosterPack.classList.add('shaking');
     cardStage.classList.add('hidden');
     card3d.classList.remove('flipped');
@@ -212,12 +375,10 @@ openPackBtn.addEventListener('click', async () => {
         boosterPack.classList.add('hidden');
         cardStage.classList.remove('hidden');
 
-        // Roll card
         const drop = rollRandomCard();
         const cardKey = `${drop.series.slug}_${drop.card.index}`;
         userCards[cardKey] = (userCards[cardKey] || 0) + 1;
 
-        // Render front of card
         cardFront.innerHTML = `
             <div class="card-frame ${drop.series.theme}">
                 <div class="card-series-tag">${drop.series.name}</div>
@@ -227,11 +388,9 @@ openPackBtn.addEventListener('click', async () => {
             </div>
         `;
 
-        // 2. Flip 3D Card
         setTimeout(() => {
             card3d.classList.add('flipped');
 
-            // Fire confetti
             if (window.confetti) {
                 confetti({
                     particleCount: drop.card.rarity === 'legendary' ? 120 : 60,
@@ -240,10 +399,8 @@ openPackBtn.addEventListener('click', async () => {
                 });
             }
 
-            // Sync with backend
             syncOpenedCard(drop.series.slug, drop.card.index);
 
-            // Re-enable button after 2.5s
             setTimeout(() => {
                 isOpening = false;
                 boosterPack.classList.remove('hidden');
@@ -273,7 +430,7 @@ async function syncOpenedCard(seriesSlug, cardIndex) {
     }
 }
 
-// Render Collection (7 Series)
+// Render Collection
 function renderCollection() {
     seriesContainer.innerHTML = '';
     let totalCollected = 0;
@@ -310,8 +467,7 @@ function renderCollection() {
                 `;
             } else {
                 slot.innerHTML = `
-                    <div style="font-size:1.2rem; opacity:0.3;">🔒</div>
-                    <div style="font-size:0.55rem; color:#888; text-align:center; margin-top:4px;">${card.name}</div>
+                    <div style="font-size:0.5rem; color:#666; text-align:center; padding: 4px;">${card.name}</div>
                 `;
             }
 
@@ -320,7 +476,7 @@ function renderCollection() {
 
         titleRow.innerHTML = `
             <div class="series-name">${series.name}</div>
-            <div class="series-progress">${seriesCollectedCount} / 4 ${seriesCollectedCount === 4 ? '✅' : ''}</div>
+            <div class="series-progress">${seriesCollectedCount} / 4</div>
         `;
 
         seriesBlock.appendChild(titleRow);
