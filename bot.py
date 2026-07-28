@@ -68,7 +68,7 @@ async def get_card_profile(request):
         cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
         user_cards = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in cards_rows}
         
-        bot_username = "Funko_Stop_bot"
+        bot_username = "funkostop_bot"
         try:
             bot_info = await bot.get_me()
             if bot_info and bot_info.username:
@@ -420,6 +420,7 @@ async def unarchive_order_db(order_id: int):
 def get_start_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
+            [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=WEBAPP_URL))],
             [KeyboardButton(text="🧮 Калькулятор стоимости")],
             [KeyboardButton(text="📦 Отследить заказы"), KeyboardButton(text="🗃 Архив заказов")]
         ],
