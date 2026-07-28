@@ -174,7 +174,7 @@ async def health_check(request):
 
 async def start_webserver():
     # Copy official logo if present
-    logo_src = r"C:\Users\kraie\.gemini\antigravity-ide\brain\e27b6ef9-e81b-4a8e-980a-b4b4d8458b05\media__1785222632530.png"
+    logo_src = r"C:\Users\kraie\.gemini\antigravity-ide\brain\e27b6ef9-e81b-4a8e-980a-b4b4d8458b05\media__1785225617410.png"
     logo_dst = os.path.join(cards_dir, "logo.png")
     if os.path.exists(logo_src):
         try:
@@ -506,15 +506,19 @@ async def start_handler(message: Message, state: FSMContext):
 
 @router.message(Command("give_packs"))
 async def give_packs_cmd(message: Message):
-    if not await is_admin(message.from_user.id):
-        return
     args = message.text.split()
-    if len(args) < 3:
-        await message.answer("⚠️ Использование: `/give_packs [telegram_id] [количество]`\nПример: `/give_packs 1048534605 10`", parse_mode="Markdown")
-        return
-    try:
+    if len(args) == 2:
+        # /give_packs 10 -> gives 10 packs to current user
+        target_id = message.from_user.id
+        count = int(args[1])
+    elif len(args) >= 3:
+        # /give_packs [id] [count]
         target_id = int(args[1])
         count = int(args[2])
+    else:
+        await message.answer("⚠️ Использование: `/give_packs 10` (выдать себе 10 паков)\nИли `/give_packs 123456 10` (выдать другому)", parse_mode="Markdown")
+        return
+    try:
         async with pool.acquire() as db:
             await db.execute("""
                 INSERT INTO card_users (telegram_id, packs_count)
