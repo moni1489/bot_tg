@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/cards/cards.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
@@ -17,54 +17,46 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
-                <div class="menu-icon">
-                    <span></span><span></span><span></span>
-                </div>
+                <!-- Hamburger Icon -->
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
             </div>
             <div class="header-center">
-                <div class="brand-logo">
-                    <span class="crown-mini">👑</span>
-                    <span class="logo-funko">Funko</span>
-                    <span class="logo-stop">STOP</span>
-                </div>
+                <img src="/cards/logo.png" class="header-logo-img" alt="FunkoStop" onerror="this.style.display='none'">
             </div>
             <div class="header-right">
-                <div class="header-icon crown-icon">👑</div>
-                <div class="header-icon gift-icon">🎁</div>
+                <!-- Crown and Gift icons -->
+                <div class="header-icons">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff0022" stroke-width="2" stroke-linejoin="round"><path d="M2 20h20M4 20l2-13 4 4 2-8 2 8 4-4 2 13"/></svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><rect x="3" y="8" width="18" height="14" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="22"></line><path d="M12 8H8a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2h0c1.1 0 2 .9 2 2v0c0 1.1.9 2 2 2z"></path><path d="M12 8h4a2 2 0 0 0 2-2v0a2 2 0 0 0-2-2h0c-1.1 0-2 .9-2 2v0c0 1.1-.9 2-2 2z"></path></svg>
+                </div>
             </div>
         </header>
 
+        <!-- Floating Daily Gift Tab (Right Side) -->
+        <div class="daily-gift-floating" id="daily-gift-btn">
+            <svg class="daily-gift-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff0022" stroke-width="2" stroke-linejoin="round"><rect x="3" y="8" width="18" height="14" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="22"></line><path d="M12 8H8a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2h0c1.1 0 2 .9 2 2v0c0 1.1.9 2 2 2z"></path><path d="M12 8h4a2 2 0 0 0 2-2v0a2 2 0 0 0-2-2h0c-1.1 0-2 .9-2 2v0c0 1.1-.9 2-2 2z"></path></svg>
+            <div class="daily-gift-text">ЕЖЕДНЕВНЫЙ<br>ПОДАРОК</div>
+            <div class="daily-gift-timer" id="daily-timer">00:00:00</div>
+        </div>
+
         <!-- MAIN VIEW (Pack Opening) -->
         <main id="view-home" class="tab-view active">
-            <!-- Side Daily Pack Widget -->
-            <div class="daily-widget-wrapper">
-                <div class="daily-widget" id="daily-gift-btn">
-                    <div class="gift-box-icon">🎁</div>
-                    <div class="widget-title">ЕЖЕДНЕВНЫЙ ПОДАРОК</div>
-                    <div class="widget-timer" id="daily-timer">00:00:00</div>
-                </div>
-            </div>
-
+            
             <!-- Pack Area -->
             <div class="pack-stage">
-                <div class="pack-crown-glow">👑</div>
                 <div class="booster-pack-wrapper" id="booster-pack">
                     <div class="booster-pack-inner">
-                        <div class="pack-top-teeth"></div>
+                        <img src="/cards/logo.png" class="pack-logo-img" alt="FunkoStop Logo">
                         <div class="pack-badge">1 RANDOM CARD</div>
-                        <div class="pack-logo-group">
-                            <div class="pack-funko-text">Funko</div>
-                            <div class="pack-stop-badge">STOP</div>
-                        </div>
                         <div class="pack-character-silhouette">
-                            <div class="silhouette-crown">👑</div>
+                            <svg class="crown-icon" viewBox="0 0 24 24" fill="none" stroke="#ff0022" stroke-width="2" stroke-linejoin="round"><path d="M2 20h20M4 20l2-13 4 4 2-8 2 8 4-4 2 13"/></svg>
                             <div class="silhouette-head">
                                 <span class="question-mark">?</span>
                             </div>
                             <div class="silhouette-body"></div>
                         </div>
                         <div class="pack-footer-badge">
-                            <span class="reward-crown">👑</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff0022" stroke-width="2" stroke-linejoin="round"><path d="M2 20h20M4 20l2-13 4 4 2-8 2 8 4-4 2 13"/></svg>
                             <span>GUARANTEED REWARD</span>
                         </div>
                     </div>
@@ -75,8 +67,8 @@
                     <div class="card-3d-wrapper" id="card-3d">
                         <div class="card-face card-back">
                             <div class="card-back-pattern">
-                                <span>👑</span>
-                                <div>Funko STOP</div>
+                                <img src="/cards/logo.png" class="card-back-logo" alt="Logo">
+                                <div>FunkoSTOP</div>
                             </div>
                         </div>
                         <div class="card-face card-front" id="card-front">
@@ -88,30 +80,40 @@
 
             <!-- Main Action Button -->
             <div class="action-section">
-                <button id="open-pack-btn" class="btn-neon-red">
-                    <span id="btn-text">ОТКРЫТЬ</span>
-                    <span class="packs-counter-badge" id="packs-count-badge">3</span>
+                <button id="open-pack-btn" class="btn-neon-open">
+                    ОТКРЫТЬ
+                    <span class="packs-counter-badge" id="packs-count-badge">5</span>
                 </button>
             </div>
 
             <!-- What's Inside Block -->
             <div class="whats-inside-block">
-                <div class="inside-title">ЧТО ВНУТРИ?</div>
+                <div class="inside-title-line">
+                    <span>ЧТО ВНУТРИ?</span>
+                </div>
                 <div class="inside-grid">
                     <div class="inside-item">
-                        <div class="item-icon">🎴</div>
+                        <div class="item-icon-box">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M8 6h8M8 10h8M8 14h4"/></svg>
+                        </div>
                         <div class="item-label">КАРТОЧКА</div>
                     </div>
                     <div class="inside-item">
-                        <div class="item-icon">🏷️</div>
+                        <div class="item-icon-box">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><path d="M19 5L5 19M19 19L5 5"/></svg>
+                        </div>
                         <div class="item-label">СКИДКА</div>
                     </div>
                     <div class="inside-item">
-                        <div class="item-icon">🎁</div>
+                        <div class="item-icon-box">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><rect x="3" y="8" width="18" height="14" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="22"></line><path d="M12 8H8a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2h0c1.1 0 2 .9 2 2v0c0 1.1.9 2 2 2z"></path><path d="M12 8h4a2 2 0 0 0 2-2v0a2 2 0 0 0-2-2h0c-1.1 0-2 .9-2 2v0c0 1.1-.9 2-2 2z"></path></svg>
+                        </div>
                         <div class="item-label">БОНУСНЫЙ ПАК</div>
                     </div>
                     <div class="inside-item">
-                        <div class="item-icon">🧸</div>
+                        <div class="item-icon-box">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><circle cx="12" cy="8" r="4"></circle><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"></path></svg>
+                        </div>
                         <div class="item-label">ФИГУРКА</div>
                     </div>
                 </div>
@@ -121,7 +123,7 @@
         <!-- COLLECTION VIEW -->
         <main id="view-collection" class="tab-view hidden">
             <div class="collection-header">
-                <h2>Коллекция карточек</h2>
+                <h2>КОЛЛЕКЦИЯ</h2>
                 <div class="total-progress" id="total-progress-text">Собрано: 0 / 28</div>
             </div>
             
@@ -133,27 +135,36 @@
         <!-- TASKS & REFS VIEW -->
         <main id="view-community" class="tab-view hidden">
             <div class="community-section">
-                <h2>Задания & Награды</h2>
-                <p class="section-desc">Выполняйте задания и приглашайте друзей, чтобы получать дополнительные паки!</p>
+                <h2>ЗАДАНИЯ И НАГРАДЫ</h2>
+                <p class="section-desc">Выполняйте задания и приглашайте друзей для получения дополнительных паков!</p>
 
                 <!-- Ref Link Box -->
-                <div class="ref-box">
-                    <h3>🤝 Пригласи друга</h3>
-                    <p>Получите **+1 пак** за каждого приглашенного друга!</p>
-                    <div class="ref-link-row">
-                        <input type="text" id="ref-link-input" readonly value="https://t.me/Funko_Stop_bot">
-                        <button id="copy-ref-btn" class="btn-small">Копировать</button>
+                <div class="task-card">
+                    <div class="task-info">
+                        <h4>👥 Пригласить друга</h4>
+                        <span class="task-reward">+1 пак (вам и другу)</span>
+                        <div class="ref-link-row">
+                            <input type="text" id="ref-link-input" readonly value="https://t.me/Funko_Stop_bot">
+                        </div>
                     </div>
+                    <button id="copy-ref-btn" class="btn-task btn-ref-copy">Копировать</button>
                 </div>
 
                 <!-- Tasks List -->
                 <div class="tasks-list" id="tasks-container">
                     <div class="task-card">
                         <div class="task-info">
-                            <h4>📢 Подписаться на Telegram-канал</h4>
+                            <h4>✈️ Подписаться на Telegram</h4>
                             <span class="task-reward">+1 пак</span>
                         </div>
-                        <button class="btn-task" id="task-tg-btn">Выполнить</button>
+                        <button class="btn-task" id="task-tg-btn" data-task="tg_sub">Выполнить</button>
+                    </div>
+                    <div class="task-card">
+                        <div class="task-info">
+                            <h4>🔔 Подписаться на новости</h4>
+                            <span class="task-reward">+1 пак</span>
+                        </div>
+                        <button class="btn-task" id="task-news-btn" data-task="news_sub">Выполнить</button>
                     </div>
                 </div>
             </div>
@@ -162,16 +173,16 @@
         <!-- Bottom Navigation Bar -->
         <nav class="bottom-nav">
             <button class="nav-btn active" data-target="view-home">
-                <span class="nav-icon">🏠</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                 <span class="nav-label">ГЛАВНАЯ</span>
             </button>
             <button class="nav-btn" data-target="view-collection">
-                <span class="nav-icon">🎴</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="16" y1="14" x2="16" y2="14.01"></line></svg>
                 <span class="nav-label">КОЛЛЕКЦИЯ</span>
             </button>
             <button class="nav-btn" data-target="view-community">
-                <span class="nav-icon">👥</span>
-                <span class="nav-label">СООБЩЕСТВО</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <span class="nav-label">ЗАДАНИЯ</span>
             </button>
         </nav>
     </div>
