@@ -50,20 +50,95 @@ async def get_card_profile(request):
         return web.json_response({"error": "tg_id missing"}, status=400)
     
     async with pool.acquire() as db:
-        user = await db.fetchrow("SELECT packs_count, last_daily_pack FROM card_users WHERE telegram_id = $1", tg_id)
+        user = await db.fetchrow("SELECT packs_count, last_daily_pack, completed_tasks FROM card_users WHERE telegram_id = $1", tg_id)
         if not user:
-            await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 3) ON CONFLICT DO NOTHING", tg_id)
-            packs_count = 3
+            # Give 5 starting free packs
+            await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 5) ON CONFLICT DO NOTHING", tg_id)
+            packs_count = 5
+            last_daily = None
+            completed_tasks = []
         else:
             packs_count = user["packs_count"]
+            last_daily = user["last_daily_pack"].isoformat() if user["last_daily_pack"] else None
+            try:
+                completed_tasks = json.loads(user["completed_tasks"] or "[]")
+            except Exception:
+                completed_tasks = []
             
         cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
         user_cards = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in cards_rows}
         
         return web.json_response({
             "packs_count": packs_count,
-            "user_cards": user_cards
+            "last_daily_pack": last_daily,
+            "user_cards": user_cards,
+            "completed_tasks": completed_tasks
         })
+
+async def claim_task_reward(request):
+    try:
+        body = await request.json()
+        tg_id = int(body.get("telegram_id", 0))
+        task_id = body.get("task_id")
+        
+        if not tg_id or not task_id:
+            return web.json_response({"error": "Invalid params"}, status=400)
+            
+        async with pool.acquire() as db:
+            user = await db.fetchrow("SELECT packs_count, completed_tasks FROM card_users WHERE telegram_id = $1", tg_id)
+            if not user:
+                return web.json_response({"error": "User not found"}, status=404)
+                
+            completed = []
+            try:
+                completed = json.loads(user["completed_tasks"] or "[]")
+            except:
+                pass
+                
+            if task_id in completed:
+                return web.json_response({"success": False, "message": "Задание уже выполнено"})
+                
+            completed.append(task_id)
+            new_count = user["packs_count"] + 1
+            
+            await db.execute(
+                "UPDATE card_users SET packs_count = $1, completed_tasks = $2 WHERE telegram_id = $3", 
+                new_count, json.dumps(completed), tg_id
+            )
+            return web.json_response({"success": True, "packs_count": new_count, "completed_tasks": completed})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def claim_daily_pack(request):
+    try:
+        body = await request.json()
+        tg_id = int(body.get("telegram_id", 0))
+        if not tg_id:
+            return web.json_response({"error": "tg_id missing"}, status=400)
+            
+        async with pool.acquire() as db:
+            user = await db.fetchrow("SELECT packs_count, last_daily_pack FROM card_users WHERE telegram_id = $1", tg_id)
+            if not user:
+                await db.execute("INSERT INTO card_users (telegram_id, packs_count, last_daily_pack) VALUES ($1, 6, NOW())", tg_id)
+                return web.json_response({"success": True, "packs_count": 6})
+                
+            last_daily = user["last_daily_pack"]
+            now = datetime.utcnow()
+            
+            if last_daily and (now - last_daily).total_seconds() < 86400:
+                seconds_left = int(86400 - (now - last_daily).total_seconds())
+                return web.json_response({
+                    "success": False, 
+                    "message": "Ежедневный пак уже получен!", 
+                    "seconds_left": seconds_left,
+                    "packs_count": user["packs_count"]
+                })
+                
+            new_count = user["packs_count"] + 1
+            await db.execute("UPDATE card_users SET packs_count = $1, last_daily_pack = NOW() WHERE telegram_id = $2", new_count, tg_id)
+            return web.json_response({"success": True, "packs_count": new_count})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
 
 async def open_card_pack(request):
     try:
@@ -98,12 +173,24 @@ async def health_check(request):
     return web.Response(text="Bot & Cards Mini App is alive!")
 
 async def start_webserver():
+    # Copy official logo if present
+    logo_src = r"C:\Users\kraie\.gemini\antigravity-ide\brain\e27b6ef9-e81b-4a8e-980a-b4b4d8458b05\media__1785222632530.png"
+    logo_dst = os.path.join(cards_dir, "logo.png")
+    if os.path.exists(logo_src):
+        try:
+            import shutil
+            shutil.copy(logo_src, logo_dst)
+        except Exception:
+            pass
+
     app = web.Application()
     app.router.add_get('/', health_check)
     app.router.add_get('/cards', serve_cards_app)
     app.router.add_get('/cards/', serve_cards_app)
     app.router.add_get('/api/cards/profile', get_card_profile)
+    app.router.add_post('/api/cards/claim_daily', claim_daily_pack)
     app.router.add_post('/api/cards/open', open_card_pack)
+    app.router.add_post('/api/cards/tasks/claim', claim_task_reward)
     
     if os.path.exists(cards_dir):
         app.router.add_static('/cards', cards_dir)
@@ -194,9 +281,15 @@ async def init_db():
                 last_daily_pack TIMESTAMP,
                 ref_code TEXT,
                 referred_by BIGINT,
+                completed_tasks TEXT DEFAULT '[]',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        try:
+            await db.execute("ALTER TABLE card_users ADD COLUMN completed_tasks TEXT DEFAULT '[]'")
+        except asyncpg.exceptions.DuplicateColumnError:
+            pass
+        
         await db.execute("""
             CREATE TABLE IF NOT EXISTS user_cards (
                 telegram_id BIGINT,
@@ -394,9 +487,15 @@ async def start_handler(message: Message, state: FSMContext):
                 async with pool.acquire() as db:
                     existing = await db.fetchrow("SELECT telegram_id FROM card_users WHERE telegram_id = $1", message.from_user.id)
                     if not existing:
-                        await db.execute("INSERT INTO card_users (telegram_id, packs_count, referred_by) VALUES ($1, 4, $2)", message.from_user.id, inviter_id)
+                        # Give 5 base packs + 1 bonus pack = 6
+                        await db.execute("INSERT INTO card_users (telegram_id, packs_count, referred_by) VALUES ($1, 6, $2)", message.from_user.id, inviter_id)
+                        # Give +1 pack to inviter
                         await db.execute("UPDATE card_users SET packs_count = card_users.packs_count + 1 WHERE telegram_id = $1", inviter_id)
-                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный **+1 пак**!", parse_mode="Markdown")
+                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный **+1 пак** (Всего 6 стартовых паков)!", parse_mode="Markdown")
+                        try:
+                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислен **+1 пак**!", parse_mode="Markdown")
+                        except Exception:
+                            pass
         except Exception as e:
             logging.error(f"Ref error: {e}")
 
