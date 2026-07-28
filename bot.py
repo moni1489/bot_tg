@@ -786,7 +786,7 @@ async def handle_link(message: Message, state: FSMContext):
     )
 
     if weight is None:
-        await message.answer(f"📦 **{name}**\n💵 Цена: ${price} + Доставка США: ${shipping}\n\n⚖️ Вес товара не найден на странице.\nПожалуйста, напишите примерный вес товара в **кг** (например, 0.5):", parse_mode="Markdown")
+        await message.answer(f"📦 **{name}**\n💵 Цена: ${price}\n\n⚖️ Вес товара не найден на странице.\nПожалуйста, напишите примерный вес товара в **кг** (например, 0.5):", parse_mode="Markdown")
         await state.set_state(ParseLink.waiting_for_weight)
     else:
         await calculate_and_send_result(message, state, float(weight))
@@ -821,7 +821,7 @@ async def calculate_and_send_result(message: Message, state: FSMContext, weight:
     delivery_rf_rub = weight * 1200.0
     
     cbrf_rate = await get_usd_rate()
-    rate = cbrf_rate + 2.0
+    rate = cbrf_rate + 5.0
     
     total_usd = base_price + commission
     total_rub = (total_usd * rate) + delivery_rf_rub
@@ -834,10 +834,9 @@ async def calculate_and_send_result(message: Message, state: FSMContext, weight:
     
     response = f"📦 **{name}**\n\n"
     response += f"💵 Цена на сайте: ${price}\n"
-    response += f"🚚 Доставка по США: ${shipping}\n"
     response += f"⚖️ Вес: {weight} кг\n\n"
     response += f"💰 **Итого к оплате: ~{final_price_rub} ₽**\n"
-    response += f"_(Включая доставку в РФ и комиссию сервиса. Курс: {rate:.2f} ₽/$)_\n\n"
+    response += f"_(Включая доставку в РФ и комиссию сервиса)_\n\n"
     response += f"⚠️ Цена ориентировочная. Для точного расчета и оформления заказа напишите менеджеру."
     
     await message.answer(response, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=kb)
