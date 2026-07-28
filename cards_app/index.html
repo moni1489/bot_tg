@@ -14,15 +14,14 @@
 <body>
     <div class="app-container">
         
-        <!-- Header: Just the centered logo on black bg -->
+        <!-- Header: Centered logo on black bg -->
         <header class="app-header">
-            <!-- If the image logo.png is missing, this SVG fallback will show a nice FunkoStop text logo -->
-            <object data="/cards/logo.png" type="image/png" class="header-logo-obj">
-                <div class="fallback-logo">
-                    <span class="crown">👑</span>
-                    FUNKO<span class="stop-badge">STOP</span>
+            <div id="logo-container">
+                <img src="/cards/logo.png" class="header-logo-img" alt="FunkoStop" onerror="this.style.display='none'; document.getElementById('header-text-logo').style.display='flex';">
+                <div class="fallback-logo" id="header-text-logo" style="display: none;">
+                    <span>👑 FUNKO</span><span class="stop-badge">STOP</span>
                 </div>
-            </object>
+            </div>
         </header>
 
         <!-- Floating Daily Gift Tab (Right Side) -->
