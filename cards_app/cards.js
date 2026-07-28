@@ -6,15 +6,35 @@ if (tg) {
     tg.setBackgroundColor('#000000');
 }
 
+// Get user ID from Telegram WebApp, URL params, or generate unique localStorage ID
+function getEffectiveUserId() {
+    if (tg?.initDataUnsafe?.user?.id) {
+        return tg.initDataUnsafe.user.id;
+    }
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramId = urlParams.get('tg_id');
+    if (paramId) {
+        return parseInt(paramId, 10);
+    }
+    let localId = localStorage.getItem('funko_cards_uid');
+    if (!localId) {
+        localId = Math.floor(Math.random() * 89999999) + 10000000;
+        localStorage.setItem('funko_cards_uid', localId);
+    }
+    return parseInt(localId, 10);
+}
+
+const effectiveTgId = getEffectiveUserId();
+
 // User state
 let userData = {
-    telegram_id: tg?.initDataUnsafe?.user?.id || 12345678,
+    telegram_id: effectiveTgId,
     first_name: tg?.initDataUnsafe?.user?.first_name || 'Игрок',
     username: tg?.initDataUnsafe?.user?.username || 'player',
     packs_count: 5,
     last_daily_pack: null,
     completed_tasks: [],
-    ref_code: 'ref_' + (tg?.initDataUnsafe?.user?.id || 12345678)
+    ref_code: 'ref_' + effectiveTgId
 };
 
 let userCards = {}; 
@@ -167,7 +187,7 @@ function setupNavigation() {
     });
 }
 
-let botUsername = "Funko_Stop_bot";
+let botUsername = "funkostop_bot";
 
 function setupRefLink() {
     const link = `https://t.me/${botUsername}?start=ref_${userData.telegram_id}`;
