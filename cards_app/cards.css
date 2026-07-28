@@ -60,32 +60,31 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 20px 20px 10px 20px;
+    padding: 15px 20px 5px 20px;
     background: transparent;
     position: relative;
     z-index: 100;
 }
 
-.header-logo-obj {
-    height: 50px;
+.header-logo-img {
+    height: 40px;
     width: auto;
     object-fit: contain;
 }
 
 .fallback-logo {
     display: flex;
-    flex-direction: column;
     align-items: center;
+    gap: 6px;
     font-weight: 900;
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     color: #fff;
-    border: 2px solid var(--text-white);
-    padding: 5px 15px;
-    border-radius: 10px;
+    letter-spacing: 1px;
 }
 
 .fallback-logo .stop-badge {
     color: var(--neon-red);
+    text-shadow: 0 0 10px var(--neon-red-glow);
 }
 
 /* Floating Daily Gift */
@@ -136,18 +135,18 @@ body {
 
 /* Tabs */
 .tab-view {
-    display: none;
+    display: block;
     flex-grow: 1;
     padding: 16px;
     animation: fadeIn 0.25s ease;
-    overflow-y: scroll; /* allow scrolling inside */
+    overflow-y: auto; /* allow scrolling inside */
     padding-bottom: 90px; /* Space for bottom nav */
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
 
-.tab-view.active {
-    display: block;
+.tab-view.hidden {
+    display: none !important;
 }
 
 @keyframes fadeIn {
