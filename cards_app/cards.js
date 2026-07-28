@@ -153,6 +153,16 @@ function setupNavigation() {
                 targetView.classList.remove('hidden');
                 targetView.classList.add('active');
             }
+
+            // Hide floating daily gift button on Collection & Tasks tabs
+            const dailyBtn = document.getElementById('daily-gift-btn');
+            if (dailyBtn) {
+                if (targetId === 'view-home') {
+                    dailyBtn.classList.remove('hidden');
+                } else {
+                    dailyBtn.classList.add('hidden');
+                }
+            }
         });
     });
 }
@@ -240,6 +250,7 @@ function setupDailyPackButton() {
             const tasksNavBtn = document.querySelector('.nav-btn[data-target="view-community"]');
             if (tasksNavBtn) tasksNavBtn.classList.add('active');
             document.getElementById('view-community').classList.remove('hidden');
+            dailyGiftBtn.classList.add('hidden');
             return;
         }
 
