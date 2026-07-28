@@ -141,11 +141,18 @@ function setupNavigation() {
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
+            document.querySelectorAll('.tab-view').forEach(v => {
+                v.classList.add('hidden');
+                v.classList.remove('active');
+            });
             
             btn.classList.add('active');
             const targetId = btn.getAttribute('data-target');
-            document.getElementById(targetId).classList.remove('hidden');
+            const targetView = document.getElementById(targetId);
+            if (targetView) {
+                targetView.classList.remove('hidden');
+                targetView.classList.add('active');
+            }
         });
     });
 }
