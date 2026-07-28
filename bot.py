@@ -14,7 +14,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.types import (
     Message, CallbackQuery, ReplyKeyboardMarkup, 
     KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton,
-    ReplyKeyboardRemove
+    ReplyKeyboardRemove, WebAppInfo
 )
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
@@ -23,6 +23,7 @@ import aiohttp
 from aiohttp import web
 
 load_dotenv()
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bot-tg-uyoe.onrender.com/cards")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 ADMIN_IDS = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
@@ -41,18 +42,70 @@ dp.include_router(router)
 
 pool = None
 
-# --- WEB SERVER (Для Hugging Face и cron-job) ---
+cards_dir = os.path.join(os.path.dirname(__file__), "cards_app")
+
+async def get_card_profile(request):
+    tg_id = int(request.query.get("tg_id", 0))
+    if not tg_id:
+        return web.json_response({"error": "tg_id missing"}, status=400)
+    
+    async with pool.acquire() as db:
+        user = await db.fetchrow("SELECT packs_count, last_daily_pack FROM card_users WHERE telegram_id = $1", tg_id)
+        if not user:
+            await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 3) ON CONFLICT DO NOTHING", tg_id)
+            packs_count = 3
+        else:
+            packs_count = user["packs_count"]
+            
+        cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
+        user_cards = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in cards_rows}
+        
+        return web.json_response({
+            "packs_count": packs_count,
+            "user_cards": user_cards
+        })
+
+async def open_card_pack(request):
+    try:
+        body = await request.json()
+        tg_id = int(body.get("telegram_id", 0))
+        series_slug = body.get("series_slug")
+        card_index = int(body.get("card_index", 1))
+        
+        if not tg_id or not series_slug:
+            return web.json_response({"error": "Invalid params"}, status=400)
+            
+        async with pool.acquire() as db:
+            await db.execute("UPDATE card_users SET packs_count = GREATEST(0, packs_count - 1) WHERE telegram_id = $1", tg_id)
+            await db.execute("""
+                INSERT INTO user_cards (telegram_id, series_slug, card_index, count)
+                VALUES ($1, $2, $3, 1)
+                ON CONFLICT (telegram_id, series_slug, card_index)
+                DO UPDATE SET count = user_cards.count + 1
+            """, tg_id, series_slug, card_index)
+            
+        return web.json_response({"success": True})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 async def health_check(request):
-    return web.Response(text="Bot is alive!")
+    return web.Response(text="Bot & Cards Mini App is alive!")
 
 async def start_webserver():
     app = web.Application()
     app.router.add_get('/', health_check)
+    app.router.add_get('/api/cards/profile', get_card_profile)
+    app.router.add_post('/api/cards/open', open_card_pack)
+    
+    if os.path.exists(cards_dir):
+        app.router.add_static('/cards', cards_dir, show_index=True)
+        
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 7860)
+    port = int(os.environ.get("PORT", 7860))
+    site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    logging.info("🌐 Веб-сервер запущен на порту 7860 (Hugging Face health check)")
+    logging.info(f"🌐 Веб-сервер и Cards Mini App запущены на порту {port}")
 
 # --- CURRENCY ---
 async def get_usd_rate():
@@ -122,6 +175,27 @@ async def init_db():
                 status TEXT,
                 photo_id TEXT,
                 archived BOOLEAN DEFAULT FALSE
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS card_users (
+                telegram_id BIGINT PRIMARY KEY,
+                username TEXT,
+                first_name TEXT,
+                packs_count INTEGER DEFAULT 3,
+                last_daily_pack TIMESTAMP,
+                ref_code TEXT,
+                referred_by BIGINT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_cards (
+                telegram_id BIGINT,
+                series_slug TEXT,
+                card_index INTEGER,
+                count INTEGER DEFAULT 1,
+                PRIMARY KEY (telegram_id, series_slug, card_index)
             )
         """)
         
@@ -235,6 +309,7 @@ async def unarchive_order_db(order_id: int):
 def get_start_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
+            [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=WEBAPP_URL))],
             [KeyboardButton(text="🧮 Калькулятор стоимости")],
             [KeyboardButton(text="📦 Отследить заказы"), KeyboardButton(text="🗃 Архив заказов")]
         ],
@@ -301,10 +376,48 @@ def generate_random_password(length=6):
 @router.message(CommandStart())
 async def start_handler(message: Message, state: FSMContext):
     await state.clear()
+    
+    # Handle Referral deep link (e.g. /start ref_12345)
+    args = message.text.split()
+    if len(args) > 1 and args[1].startswith("ref_"):
+        try:
+            inviter_id = int(args[1].replace("ref_", ""))
+            if inviter_id != message.from_user.id:
+                async with pool.acquire() as db:
+                    existing = await db.fetchrow("SELECT telegram_id FROM card_users WHERE telegram_id = $1", message.from_user.id)
+                    if not existing:
+                        await db.execute("INSERT INTO card_users (telegram_id, packs_count, referred_by) VALUES ($1, 4, $2)", message.from_user.id, inviter_id)
+                        await db.execute("UPDATE card_users SET packs_count = card_users.packs_count + 1 WHERE telegram_id = $1", inviter_id)
+                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный **+1 пак**!", parse_mode="Markdown")
+        except Exception as e:
+            logging.error(f"Ref error: {e}")
+
     if await is_admin(message.from_user.id):
         await message.answer("Добро пожаловать в панель администратора!", reply_markup=get_admin_kb())
     else:
-        await message.answer("Добро пожаловать в Личный Кабинет! Выберите действие ниже.", reply_markup=get_start_kb())
+        await message.answer("Добро пожаловать в FunkoStop! Открывайте коллекционные паки и отслеживайте заказы ниже.", reply_markup=get_start_kb())
+
+@router.message(Command("give_packs"))
+async def give_packs_cmd(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+    args = message.text.split()
+    if len(args) < 3:
+        await message.answer("⚠️ Использование: `/give_packs [telegram_id] [количество]`\nПример: `/give_packs 1048534605 10`", parse_mode="Markdown")
+        return
+    try:
+        target_id = int(args[1])
+        count = int(args[2])
+        async with pool.acquire() as db:
+            await db.execute("""
+                INSERT INTO card_users (telegram_id, packs_count)
+                VALUES ($1, $2)
+                ON CONFLICT (telegram_id)
+                DO UPDATE SET packs_count = card_users.packs_count + $2
+            """, target_id, count)
+        await message.answer(f"✅ Успешно выдано **+{count} паков** пользователю `{target_id}`!", parse_mode="Markdown")
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
 
 @router.message(Command("admin_login"))
 async def admin_login_start(message: Message, state: FSMContext):
