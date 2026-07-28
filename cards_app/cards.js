@@ -167,15 +167,40 @@ function setupNavigation() {
     });
 }
 
+let botUsername = "Funko_Stop_bot";
+
 function setupRefLink() {
-    const link = `https://t.me/Funko_Stop_bot?start=ref_${userData.telegram_id}`;
+    const link = `https://t.me/${botUsername}?start=ref_${userData.telegram_id}`;
     if (refLinkInput) refLinkInput.value = link;
     if (copyRefBtn) {
-        copyRefBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(link);
+        copyRefBtn.onclick = () => {
+            navigator.clipboard.writeText(refLinkInput.value);
             copyRefBtn.textContent = 'Скопировано';
             setTimeout(() => copyRefBtn.textContent = 'Копировать', 2000);
-        });
+        };
+    }
+}
+
+// API Calls
+async function fetchProfile() {
+    try {
+        const res = await fetch(`/api/cards/profile?tg_id=${userData.telegram_id}`);
+        if (res.ok) {
+            const data = await res.json();
+            userData.packs_count = data.packs_count;
+            userData.last_daily_pack = data.last_daily_pack;
+            userCards = data.user_cards || {};
+            userData.completed_tasks = data.completed_tasks || [];
+            if (data.bot_username) {
+                botUsername = data.bot_username;
+                setupRefLink();
+            }
+            checkDailyTimer();
+            updateUI();
+        }
+    } catch (e) {
+        console.log("Using default profile");
+        checkDailyTimer();
     }
 }
 
@@ -214,7 +239,8 @@ function setupTasks() {
             } catch (e) {
                 console.error("Task claim error", e);
                 // Fallback offline simulation
-                userData.packs_count++;
+                const rewardPacks = taskId === 'order_2000' ? 3 : 1;
+                userData.packs_count += rewardPacks;
                 userData.completed_tasks.push(taskId);
                 updateUI();
             }
