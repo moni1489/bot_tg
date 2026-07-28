@@ -88,17 +88,25 @@ async def open_card_pack(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+async def serve_cards_app(request):
+    index_path = os.path.join(cards_dir, "index.html")
+    if os.path.exists(index_path):
+        return web.FileResponse(index_path)
+    return web.Response(text="index.html not found", status=404)
+
 async def health_check(request):
     return web.Response(text="Bot & Cards Mini App is alive!")
 
 async def start_webserver():
     app = web.Application()
     app.router.add_get('/', health_check)
+    app.router.add_get('/cards', serve_cards_app)
+    app.router.add_get('/cards/', serve_cards_app)
     app.router.add_get('/api/cards/profile', get_card_profile)
     app.router.add_post('/api/cards/open', open_card_pack)
     
     if os.path.exists(cards_dir):
-        app.router.add_static('/cards', cards_dir, show_index=True)
+        app.router.add_static('/cards', cards_dir)
         
     runner = web.AppRunner(app)
     await runner.setup()
