@@ -420,7 +420,6 @@ async def unarchive_order_db(order_id: int):
 def get_start_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=WEBAPP_URL))],
             [KeyboardButton(text="🧮 Калькулятор стоимости")],
             [KeyboardButton(text="📦 Отследить заказы"), KeyboardButton(text="🗃 Архив заказов")]
         ],
