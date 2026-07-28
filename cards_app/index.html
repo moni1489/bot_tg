@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FunkoStop Cards</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/cards/cards.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="menu-icon">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="brand-logo">
+                    <span class="crown-mini">👑</span>
+                    <span class="logo-funko">Funko</span>
+                    <span class="logo-stop">STOP</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="header-icon crown-icon">👑</div>
+                <div class="header-icon gift-icon">🎁</div>
+            </div>
+        </header>
+
+        <!-- MAIN VIEW (Pack Opening) -->
+        <main id="view-home" class="tab-view active">
+            <!-- Side Daily Pack Widget -->
+            <div class="daily-widget-wrapper">
+                <div class="daily-widget" id="daily-gift-btn">
+                    <div class="gift-box-icon">🎁</div>
+                    <div class="widget-title">ЕЖЕДНЕВНЫЙ ПОДАРОК</div>
+                    <div class="widget-timer" id="daily-timer">00:00:00</div>
+                </div>
+            </div>
+
+            <!-- Pack Area -->
+            <div class="pack-stage">
+                <div class="pack-crown-glow">👑</div>
+                <div class="booster-pack-wrapper" id="booster-pack">
+                    <div class="booster-pack-inner">
+                        <div class="pack-top-teeth"></div>
+                        <div class="pack-badge">1 RANDOM CARD</div>
+                        <div class="pack-logo-group">
+                            <div class="pack-funko-text">Funko</div>
+                            <div class="pack-stop-badge">STOP</div>
+                        </div>
+                        <div class="pack-character-silhouette">
+                            <div class="silhouette-crown">👑</div>
+                            <div class="silhouette-head">
+                                <span class="question-mark">?</span>
+                            </div>
+                            <div class="silhouette-body"></div>
+                        </div>
+                        <div class="pack-footer-badge">
+                            <span class="reward-crown">👑</span>
+                            <span>GUARANTEED REWARD</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Opened Card Container (Hidden initially) -->
+                <div class="opened-card-stage hidden" id="card-stage">
+                    <div class="card-3d-wrapper" id="card-3d">
+                        <div class="card-face card-back">
+                            <div class="card-back-pattern">
+                                <span>👑</span>
+                                <div>Funko STOP</div>
+                            </div>
+                        </div>
+                        <div class="card-face card-front" id="card-front">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Action Button -->
+            <div class="action-section">
+                <button id="open-pack-btn" class="btn-neon-red">
+                    <span id="btn-text">ОТКРЫТЬ</span>
+                    <span class="packs-counter-badge" id="packs-count-badge">3</span>
+                </button>
+            </div>
+
+            <!-- What's Inside Block -->
+            <div class="whats-inside-block">
+                <div class="inside-title">ЧТО ВНУТРИ?</div>
+                <div class="inside-grid">
+                    <div class="inside-item">
+                        <div class="item-icon">🎴</div>
+                        <div class="item-label">КАРТОЧКА</div>
+                    </div>
+                    <div class="inside-item">
+                        <div class="item-icon">🏷️</div>
+                        <div class="item-label">СКИДКА</div>
+                    </div>
+                    <div class="inside-item">
+                        <div class="item-icon">🎁</div>
+                        <div class="item-label">БОНУСНЫЙ ПАК</div>
+                    </div>
+                    <div class="inside-item">
+                        <div class="item-icon">🧸</div>
+                        <div class="item-label">ФИГУРКА</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- COLLECTION VIEW -->
+        <main id="view-collection" class="tab-view hidden">
+            <div class="collection-header">
+                <h2>Коллекция карточек</h2>
+                <div class="total-progress" id="total-progress-text">Собрано: 0 / 28</div>
+            </div>
+            
+            <div class="series-list" id="series-container">
+                <!-- Dynamically populated 7 series -->
+            </div>
+        </main>
+
+        <!-- TASKS & REFS VIEW -->
+        <main id="view-community" class="tab-view hidden">
+            <div class="community-section">
+                <h2>Задания & Награды</h2>
+                <p class="section-desc">Выполняйте задания и приглашайте друзей, чтобы получать дополнительные паки!</p>
+
+                <!-- Ref Link Box -->
+                <div class="ref-box">
+                    <h3>🤝 Пригласи друга</h3>
+                    <p>Получите **+1 пак** за каждого приглашенного друга!</p>
+                    <div class="ref-link-row">
+                        <input type="text" id="ref-link-input" readonly value="https://t.me/Funko_Stop_bot">
+                        <button id="copy-ref-btn" class="btn-small">Копировать</button>
+                    </div>
+                </div>
+
+                <!-- Tasks List -->
+                <div class="tasks-list" id="tasks-container">
+                    <div class="task-card">
+                        <div class="task-info">
+                            <h4>📢 Подписаться на Telegram-канал</h4>
+                            <span class="task-reward">+1 пак</span>
+                        </div>
+                        <button class="btn-task" id="task-tg-btn">Выполнить</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation Bar -->
+        <nav class="bottom-nav">
+            <button class="nav-btn active" data-target="view-home">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">ГЛАВНАЯ</span>
+            </button>
+            <button class="nav-btn" data-target="view-collection">
+                <span class="nav-icon">🎴</span>
+                <span class="nav-label">КОЛЛЕКЦИЯ</span>
+            </button>
+            <button class="nav-btn" data-target="view-community">
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">СООБЩЕСТВО</span>
+            </button>
+        </nav>
+    </div>
+
+    <script src="/cards/cards.js"></script>
+</body>
+</html>
