@@ -441,13 +441,41 @@ body {
     position: relative;
     border-radius: 16px;
 }
-.card-frame.breaking_bad { background: radial-gradient(circle, #1b381e, #051007); border: 2px solid #28a745; }
-.card-frame.marvel { background: radial-gradient(circle, #4d1218, #140305); border: 2px solid #dc3545; }
-.card-frame.dc { background: radial-gradient(circle, #142847, #040914); border: 2px solid #007bff; }
-.card-frame.death_note { background: radial-gradient(circle, #2c2c30, #0a0a0c); border: 2px solid #e0e0e0; }
-.card-frame.invincible { background: radial-gradient(circle, #473a14, #141004); border: 2px solid #ffc107; }
-.card-frame.one_piece { background: radial-gradient(circle, #3d2613, #120a04); border: 2px solid #fd7e14; }
-.card-frame.universal { background: radial-gradient(circle, #3d0c18, #0e0205); border: 2px solid #e61c34; }
+.card-frame.breaking_bad { background: url('/cards/frame_breaking_bad.png') center/cover no-repeat, radial-gradient(circle, #1b381e, #051007); }
+.card-frame.marvel { background: url('/cards/frame_marvel.png') center/cover no-repeat, radial-gradient(circle, #4d1218, #140305); }
+.card-frame.dc { background: url('/cards/frame_dc.png') center/cover no-repeat, radial-gradient(circle, #142847, #040914); }
+.card-frame.death_note { background: url('/cards/frame_death_note.png') center/cover no-repeat, radial-gradient(circle, #2c2c30, #0a0a0c); }
+.card-frame.invincible { background: url('/cards/frame_invincible.png') center/cover no-repeat, radial-gradient(circle, #473a14, #141004); }
+.card-frame.one_piece { background: url('/cards/frame_one_piece.png') center/cover no-repeat, radial-gradient(circle, #3d2613, #120a04); }
+.card-frame.universal { background: url('/cards/frame_universal.png') center/cover no-repeat, radial-gradient(circle, #3d0c18, #0e0205); }
+
+/* Epic & Legendary Glowing Auras (as seen in reference Shorts) */
+.card-3d-wrapper.aura-epic {
+    border-radius: 16px;
+    animation: epicAuraPulse 1.2s infinite alternate ease-in-out;
+}
+@keyframes epicAuraPulse {
+    0% { box-shadow: 0 0 20px #9c27b0, inset 0 0 15px #9c27b0; }
+    100% { box-shadow: 0 0 50px #e040fb, 0 0 80px #9c27b0, inset 0 0 30px #e040fb; }
+}
+
+.card-3d-wrapper.aura-legendary {
+    border-radius: 16px;
+    animation: legendaryAuraPulse 1.0s infinite alternate ease-in-out, screenShake 0.4s ease;
+}
+@keyframes legendaryAuraPulse {
+    0% { box-shadow: 0 0 30px #ffc107, 0 0 50px #ff9800, inset 0 0 20px #ffc107; }
+    100% { box-shadow: 0 0 70px #ffe082, 0 0 110px #ffc107, inset 0 0 45px #ffe082; }
+}
+
+@keyframes screenShake {
+    0% { transform: translate(0, 0); }
+    10% { transform: translate(-4px, 3px) rotate(-1deg); }
+    30% { transform: translate(4px, -3px) rotate(1deg); }
+    50% { transform: translate(-3px, -2px); }
+    70% { transform: translate(3px, 2px); }
+    100% { transform: translate(0, 0); }
+}
 
 .card-series-tag {
     font-size: 0.75rem;
@@ -703,3 +731,4 @@ body {
 
 .hidden {
     display: none !important;
+}
