@@ -60,7 +60,15 @@ async def get_card_profile(request):
             completed_tasks = []
         else:
             packs_count = user["packs_count"]
-            last_daily = user["last_daily_pack"].isoformat() if user["last_daily_pack"] else None
+            if user["last_daily_pack"]:
+                ld = user["last_daily_pack"]
+                if hasattr(ld, 'tzinfo') and ld.tzinfo is not None:
+                    last_daily = ld.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    last_daily = ld.strftime("%Y-%m-%dT%H:%M:%SZ")
+            else:
+                last_daily = None
+
             try:
                 completed_tasks = json.loads(user["completed_tasks"] or "[]")
             except Exception:
@@ -233,6 +241,15 @@ async def give_test_packs_api(request):
             """, tg_id)
             new_count = await db.fetchval("SELECT packs_count FROM card_users WHERE telegram_id = $1", tg_id)
         return web.json_response({"success": True, "packs_count": new_count})
+async def reset_daily_test_api(request):
+    try:
+        body = await request.json()
+        tg_id = int(body.get("telegram_id", 0))
+        if not tg_id:
+            return web.json_response({"error": "tg_id missing"}, status=400)
+        async with pool.acquire() as db:
+            await db.execute("UPDATE card_users SET last_daily_pack = NULL WHERE telegram_id = $1", tg_id)
+        return web.json_response({"success": True})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
@@ -287,6 +304,7 @@ async def start_webserver():
     app.router.add_post('/api/cards/open', open_card_pack)
     app.router.add_post('/api/cards/tasks/claim', claim_task_reward)
     app.router.add_post('/api/cards/give_test_packs', give_test_packs_api)
+    app.router.add_post('/api/cards/reset_daily_test', reset_daily_test_api)
     
     if os.path.exists(cards_dir):
         app.router.add_static('/cards', cards_dir)
