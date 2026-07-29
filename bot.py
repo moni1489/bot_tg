@@ -8,6 +8,7 @@ import json
 import math
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -580,17 +581,31 @@ async def start_handler(message: Message, state: FSMContext):
             inviter_id = int(args[1].replace("ref_", ""))
             if inviter_id != message.from_user.id:
                 async with pool.acquire() as db:
-                    existing = await db.fetchrow("SELECT telegram_id FROM card_users WHERE telegram_id = $1", message.from_user.id)
-                    if not existing:
-                        # Give 5 base packs + 1 bonus pack = 6
+                    user = await db.fetchrow("SELECT telegram_id, referred_by FROM card_users WHERE telegram_id = $1", message.from_user.id)
+                    if not user:
+                        # Give 5 base packs + 1 bonus pack = 6 to new user
                         await db.execute("INSERT INTO card_users (telegram_id, packs_count, referred_by) VALUES ($1, 6, $2)", message.from_user.id, inviter_id)
                         # Give +1 pack to inviter
-                        await db.execute("UPDATE card_users SET packs_count = card_users.packs_count + 1 WHERE telegram_id = $1", inviter_id)
+                        await db.execute("""
+                            INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 6)
+                            ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 1
+                        """, inviter_id)
                         await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный **+1 пак** (Всего 6 стартовых паков)!", parse_mode="Markdown")
                         try:
                             await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислен **+1 пак**!", parse_mode="Markdown")
-                        except Exception:
-                            pass
+                        except Exception as notify_err:
+                            logging.error(f"Notify error: {notify_err}")
+                    elif not user["referred_by"]:
+                        await db.execute("UPDATE card_users SET referred_by = $1, packs_count = packs_count + 1 WHERE telegram_id = $2", inviter_id, message.from_user.id)
+                        await db.execute("""
+                            INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 6)
+                            ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 1
+                        """, inviter_id)
+                        await message.answer("🎉 Вы активировали реферальную ссылку и получили бонусный **+1 пак**!", parse_mode="Markdown")
+                        try:
+                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислен **+1 пак**!", parse_mode="Markdown")
+                        except Exception as notify_err:
+                            logging.error(f"Notify error: {notify_err}")
         except Exception as e:
             logging.error(f"Ref error: {e}")
 
