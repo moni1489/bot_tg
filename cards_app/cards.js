@@ -619,6 +619,22 @@ function setupTestButton() {
             }
         });
     }
+
+    const resetTestDailyBtn = document.getElementById('reset-test-daily-btn');
+    if (resetTestDailyBtn) {
+        resetTestDailyBtn.addEventListener('click', async () => {
+            userData.last_daily_pack = null;
+            if (dailyTimerInterval) clearInterval(dailyTimerInterval);
+            checkDailyTimer();
+            try {
+                await fetch('/api/cards/reset_daily_test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegram_id: userData.telegram_id })
+                });
+            } catch (e) {}
+        });
+    }
 }
 
 function initApp() {
