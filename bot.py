@@ -129,25 +129,32 @@ async def claim_daily_pack(request):
         async with pool.acquire() as db:
             user = await db.fetchrow("SELECT packs_count, last_daily_pack FROM card_users WHERE telegram_id = $1", tg_id)
             if not user:
-                await db.execute("INSERT INTO card_users (telegram_id, packs_count, last_daily_pack) VALUES ($1, 6, NOW())", tg_id)
+                await db.execute("INSERT INTO card_users (telegram_id, packs_count, last_daily_pack) VALUES ($1, 6, CURRENT_TIMESTAMP)", tg_id)
                 return web.json_response({"success": True, "packs_count": 6})
                 
             last_daily = user["last_daily_pack"]
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
             
-            if last_daily and (now - last_daily).total_seconds() < 86400:
-                seconds_left = int(86400 - (now - last_daily).total_seconds())
-                return web.json_response({
-                    "success": False, 
-                    "message": "Ежедневный пак уже получен!", 
-                    "seconds_left": seconds_left,
-                    "packs_count": user["packs_count"]
-                })
+            if last_daily:
+                # Ensure last_daily is naive for subtraction
+                if hasattr(last_daily, 'tzinfo') and last_daily.tzinfo is not None:
+                    last_daily = last_daily.astimezone(timezone.utc).replace(tzinfo=None)
+                
+                elapsed = (now - last_daily).total_seconds()
+                if elapsed < 86400:
+                    seconds_left = int(86400 - elapsed)
+                    return web.json_response({
+                        "success": False, 
+                        "message": "Ежедневный пак уже получен!", 
+                        "seconds_left": seconds_left,
+                        "packs_count": user["packs_count"]
+                    })
                 
             new_count = user["packs_count"] + 1
-            await db.execute("UPDATE card_users SET packs_count = $1, last_daily_pack = NOW() WHERE telegram_id = $2", new_count, tg_id)
+            await db.execute("UPDATE card_users SET packs_count = $1, last_daily_pack = CURRENT_TIMESTAMP WHERE telegram_id = $2", new_count, tg_id)
             return web.json_response({"success": True, "packs_count": new_count})
     except Exception as e:
+        logging.error(f"Daily pack error: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
 async def open_card_pack(request):
@@ -183,6 +190,9 @@ async def health_check(request):
     return web.Response(text="Bot & Cards Mini App is alive!")
 
 async def start_webserver():
+    images_dir = os.path.join(cards_dir, "images")
+    os.makedirs(images_dir, exist_ok=True)
+    
     # Copy official logo if present
     logo_src = r"C:\Users\kraie\.gemini\antigravity-ide\brain\e27b6ef9-e81b-4a8e-980a-b4b4d8458b05\media__1785225617410.png"
     logo_dst = os.path.join(cards_dir, "logo.png")
@@ -190,8 +200,36 @@ async def start_webserver():
         try:
             import shutil
             shutil.copy(logo_src, logo_dst)
+            shutil.copy(logo_src, os.path.join(images_dir, "logo.png"))
         except Exception:
             pass
+
+    # Slice 7 series frames if available
+    frames_src = r"C:\Users\kraie\.gemini\antigravity-ide\brain\e27b6ef9-e81b-4a8e-980a-b4b4d8458b05\media__1785321073494.png"
+    if os.path.exists(frames_src):
+        try:
+            from PIL import Image
+            img = Image.open(frames_src)
+            w, h = img.size
+            card_w = w / 4
+            card_h = h / 2
+            
+            names_r1 = ["breaking_bad", "marvel", "dc", "death_note"]
+            for i, name in enumerate(names_r1):
+                box = (int(i * card_w), 0, int((i + 1) * card_w), int(card_h))
+                cropped = img.crop(box)
+                cropped.save(os.path.join(images_dir, f"frame_{name}.png"))
+                cropped.save(os.path.join(cards_dir, f"frame_{name}.png"))
+                
+            card_w2 = w / 3
+            names_r2 = ["invincible", "one_piece", "universal"]
+            for i, name in enumerate(names_r2):
+                box = (int(i * card_w2), int(card_h), int((i + 1) * card_w2), int(h))
+                cropped = img.crop(box)
+                cropped.save(os.path.join(images_dir, f"frame_{name}.png"))
+                cropped.save(os.path.join(cards_dir, f"frame_{name}.png"))
+        except Exception as e:
+            logging.error(f"Frame slicing error: {e}")
 
     app = web.Application()
     app.router.add_get('/', health_check)
