@@ -172,7 +172,7 @@ body {
 .booster-pack-wrapper {
     width: 290px;
     height: 400px;
-    background: url('/cards/images/pack.png') center/contain no-repeat;
+    background: url('/cards/images/pack.png?v=3') center/contain no-repeat;
     position: relative;
     cursor: pointer;
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.3s ease, opacity 0.3s ease;
