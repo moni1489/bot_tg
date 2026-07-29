@@ -88,17 +88,18 @@ body {
     text-shadow: 0 0 10px var(--neon-red-glow);
 }
 
-/* Floating Daily Gift */
+/* Floating Daily Gift (Compact & Sleek) */
 .daily-gift-floating {
     position: absolute;
-    right: -2px; /* Pull it slightly to overlap border */
-    top: 35%;
+    right: 0;
+    top: 36%;
+    width: 62px;
     background-color: var(--bg-black);
-    border: 2px solid var(--neon-red);
+    border: 1px solid var(--neon-red);
     border-right: none;
-    box-shadow: 0 0 15px var(--neon-red-glow);
-    border-radius: 12px 0 0 12px;
-    padding: 10px;
+    box-shadow: 0 0 12px var(--neon-red-glow);
+    border-radius: 10px 0 0 10px;
+    padding: 6px 3px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -108,29 +109,30 @@ body {
 }
 
 .daily-gift-floating:active {
-    transform: scale(0.95) translateX(2px);
+    transform: scale(0.92) translateX(2px);
 }
 
-.daily-gift-icon {
-    margin-bottom: 5px;
+.daily-gift-icon svg {
+    width: 18px;
+    height: 18px;
 }
 
 .daily-gift-text {
-    font-size: 0.5rem;
+    font-size: 0.45rem;
     font-weight: 900;
     text-align: center;
     line-height: 1.1;
     color: var(--text-white);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 
 .daily-gift-timer {
-    font-size: 0.65rem;
+    font-size: 0.55rem;
     font-weight: 900;
     color: var(--neon-red);
     border: 1px solid var(--neon-red);
-    padding: 2px 6px;
-    border-radius: 6px;
+    padding: 1px 3px;
+    border-radius: 4px;
     box-shadow: 0 0 5px var(--neon-red-glow);
 }
 
@@ -140,8 +142,8 @@ body {
     flex-grow: 1;
     padding: 16px;
     animation: fadeIn 0.25s ease;
-    overflow-y: auto; /* allow scrolling inside */
-    padding-bottom: 90px; /* Space for bottom nav */
+    overflow-y: auto;
+    padding-bottom: 90px;
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
@@ -155,43 +157,44 @@ body {
     to { opacity: 1; }
 }
 
-/* Pack Stage */
+/* Pack Stage - Centered & Dominant */
 .pack-stage {
     position: relative;
-    height: 380px;
+    height: 410px;
+    width: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-bottom: 20px;
-    perspective: 1000px;
+    margin: 10px auto 15px auto;
+    perspective: 1200px;
 }
 
 .booster-pack-wrapper {
-    width: 260px;
-    height: 370px;
+    width: 290px;
+    height: 400px;
     background: url('/cards/images/pack.png') center/contain no-repeat;
     position: relative;
     cursor: pointer;
-    transition: transform 0.3s ease, filter 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.3s ease, opacity 0.3s ease;
     transform-style: preserve-3d;
-    filter: drop-shadow(0 0 25px rgba(255, 0, 34, 0.75));
+    filter: drop-shadow(0 0 35px rgba(255, 0, 34, 0.85));
 }
 
 .booster-pack-wrapper:hover {
     transform: scale(1.03);
-    filter: drop-shadow(0 0 35px rgba(255, 0, 34, 0.95));
+    filter: drop-shadow(0 0 45px rgba(255, 0, 34, 1));
 }
 
 .booster-pack-wrapper.shaking {
-    animation: packShake 0.4s infinite;
+    animation: packOpenBurst 0.6s ease-in-out forwards;
 }
 
-@keyframes packShake {
-    0% { transform: translate(0, 0) rotate(0deg); }
-    25% { transform: translate(-3px, 2px) rotate(-1deg); }
-    50% { transform: translate(3px, -2px) rotate(1deg); }
-    75% { transform: translate(-2px, -1px) rotate(-1deg); }
-    100% { transform: translate(0, 0) rotate(0deg); }
+@keyframes packOpenBurst {
+    0% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 30px #ff0022); }
+    20% { transform: scale(1.05) rotate(-3deg); filter: drop-shadow(0 0 50px #ff0022); }
+    40% { transform: scale(1.08) rotate(3deg); filter: drop-shadow(0 0 70px #ff0022); }
+    65% { transform: scale(1.15) rotate(-2deg); filter: drop-shadow(0 0 100px #ffffff); opacity: 0.9; }
+    100% { transform: scale(1.3) rotate(0deg); filter: drop-shadow(0 0 130px #ffffff); opacity: 0; }
 }
 
 .booster-pack-inner {
