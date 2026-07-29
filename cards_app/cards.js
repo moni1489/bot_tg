@@ -155,6 +155,7 @@ function updateUI() {
         openPackBtn.style.opacity = '1';
     }
     updateTaskButtons();
+    renderCollection();
 }
 
 function setupNavigation() {
@@ -446,10 +447,12 @@ openPackBtn.addEventListener('click', async () => {
 
         cardFront.innerHTML = `
             <div class="card-frame ${drop.series.theme}">
-                <div class="card-series-tag">${drop.series.name}</div>
-                <img src="${drop.card.img}" class="card-character-image" alt="${drop.card.name}" onerror="this.style.opacity='0.1';">
-                <div class="card-character-name">${drop.card.name}</div>
-                <div class="card-rarity-badge rarity-${drop.card.rarity}">${drop.card.rarity}</div>
+                <img src="${drop.card.img}" class="full-card-image" alt="${drop.card.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="card-fallback-frame" style="display:none; width:100%; height:100%; flex-direction:column; justify-content:space-between; align-items:center; padding:10px;">
+                    <div class="card-series-tag">${drop.series.name}</div>
+                    <div class="card-character-name">${drop.card.name}</div>
+                    <div class="card-rarity-badge rarity-${drop.card.rarity}">${drop.card.rarity}</div>
+                </div>
             </div>
         `;
 
