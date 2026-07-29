@@ -53,9 +53,9 @@ async def get_card_profile(request):
     async with pool.acquire() as db:
         user = await db.fetchrow("SELECT packs_count, last_daily_pack, completed_tasks FROM card_users WHERE telegram_id = $1", tg_id)
         if not user:
-            # Give 5 starting free packs
-            await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 5) ON CONFLICT DO NOTHING", tg_id)
-            packs_count = 5
+            # Give 3 starting free packs
+            await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 3) ON CONFLICT DO NOTHING", tg_id)
+            packs_count = 3
             last_daily = None
             completed_tasks = []
         else:
@@ -613,6 +613,16 @@ async def start_handler(message: Message, state: FSMContext):
         await message.answer("Добро пожаловать в панель администратора!", reply_markup=get_admin_kb())
     else:
         await message.answer("Добро пожаловать в Личный Кабинет! Нажмите кнопку ниже, чтобы проверить свои заказы.", reply_markup=get_start_kb())
+
+@router.message(Command("reset_daily"), StateFilter("*"))
+async def reset_daily_cmd(message: Message, state: FSMContext):
+    await state.clear()
+    try:
+        async with pool.acquire() as db:
+            await db.execute("UPDATE card_users SET last_daily_pack = NULL WHERE telegram_id = $1", message.from_user.id)
+        await message.answer("✅ Ваш ежедневный подарок сброшен! Зайдите в игру — кнопка снова будет в состоянии **ГОТОВО**.")
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
 
 @router.message(Command("give_packs", "give", "packs"), StateFilter("*"))
 async def give_packs_cmd(message: Message, state: FSMContext):
