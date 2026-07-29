@@ -596,15 +596,30 @@ function renderCollection() {
         seriesBlock.appendChild(listView);
         seriesContainer.appendChild(seriesBlock);
     });
+}
 
 function setupTestButton() {
     const addTestPacksBtn = document.getElementById('add-test-packs-btn');
     if (addTestPacksBtn) {
-        addTestPacksBtn.addEventListener('click', () => {
+        addTestPacksBtn.addEventListener('click', async () => {
             userData.packs_count += 10;
             updateUI();
             if (window.confetti) {
                 confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } });
+            }
+            try {
+                const res = await fetch('/api/cards/give_test_packs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegram_id: userData.telegram_id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    userData.packs_count = data.packs_count;
+                    updateUI();
+                }
+            } catch (e) {
+                console.log("Local test pack addition");
             }
         });
     }
