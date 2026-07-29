@@ -241,6 +241,9 @@ async def give_test_packs_api(request):
             """, tg_id)
             new_count = await db.fetchval("SELECT packs_count FROM card_users WHERE telegram_id = $1", tg_id)
         return web.json_response({"success": True, "packs_count": new_count})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 async def reset_daily_test_api(request):
     try:
         body = await request.json()
