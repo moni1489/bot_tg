@@ -41,17 +41,17 @@ let userCards = {};
 let isOpening = false;
 let dailyTimerInterval = null;
 
-// 7 Series Configurations
+// 7 Series Configurations (28 total cards)
 const SERIES_CONFIG = [
     {
         slug: 'breaking_bad',
         name: 'Breaking Bad',
         theme: 'breaking_bad',
         cards: [
-            { index: 1, name: 'Walter White', rarity: 'legendary', img: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=300' },
-            { index: 2, name: 'Jesse Pinkman', rarity: 'epic', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300' },
-            { index: 3, name: 'Saul Goodman', rarity: 'rare', img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300' },
-            { index: 4, name: 'Gus Fring', rarity: 'common', img: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300' }
+            { index: 1, name: 'Walter White', rarity: 'legendary', img: '/cards/images/card_breaking_bad_1.png' },
+            { index: 2, name: 'Jesse Pinkman', rarity: 'epic', img: '/cards/images/card_breaking_bad_2.png' },
+            { index: 3, name: 'Saul Goodman', rarity: 'rare', img: '/cards/images/card_breaking_bad_3.png' },
+            { index: 4, name: 'Gus Fring', rarity: 'common', img: '/cards/images/card_breaking_bad_4.png' }
         ]
     },
     {
@@ -59,10 +59,10 @@ const SERIES_CONFIG = [
         name: 'Marvel',
         theme: 'marvel',
         cards: [
-            { index: 1, name: 'Iron Man', rarity: 'legendary', img: 'https://images.unsplash.com/photo-1635863138275-d9b33299680b?w=300' },
-            { index: 2, name: 'Spider-Man', rarity: 'epic', img: 'https://images.unsplash.com/photo-1604200213928-ba3cf4fc8436?w=300' },
-            { index: 3, name: 'Captain America', rarity: 'rare', img: 'https://images.unsplash.com/photo-1569003339405-ea396a5a8a90?w=300' },
-            { index: 4, name: 'Deadpool', rarity: 'common', img: 'https://images.unsplash.com/photo-1534809027769-b00d750a6bac?w=300' }
+            { index: 1, name: 'Iron Man', rarity: 'legendary', img: '/cards/images/card_marvel_1.png' },
+            { index: 2, name: 'Spider-Man', rarity: 'epic', img: '/cards/images/card_marvel_2.png' },
+            { index: 3, name: 'Captain America', rarity: 'rare', img: '/cards/images/card_marvel_3.png' },
+            { index: 4, name: 'Deadpool', rarity: 'common', img: '/cards/images/card_marvel_4.png' }
         ]
     },
     {
@@ -70,10 +70,10 @@ const SERIES_CONFIG = [
         name: 'DC Comics',
         theme: 'dc',
         cards: [
-            { index: 1, name: 'Batman', rarity: 'legendary', img: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=300' },
-            { index: 2, name: 'Superman', rarity: 'epic', img: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=300' },
-            { index: 3, name: 'Joker', rarity: 'rare', img: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=300' },
-            { index: 4, name: 'Flash', rarity: 'common', img: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300' }
+            { index: 1, name: 'Batman', rarity: 'legendary', img: '/cards/images/card_dc_1.png' },
+            { index: 2, name: 'Superman', rarity: 'epic', img: '/cards/images/card_dc_2.png' },
+            { index: 3, name: 'Joker', rarity: 'rare', img: '/cards/images/card_dc_3.png' },
+            { index: 4, name: 'Flash', rarity: 'common', img: '/cards/images/card_dc_4.png' }
         ]
     },
     {
@@ -81,10 +81,10 @@ const SERIES_CONFIG = [
         name: 'Death Note',
         theme: 'death_note',
         cards: [
-            { index: 1, name: 'Ryuk', rarity: 'legendary', img: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=300' },
-            { index: 2, name: 'L', rarity: 'epic', img: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300' },
-            { index: 3, name: 'Light Yagami', rarity: 'rare', img: 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300' },
-            { index: 4, name: 'Misa Aane', rarity: 'common', img: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=300' }
+            { index: 1, name: 'Ryuk', rarity: 'legendary', img: '/cards/images/card_death_note_1.png' },
+            { index: 2, name: 'L', rarity: 'epic', img: '/cards/images/card_death_note_2.png' },
+            { index: 3, name: 'Light Yagami', rarity: 'rare', img: '/cards/images/card_death_note_3.png' },
+            { index: 4, name: 'Misa Aane', rarity: 'common', img: '/cards/images/card_death_note_4.png' }
         ]
     },
     {
@@ -92,10 +92,10 @@ const SERIES_CONFIG = [
         name: 'Invincible',
         theme: 'invincible',
         cards: [
-            { index: 1, name: 'Omni-Man', rarity: 'legendary', img: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300' },
-            { index: 2, name: 'Invincible', rarity: 'epic', img: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300' },
-            { index: 3, name: 'Atom Eve', rarity: 'rare', img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300' },
-            { index: 4, name: 'Allen', rarity: 'common', img: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300' }
+            { index: 1, name: 'Omni-Man', rarity: 'legendary', img: '/cards/images/card_invincible_1.png' },
+            { index: 2, name: 'Invincible', rarity: 'epic', img: '/cards/images/card_invincible_2.png' },
+            { index: 3, name: 'Atom Eve', rarity: 'rare', img: '/cards/images/card_invincible_3.png' },
+            { index: 4, name: 'Allen', rarity: 'common', img: '/cards/images/card_invincible_4.png' }
         ]
     },
     {
@@ -103,10 +103,10 @@ const SERIES_CONFIG = [
         name: 'One Piece',
         theme: 'one_piece',
         cards: [
-            { index: 1, name: 'Luffy', rarity: 'legendary', img: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300' },
-            { index: 2, name: 'Zoro', rarity: 'epic', img: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300' },
-            { index: 3, name: 'Sanji', rarity: 'rare', img: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300' },
-            { index: 4, name: 'Nami', rarity: 'common', img: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300' }
+            { index: 1, name: 'Luffy', rarity: 'legendary', img: '/cards/images/card_one_piece_1.png' },
+            { index: 2, name: 'Zoro', rarity: 'epic', img: '/cards/images/card_one_piece_2.png' },
+            { index: 3, name: 'Sanji', rarity: 'rare', img: '/cards/images/card_one_piece_3.png' },
+            { index: 4, name: 'Nami', rarity: 'common', img: '/cards/images/card_one_piece_4.png' }
         ]
     },
     {
@@ -114,10 +114,10 @@ const SERIES_CONFIG = [
         name: 'Universal',
         theme: 'universal',
         cards: [
-            { index: 1, name: 'Funko Gold Crown', rarity: 'legendary', img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300' },
-            { index: 2, name: 'Funko Silver', rarity: 'epic', img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300' },
-            { index: 3, name: 'Funko Bronze', rarity: 'rare', img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300' },
-            { index: 4, name: 'Funko Classic', rarity: 'common', img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300' }
+            { index: 1, name: 'Funko Gold Crown', rarity: 'legendary', img: '/cards/images/card_universal_1.png' },
+            { index: 2, name: 'Funko Silver', rarity: 'epic', img: '/cards/images/card_universal_2.png' },
+            { index: 3, name: 'Funko Bronze', rarity: 'rare', img: '/cards/images/card_universal_3.png' },
+            { index: 4, name: 'Funko Classic', rarity: 'common', img: '/cards/images/card_universal_4.png' }
         ]
     }
 ];
@@ -211,6 +211,7 @@ async function fetchProfile() {
             userData.last_daily_pack = data.last_daily_pack;
             userCards = data.user_cards || {};
             userData.completed_tasks = data.completed_tasks || [];
+            userData.ref_count = data.ref_count || 0;
             if (data.bot_username) {
                 botUsername = data.bot_username;
                 setupRefLink();
@@ -232,9 +233,9 @@ function setupTasks() {
             
             const taskId = btn.getAttribute('data-task');
             
-            // Simulating redirection for Telegram Sub
+            // Open official Telegram channel if tg_sub task
             if (taskId === 'tg_sub') {
-                window.open('https://t.me/Funko_Stop', '_blank');
+                window.open('https://t.me/FunkoStop', '_blank');
             }
             
             try {
@@ -254,15 +255,11 @@ function setupTasks() {
                         confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
                     }
                 } else {
-                    alert(data.message);
+                    alert(data.message || "Не удалось выполнить задание.");
                 }
             } catch (e) {
                 console.error("Task claim error", e);
-                // Fallback offline simulation
-                const rewardPacks = taskId === 'order_2000' ? 3 : 1;
-                userData.packs_count += rewardPacks;
-                userData.completed_tasks.push(taskId);
-                updateUI();
+                alert("Ошибка сети или серверов. Попробуйте еще раз.");
             }
         });
     });
@@ -276,6 +273,12 @@ function updateTaskButtons() {
             btn.classList.add('completed');
         }
     });
+
+    // Update referral counter tag
+    const refCountTag = document.getElementById('ref-count-tag');
+    if (refCountTag) {
+        refCountTag.textContent = `Приглашено друзей: ${userData.ref_count || 0}`;
+    }
 }
 
 // Daily Pack Claiming
@@ -444,7 +447,7 @@ openPackBtn.addEventListener('click', async () => {
         cardFront.innerHTML = `
             <div class="card-frame ${drop.series.theme}">
                 <div class="card-series-tag">${drop.series.name}</div>
-                <img src="${drop.card.img}" class="card-character-image" alt="${drop.card.name}">
+                <img src="${drop.card.img}" class="card-character-image" alt="${drop.card.name}" onerror="this.style.opacity='0.1';">
                 <div class="card-character-name">${drop.card.name}</div>
                 <div class="card-rarity-badge rarity-${drop.card.rarity}">${drop.card.rarity}</div>
             </div>
