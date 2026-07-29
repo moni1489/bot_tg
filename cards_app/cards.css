@@ -206,7 +206,7 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 16px 8px;
-    background: radial-gradient(circle at center, #1a0005 0%, #000000 100%);
+    background: transparent;
 }
 
 .pack-logo-placeholder {
@@ -440,13 +440,13 @@ body {
     position: relative;
     border-radius: 16px;
 }
-.card-frame.breaking_bad { background: url('/cards/frame_breaking_bad.png') center/cover no-repeat, radial-gradient(circle, #1b381e, #051007); }
-.card-frame.marvel { background: url('/cards/frame_marvel.png') center/cover no-repeat, radial-gradient(circle, #4d1218, #140305); }
-.card-frame.dc { background: url('/cards/frame_dc.png') center/cover no-repeat, radial-gradient(circle, #142847, #040914); }
-.card-frame.death_note { background: url('/cards/frame_death_note.png') center/cover no-repeat, radial-gradient(circle, #2c2c30, #0a0a0c); }
-.card-frame.invincible { background: url('/cards/frame_invincible.png') center/cover no-repeat, radial-gradient(circle, #473a14, #141004); }
-.card-frame.one_piece { background: url('/cards/frame_one_piece.png') center/cover no-repeat, radial-gradient(circle, #3d2613, #120a04); }
-.card-frame.universal { background: url('/cards/frame_universal.png') center/cover no-repeat, radial-gradient(circle, #3d0c18, #0e0205); }
+.card-frame.breaking_bad { background: url('/cards/images/frame_breaking_bad.png') center/cover no-repeat, url('/cards/frame_breaking_bad.png') center/cover no-repeat, radial-gradient(circle, #1b381e, #051007); }
+.card-frame.marvel { background: url('/cards/images/frame_marvel.png') center/cover no-repeat, url('/cards/frame_marvel.png') center/cover no-repeat, radial-gradient(circle, #4d1218, #140305); }
+.card-frame.dc { background: url('/cards/images/frame_dc.png') center/cover no-repeat, url('/cards/frame_dc.png') center/cover no-repeat, radial-gradient(circle, #142847, #040914); }
+.card-frame.death_note { background: url('/cards/images/frame_death_note.png') center/cover no-repeat, url('/cards/frame_death_note.png') center/cover no-repeat, radial-gradient(circle, #2c2c30, #0a0a0c); }
+.card-frame.invincible { background: url('/cards/images/frame_invincible.png') center/cover no-repeat, url('/cards/frame_invincible.png') center/cover no-repeat, radial-gradient(circle, #473a14, #141004); }
+.card-frame.one_piece { background: url('/cards/images/frame_one_piece.png') center/cover no-repeat, url('/cards/frame_one_piece.png') center/cover no-repeat, radial-gradient(circle, #3d2613, #120a04); }
+.card-frame.universal { background: url('/cards/images/frame_universal.png') center/cover no-repeat, url('/cards/frame_universal.png') center/cover no-repeat, radial-gradient(circle, #3d0c18, #0e0205); }
 
 /* Epic & Legendary Glowing Auras (as seen in reference Shorts) */
 .card-3d-wrapper.aura-epic {
