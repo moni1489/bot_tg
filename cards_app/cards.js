@@ -597,7 +597,26 @@ function renderCollection() {
         seriesContainer.appendChild(seriesBlock);
     });
 
-    totalProgressText.textContent = ``;
+function setupTestButton() {
+    const addTestPacksBtn = document.getElementById('add-test-packs-btn');
+    if (addTestPacksBtn) {
+        addTestPacksBtn.addEventListener('click', () => {
+            userData.packs_count += 10;
+            updateUI();
+            if (window.confetti) {
+                confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } });
+            }
+        });
+    }
+}
+
+function initApp() {
+    setupNavigation();
+    setupRefLink();
+    setupTasks();
+    setupDailyPackButton();
+    setupTestButton();
+    fetchProfile();
 }
 
 initApp();
