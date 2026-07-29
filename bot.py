@@ -68,6 +68,9 @@ async def get_card_profile(request):
         cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
         user_cards = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in cards_rows}
         
+        # Count referred friends
+        ref_count = await db.fetchval("SELECT COUNT(*) FROM card_users WHERE referred_by = $1", tg_id) or 0
+
         bot_username = "funkostop_bot"
         try:
             bot_info = await bot.get_me()
@@ -81,6 +84,7 @@ async def get_card_profile(request):
             "last_daily_pack": last_daily,
             "user_cards": user_cards,
             "completed_tasks": completed_tasks,
+            "ref_count": ref_count,
             "bot_username": bot_username
         })
 
@@ -96,7 +100,7 @@ async def claim_task_reward(request):
         async with pool.acquire() as db:
             user = await db.fetchrow("SELECT packs_count, completed_tasks FROM card_users WHERE telegram_id = $1", tg_id)
             if not user:
-                return web.json_response({"error": "User not found"}, status=404)
+                return web.json_response({"error": "Пользователь не найден"}, status=404)
                 
             completed = []
             try:
@@ -107,6 +111,31 @@ async def claim_task_reward(request):
             if task_id in completed:
                 return web.json_response({"success": False, "message": "Задание уже выполнено"})
                 
+            # Verify Telegram Channel Subscription (@FunkoStop)
+            if task_id == 'tg_sub':
+                try:
+                    member = await bot.get_chat_member(chat_id="@FunkoStop", user_id=tg_id)
+                    if member.status not in ["member", "administrator", "creator"]:
+                        return web.json_response({
+                            "success": False, 
+                            "message": "Вы еще не подписались на канал @FunkoStop! Подпишитесь и попробуйте снова."
+                        })
+                except Exception as sub_err:
+                    logging.warning(f"Sub check warning (bot might not be admin in channel): {sub_err}")
+            
+            # Verify Order > 2000 Rubles in Database
+            elif task_id == 'order_2000':
+                order = await db.fetchrow("""
+                    SELECT o.id FROM orders o
+                    JOIN clients c ON o.client_id = c.id
+                    WHERE c.user_tg_id = $1 AND o.total_price >= 2000
+                """, tg_id)
+                if not order:
+                    return web.json_response({
+                        "success": False, 
+                        "message": "У вас пока нет оформленных и оплаченных заказов от 2000 рублей."
+                    })
+
             completed.append(task_id)
             reward_count = 3 if task_id == 'order_2000' else 1
             new_count = user["packs_count"] + reward_count
@@ -136,7 +165,6 @@ async def claim_daily_pack(request):
             now = datetime.now(timezone.utc).replace(tzinfo=None)
             
             if last_daily:
-                # Ensure last_daily is naive for subtraction
                 if hasattr(last_daily, 'tzinfo') and last_daily.tzinfo is not None:
                     last_daily = last_daily.astimezone(timezone.utc).replace(tzinfo=None)
                 
@@ -552,8 +580,9 @@ async def start_handler(message: Message, state: FSMContext):
     else:
         await message.answer("Добро пожаловать в Личный Кабинет! Нажмите кнопку ниже, чтобы проверить свои заказы.", reply_markup=get_start_kb())
 
-@router.message(Command("give_packs"))
-async def give_packs_cmd(message: Message):
+@router.message(Command("give_packs", "give", "packs"), StateFilter("*"))
+async def give_packs_cmd(message: Message, state: FSMContext):
+    await state.clear()
     args = message.text.split()
     if len(args) == 2:
         # /give_packs 10 -> gives 10 packs to current user
