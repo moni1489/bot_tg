@@ -217,6 +217,24 @@ async def serve_cards_app(request):
 async def health_check(request):
     return web.Response(text="Bot & Cards Mini App is alive!")
 
+async def give_test_packs_api(request):
+    try:
+        body = await request.json()
+        tg_id = int(body.get("telegram_id", 0))
+        if not tg_id:
+            return web.json_response({"error": "tg_id missing"}, status=400)
+        async with pool.acquire() as db:
+            await db.execute("""
+                INSERT INTO card_users (telegram_id, packs_count)
+                VALUES ($1, 10)
+                ON CONFLICT (telegram_id)
+                DO UPDATE SET packs_count = card_users.packs_count + 10
+            """, tg_id)
+            new_count = await db.fetchval("SELECT packs_count FROM card_users WHERE telegram_id = $1", tg_id)
+        return web.json_response({"success": True, "packs_count": new_count})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 async def start_webserver():
     images_dir = os.path.join(cards_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
@@ -267,6 +285,7 @@ async def start_webserver():
     app.router.add_post('/api/cards/claim_daily', claim_daily_pack)
     app.router.add_post('/api/cards/open', open_card_pack)
     app.router.add_post('/api/cards/tasks/claim', claim_task_reward)
+    app.router.add_post('/api/cards/give_test_packs', give_test_packs_api)
     
     if os.path.exists(cards_dir):
         app.router.add_static('/cards', cards_dir)
