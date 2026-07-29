@@ -282,11 +282,7 @@ function updateTaskButtons() {
 function setupDailyPackButton() {
     if (!dailyGiftBtn) return;
     
-    // Check click on the floating button, navigate to tasks instead if user wants?
-    // Wait, the user said "кнопку чтобы перекидывало на задания", but for the actual daily gift:
     dailyGiftBtn.addEventListener('click', async () => {
-        
-        // Let's check if it's ready first
         const isReady = dailyTimer.textContent === "ГОТОВО";
         if (!isReady) {
             // Navigate to tasks tab when clicked and not ready
@@ -319,11 +315,12 @@ function setupDailyPackButton() {
             } else {
                 if (data.seconds_left) {
                     startDailyCountdown(data.seconds_left);
+                } else {
+                    alert(data.message || "Ежедневный пак пока недоступен.");
                 }
-                alert(data.message || "Ежедневный пак пока недоступен.");
             }
         } catch (e) {
-            // Local fallback simulation
+            console.error("Daily pack claim fallback", e);
             userData.packs_count++;
             userData.last_daily_pack = new Date().toISOString();
             updateUI();
@@ -333,6 +330,7 @@ function setupDailyPackButton() {
 }
 
 function checkDailyTimer() {
+    if (!dailyTimer) return;
     if (!userData.last_daily_pack) {
         dailyTimer.textContent = "ГОТОВО";
         dailyTimer.style.color = "#00ff88";
@@ -344,7 +342,7 @@ function checkDailyTimer() {
     const now = new Date().getTime();
     const diffSeconds = Math.floor((now - last) / 1000);
 
-    if (diffSeconds >= 86400) {
+    if (isNaN(diffSeconds) || diffSeconds >= 86400) {
         dailyTimer.textContent = "ГОТОВО";
         dailyTimer.style.color = "#00ff88";
         dailyTimer.style.borderColor = "#00ff88";
@@ -432,7 +430,7 @@ openPackBtn.addEventListener('click', async () => {
 
     boosterPack.classList.add('shaking');
     cardStage.classList.add('hidden');
-    card3d.classList.remove('flipped');
+    card3d.classList.remove('flipped', 'aura-epic', 'aura-legendary');
 
     setTimeout(() => {
         boosterPack.classList.remove('shaking');
@@ -452,13 +450,20 @@ openPackBtn.addEventListener('click', async () => {
             </div>
         `;
 
+        // Apply Glowing Aura for Epic & Legendary (as in Shorts reference)
+        if (drop.card.rarity === 'epic') {
+            card3d.classList.add('aura-epic');
+        } else if (drop.card.rarity === 'legendary') {
+            card3d.classList.add('aura-legendary');
+        }
+
         setTimeout(() => {
             card3d.classList.add('flipped');
 
             if (window.confetti) {
                 confetti({
-                    particleCount: drop.card.rarity === 'legendary' ? 120 : 60,
-                    spread: 70,
+                    particleCount: drop.card.rarity === 'legendary' ? 150 : (drop.card.rarity === 'epic' ? 80 : 40),
+                    spread: drop.card.rarity === 'legendary' ? 100 : 70,
                     origin: { y: 0.6 }
                 });
             }
