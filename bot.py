@@ -512,7 +512,7 @@ async def start_handler(message: Message, state: FSMContext):
     if await is_admin(message.from_user.id):
         await message.answer("Добро пожаловать в панель администратора!", reply_markup=get_admin_kb())
     else:
-        await message.answer("Добро пожаловать в FunkoStop! Открывайте коллекционные паки и отслеживайте заказы ниже.", reply_markup=get_start_kb())
+        await message.answer("Добро пожаловать в Личный Кабинет! Нажмите кнопку ниже, чтобы проверить свои заказы.", reply_markup=get_start_kb())
 
 @router.message(Command("give_packs"))
 async def give_packs_cmd(message: Message):
@@ -552,6 +552,14 @@ async def admin_login_start(message: Message, state: FSMContext):
             await message.answer("Неверный логин или пароль администратора.")
     else:
         await message.answer("Использование: /admin_login [логин] [пароль]")
+
+@router.message(Command("admin_logout"))
+@router.message(Command("logout"))
+async def admin_logout_cmd(message: Message, state: FSMContext):
+    await state.clear()
+    async with pool.acquire() as db:
+        await db.execute("UPDATE users SET user_tg_id = NULL WHERE user_tg_id = $1 AND role = 'admin'", message.from_user.id)
+    await message.answer("🚪 Вы вышли из режима администратора. Теперь вы видите меню обычного пользователя.", reply_markup=get_start_kb())
 
 @router.message(Command("add_admin"))
 async def add_new_admin(message: Message):
