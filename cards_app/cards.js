@@ -31,7 +31,7 @@ let userData = {
     telegram_id: effectiveTgId,
     first_name: tg?.initDataUnsafe?.user?.first_name || 'Игрок',
     username: tg?.initDataUnsafe?.user?.username || 'player',
-    packs_count: 5,
+    packs_count: 3,
     last_daily_pack: null,
     completed_tasks: [],
     ref_code: 'ref_' + effectiveTgId
@@ -289,14 +289,7 @@ function setupDailyPackButton() {
     dailyGiftBtn.addEventListener('click', async () => {
         const isReady = dailyTimer.textContent === "ГОТОВО";
         if (!isReady) {
-            // Navigate to tasks tab when clicked and not ready
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
-            
-            const tasksNavBtn = document.querySelector('.nav-btn[data-target="view-community"]');
-            if (tasksNavBtn) tasksNavBtn.classList.add('active');
-            document.getElementById('view-community').classList.remove('hidden');
-            dailyGiftBtn.classList.add('hidden');
+            alert(`⏳ Ежедневный подарок уже получен! Следующий забор будет доступен через ${dailyTimer.textContent}.`);
             return;
         }
 
