@@ -166,11 +166,10 @@ body {
     perspective: 1000px;
 }
 
-/* Booster Pack Styling */
 .booster-pack-wrapper {
     width: 240px;
     height: 360px;
-    background: #000;
+    background: url('/cards/images/pack.png') center/cover no-repeat, radial-gradient(circle at center, #1a0005 0%, #000000 100%);
     border-radius: 16px;
     border: 2px solid var(--neon-red);
     box-shadow: 0 0 30px var(--neon-red-glow);
