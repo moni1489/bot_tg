@@ -54,6 +54,10 @@ body {
     height: 100vh;
     max-height: 900px;
     background-color: #080808;
+    background-image: url('/cards/images/bg.png');
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
     position: relative;
     display: flex;
     flex-direction: column;
