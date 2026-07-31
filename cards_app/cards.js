@@ -49,9 +49,9 @@ const SERIES_CONFIG = [
         theme: 'breaking_bad',
         cards: [
             { index: 1, name: 'Walter White', rarity: 'legendary', img: '/cards/images/card_breaking_bad_1.png' },
-            { index: 2, name: 'Jesse Pinkman', rarity: 'epic', img: '/cards/images/card_breaking_bad_2.png' },
+            { index: 2, name: 'Jesse Pinkman', rarity: 'common', img: '/cards/images/card_breaking_bad_2.png' },
             { index: 3, name: 'Saul Goodman', rarity: 'rare', img: '/cards/images/card_breaking_bad_3.png' },
-            { index: 4, name: 'Gus Fring', rarity: 'common', img: '/cards/images/card_breaking_bad_4.png' }
+            { index: 4, name: 'Gustavo Fring', rarity: 'epic', img: '/cards/images/card_breaking_bad_4.png' }
         ]
     },
     {
@@ -413,7 +413,7 @@ function rollRandomCard() {
     return matching[Math.floor(Math.random() * matching.length)];
 }
 
-// Pack Opening Flow
+// Pack Opening Flow — Shorts-style: card shoots from bottom of screen
 openPackBtn.addEventListener('click', async () => {
     if (isOpening) return;
     if (userData.packs_count <= 0) {
@@ -425,14 +425,14 @@ openPackBtn.addEventListener('click', async () => {
     userData.packs_count--;
     updateUI();
 
+    // Phase 1: Pack shakes & explodes
+    card3d.classList.remove('flipped', 'aura-epic', 'aura-legendary', 'card-fly-in');
     boosterPack.classList.add('shaking');
-    cardStage.classList.add('hidden');
-    card3d.classList.remove('flipped', 'aura-epic', 'aura-legendary');
 
     setTimeout(() => {
+        // Phase 2: Pack disappears, prepare drop
         boosterPack.classList.remove('shaking');
         boosterPack.classList.add('hidden');
-        cardStage.classList.remove('hidden');
 
         const drop = rollRandomCard();
         const cardKey = `${drop.series.slug}_${drop.card.index}`;
@@ -449,38 +449,86 @@ openPackBtn.addEventListener('click', async () => {
             </div>
         `;
 
-        // Apply Glowing Aura for Epic & Legendary (as in Shorts reference)
-        if (drop.card.rarity === 'epic') {
-            card3d.classList.add('aura-epic');
-        } else if (drop.card.rarity === 'legendary') {
-            card3d.classList.add('aura-legendary');
-        }
+        // Phase 3: Show card stage, card starts below screen
+        cardStage.classList.remove('hidden');
+        card3d.style.transform = 'translateY(120vh) rotateY(0deg)';
+        card3d.style.transition = 'none';
+        card3d.style.opacity = '0';
 
-        setTimeout(() => {
-            card3d.classList.add('flipped');
+        // Phase 4: Card SHOOTS UP from bottom (Shorts-style)
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                card3d.style.transition = 'transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.25s ease';
+                card3d.style.transform = 'translateY(0) rotateY(0deg)';
+                card3d.style.opacity = '1';
 
-            if (window.confetti) {
-                confetti({
-                    particleCount: drop.card.rarity === 'legendary' ? 150 : (drop.card.rarity === 'epic' ? 80 : 40),
-                    spread: drop.card.rarity === 'legendary' ? 100 : 70,
-                    origin: { y: 0.6 }
-                });
-            }
+                // Phase 5: Aura on arrival
+                if (drop.card.rarity === 'epic') {
+                    card3d.classList.add('aura-epic');
+                } else if (drop.card.rarity === 'legendary') {
+                    card3d.classList.add('aura-legendary');
+                    // Extra screen flash for legendary
+                    flashScreen();
+                }
 
-            syncOpenedCard(drop.series.slug, drop.card.index);
+                // Phase 6: Card flips to reveal face after landing
+                setTimeout(() => {
+                    card3d.style.transition = 'transform 0.75s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease';
+                    card3d.style.transform = 'translateY(0) rotateY(180deg)';
 
-            setTimeout(() => {
-                isOpening = false;
-                boosterPack.classList.remove('hidden');
-                cardStage.classList.add('hidden');
-                card3d.classList.remove('flipped');
-                renderCollection();
-            }, 3000);
+                    // Confetti burst on reveal
+                    setTimeout(() => {
+                        if (window.confetti) {
+                            confetti({
+                                particleCount: drop.card.rarity === 'legendary' ? 200 : (drop.card.rarity === 'epic' ? 100 : 50),
+                                spread: drop.card.rarity === 'legendary' ? 120 : 80,
+                                origin: { y: 0.5 },
+                                colors: drop.card.rarity === 'legendary' ? ['#ffc107','#ff9800','#fff'] :
+                                        drop.card.rarity === 'epic' ? ['#e040fb','#9c27b0','#fff'] :
+                                        drop.card.rarity === 'rare' ? ['#2196f3','#00bcd4','#fff'] :
+                                        ['#4caf50','#8bc34a','#fff']
+                            });
+                        }
 
-        }, 400);
+                        syncOpenedCard(drop.series.slug, drop.card.index);
+
+                        // Tap-to-dismiss overlay
+                        cardStage.classList.add('tap-to-close');
+                        cardStage.onclick = () => {
+                            cardStage.onclick = null;
+                            cardStage.classList.remove('tap-to-close');
+                            card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
+                            card3d.style.transform = 'translateY(-120vh) rotateY(180deg)';
+                            card3d.style.opacity = '0';
+                            setTimeout(() => {
+                                isOpening = false;
+                                boosterPack.classList.remove('hidden');
+                                cardStage.classList.add('hidden');
+                                card3d.style.transform = '';
+                                card3d.style.transition = '';
+                                card3d.style.opacity = '';
+                                card3d.classList.remove('aura-epic', 'aura-legendary');
+                                renderCollection();
+                            }, 400);
+                        };
+
+                    }, 200);
+                }, 600);
+            });
+        });
 
     }, 1200);
 });
+
+function flashScreen() {
+    const flash = document.createElement('div');
+    flash.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;pointer-events:none;animation:flashAnim 0.5s ease forwards';
+    const style = document.createElement('style');
+    style.textContent = '@keyframes flashAnim{0%{opacity:0.9}100%{opacity:0}}';
+    document.head.appendChild(style);
+    document.body.appendChild(flash);
+    setTimeout(() => { flash.remove(); style.remove(); }, 600);
+}
 
 async function syncOpenedCard(seriesSlug, cardIndex) {
     try {
@@ -545,51 +593,56 @@ function renderCollection() {
 
     SERIES_CONFIG.forEach(series => {
         let seriesCollectedCount = 0;
-        
+        series.cards.forEach(c => { if ((userCards[`${series.slug}_${c.index}`] || 0) > 0) seriesCollectedCount++; });
+
         const seriesBlock = document.createElement('div');
         seriesBlock.className = 'series-card-block';
 
+        // Title row
         const titleRow = document.createElement('div');
         titleRow.className = 'series-title-row';
+        titleRow.innerHTML = `
+            <div class="series-name">${series.name}</div>
+            <div class="series-progress">${seriesCollectedCount} / 4</div>
+        `;
+        seriesBlock.appendChild(titleRow);
 
-        const listView = document.createElement('div');
-        listView.className = 'cards-list-view';
+        // Card grid (visual cards, not list)
+        const grid = document.createElement('div');
+        grid.className = 'cards-grid-view';
 
         series.cards.forEach(card => {
             const cardKey = `${series.slug}_${card.index}`;
             const count = userCards[cardKey] || 0;
             const isCollected = count > 0;
 
-            if (isCollected) {
-                seriesCollectedCount++;
-            }
+            const cardWrap = document.createElement('div');
+            cardWrap.className = `coll-card rarity-border-${card.rarity} ${isCollected ? 'collected' : 'locked'}`;
 
-            const listItem = document.createElement('div');
-            listItem.className = 'card-list-item';
-            
-            const leftCol = document.createElement('div');
-            leftCol.className = 'card-item-left';
-            leftCol.innerHTML = `
-                <span class="card-check">${isCollected ? '✅' : '❌'}</span>
-                <span class="card-item-name" style="color: ${isCollected ? '#fff' : '#666'}">${card.name}</span>
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'coll-card-img-wrap';
+            imgContainer.innerHTML = `
+                <img src="${card.img}" 
+                     class="coll-card-img ${isCollected ? '' : 'silhouette'}" 
+                     alt="${card.name}"
+                     onerror="this.src=''; this.style.display='none';">
+                ${!isCollected ? '<div class="coll-lock-icon">🔒</div>' : ''}
+                ${count > 1 ? `<div class="coll-dupe-badge">x${count}</div>` : ''}
             `;
 
-            const rightCol = document.createElement('div');
-            rightCol.className = `card-item-right ${count > 1 ? 'has-dupes' : ''}`;
-            rightCol.textContent = isCollected ? `${count} шт.` : '0 шт.';
+            const label = document.createElement('div');
+            label.className = 'coll-card-label';
+            label.innerHTML = `
+                <span class="coll-card-name ${isCollected ? '' : 'locked-name'}">${isCollected ? card.name : '???'}</span>
+                <span class="coll-rarity-dot rarity-dot-${card.rarity}"></span>
+            `;
 
-            listItem.appendChild(leftCol);
-            listItem.appendChild(rightCol);
-            listView.appendChild(listItem);
+            cardWrap.appendChild(imgContainer);
+            cardWrap.appendChild(label);
+            grid.appendChild(cardWrap);
         });
 
-        titleRow.innerHTML = `
-            <div class="series-name">${series.name}</div>
-            <div class="series-progress">${seriesCollectedCount} / 4</div>
-        `;
-
-        seriesBlock.appendChild(titleRow);
-        seriesBlock.appendChild(listView);
+        seriesBlock.appendChild(grid);
         seriesContainer.appendChild(seriesBlock);
     });
 }
