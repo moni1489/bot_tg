@@ -162,7 +162,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 100px auto 15px auto;
+    margin: 60px auto 10px auto;
     perspective: 1200px;
 }
 
@@ -345,24 +345,23 @@ body {
 
 /* What's Inside */
 .whats-inside-block {
-    background: #000;
-    border: 2px solid var(--neon-red-dim);
-    border-radius: 16px;
-    padding: 16px;
+    background: transparent;
+    border: none;
+    padding: 0 16px 10px 16px;
     position: relative;
-    margin-top: 10px;
+    margin-top: 5px;
 }
 
 .inside-title-line {
     text-align: center;
-    margin-top: -26px;
-    margin-bottom: 16px;
+    margin-top: 0;
+    margin-bottom: 10px;
 }
 
 .inside-title-line span {
-    background: var(--bg-black);
-    padding: 0 12px;
-    font-size: 0.8rem;
+    background: transparent;
+    padding: 0;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--text-muted);
 }
