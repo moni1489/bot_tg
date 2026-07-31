@@ -1154,7 +1154,7 @@ async def check_archive_password(message: Message, state: FSMContext):
 
 @router.message(F.text == "🧮 Калькулятор стоимости")
 async def calculator_prompt(message: Message):
-    await message.answer("🔗 Просто пришлите мне ссылку на товар из любого американского магазина (например, с eBay или Funko.com), и я автоматически рассчитаю его итоговую стоимость с учетом доставки в РФ!")
+    await message.answer("🔗 Просто пришлите мне ссылку на товар с сайта **eBay**, и я автоматически рассчитаю его итоговую стоимость с учетом доставки в РФ!", parse_mode="Markdown")
 
 # --- LINK PARSER ---
 @router.message(F.text.regexp(r'https?://'))
