@@ -8,6 +8,10 @@
     --text-white: #ffffff;
     --text-muted: #888888;
     --font-main: 'Nunito', -apple-system, sans-serif;
+    --rarity-common: #4caf50;
+    --rarity-rare: #2196f3;
+    --rarity-epic: #9c27b0;
+    --rarity-legendary: #ffc107;
 }
 
 * {
@@ -18,13 +22,11 @@
     -webkit-user-select: none;
 }
 
-/* Hide scrollbars globally to prevent white scrollbars on Desktop/Web */
-::-webkit-scrollbar {
-    display: none;
-}
+/* Hide scrollbars globally */
+::-webkit-scrollbar { display: none; }
 
 body {
-    background-color: var(--bg-black);
+    background-color: #0a0a0a;
     color: var(--text-white);
     font-family: var(--font-main);
     overflow-x: hidden;
@@ -32,9 +34,17 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    /* Hide scrollbars on body */
-    -ms-overflow-style: none; 
+    -ms-overflow-style: none;
     scrollbar-width: none;
+}
+
+/* Background Sticker Decorations */
+.bg-sticker {
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+    transition: opacity 0.3s ease;
 }
 
 /* Phone Bezel Simulator / Main Container */
@@ -43,11 +53,10 @@ body {
     max-width: 420px;
     height: 100vh;
     max-height: 900px;
-    background-color: var(--bg-black);
+    background-color: #080808;
     position: relative;
     display: flex;
     flex-direction: column;
-    /* Red Neon Border around the whole app */
     border: 2px solid var(--neon-red);
     box-shadow: 0 0 20px var(--neon-red-glow), inset 0 0 10px var(--neon-red-glow);
     border-radius: 20px;
@@ -379,29 +388,49 @@ body {
     text-align: center;
 }
 
-/* 3D Opened Card Stage */
+/* 3D Opened Card Stage — full overlay for Shorts-style fly-in */
 .opened-card-stage {
-    width: 240px;
-    height: 360px;
-    perspective: 1000px;
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0,0,0,0.88);
+    backdrop-filter: blur(4px);
+}
+
+.opened-card-stage.tap-to-close::after {
+    content: 'Нажмите, чтобы продолжить';
+    position: absolute;
+    bottom: 80px;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    animation: tapPulse 1.5s infinite;
+}
+@keyframes tapPulse {
+    0%,100% { opacity: 0.4; }
+    50% { opacity: 1; }
 }
 
 .card-3d-wrapper {
-    width: 100%;
-    height: 100%;
+    width: 240px;
+    height: 360px;
     position: relative;
     transform-style: preserve-3d;
-    transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    perspective: 1000px;
+    /* transition is set inline by JS for Shorts-fly animation */
 }
 
-.card-3d-wrapper.flipped {
-    transform: rotateY(180deg);
-}
+
 
 .card-face {
     position: absolute;
-    width: 100%;
-    height: 100%;
+    width: 240px;
+    height: 360px;
     backface-visibility: hidden;
     border-radius: 16px;
     overflow: hidden;
@@ -557,151 +586,124 @@ body {
     color: var(--text-muted);
 }
 
+/* ===== COLLECTION CARD GRID ===== */
+.cards-grid-view {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.coll-card {
+    border-radius: 12px;
+    overflow: hidden;
+    background: #111;
+    border: 2px solid transparent;
+    position: relative;
+    transition: transform 0.2s ease;
+}
+
+.coll-card:active { transform: scale(0.96); }
+
+/* Rarity border colors */
+.rarity-border-common   { border-color: var(--rarity-common); box-shadow: 0 0 6px rgba(76,175,80,0.35); }
+.rarity-border-rare     { border-color: var(--rarity-rare);   box-shadow: 0 0 6px rgba(33,150,243,0.35); }
+.rarity-border-epic     { border-color: var(--rarity-epic);   box-shadow: 0 0 8px rgba(156,39,176,0.5); }
+.rarity-border-legendary{ border-color: var(--rarity-legendary); box-shadow: 0 0 12px rgba(255,193,7,0.6); }
+
+/* Locked card muted border */
+.coll-card.locked { border-color: rgba(255,255,255,0.1); box-shadow: none; }
+
+.coll-card-img-wrap {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0d0d0d;
+}
+
+.coll-card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Auto-silhouette: filters out color leaving a dark shadow */
+.coll-card-img.silhouette {
+    filter: brightness(0) saturate(0) contrast(1.2);
+    opacity: 0.55;
+}
+
+.coll-lock-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    pointer-events: none;
+    /* Slight glow behind lock */
+    text-shadow: 0 0 15px rgba(0,0,0,1);
+}
+
+.coll-dupe-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: var(--neon-red);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 20px;
+    box-shadow: 0 0 8px var(--neon-red-glow);
+}
+
+.coll-card-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px 6px;
+    background: rgba(0,0,0,0.5);
+}
+
+.coll-card-name {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80%;
+}
+
+.locked-name { color: #555; }
+
+.coll-rarity-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.rarity-dot-common    { background: var(--rarity-common); box-shadow: 0 0 4px var(--rarity-common); }
+.rarity-dot-rare      { background: var(--rarity-rare);   box-shadow: 0 0 4px var(--rarity-rare); }
+.rarity-dot-epic      { background: var(--rarity-epic);   box-shadow: 0 0 6px var(--rarity-epic); }
+.rarity-dot-legendary { background: var(--rarity-legendary); box-shadow: 0 0 8px var(--rarity-legendary); }
+
+/* ===== SERIES BLOCK UPDATED ===== */
 .series-card-block {
-    background: transparent;
+    background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 16px;
-    padding: 16px;
+    padding: 14px;
     margin-bottom: 16px;
 }
 
-.series-title-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.series-name {
-    font-weight: 900;
-    font-size: 1.1rem;
-}
-
-.series-progress {
-    font-size: 0.8rem;
-    font-weight: 800;
-    background: var(--neon-red-dim);
-    color: var(--neon-red);
-    padding: 3px 10px;
-    border-radius: 10px;
-}
-
-.cards-list-view {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.card-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 8px;
-}
-
-.card-item-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.card-check {
-    font-size: 1rem;
-}
-
-.card-item-name {
-    font-weight: 700;
-    font-size: 0.9rem;
-}
-
-.card-item-right {
-    font-size: 0.8rem;
-    font-weight: 900;
-    color: var(--text-muted);
-}
-
-.card-item-right.has-dupes {
-    color: var(--neon-red);
-}
-
-/* Tasks & Ref Box */
-.community-section h2 {
-    margin-bottom: 5px;
-}
-
-.section-desc {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 20px;
-}
-
-.task-card {
-    background: #000;
-    border: 1px solid var(--neon-red);
-    box-shadow: inset 0 0 10px var(--neon-red-dim);
-    border-radius: 12px;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-
-.task-info h4 {
-    font-size: 1rem;
-    font-weight: 700;
-}
-
-.task-reward {
-    font-size: 0.8rem;
-    color: var(--neon-red);
-    font-weight: 800;
-    display: block;
-    margin-top: 4px;
-}
-
-.ref-link-row {
-    margin-top: 10px;
-}
-
-.ref-link-row input {
-    width: 100%;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #fff;
-    padding: 10px;
-    border-radius: 8px;
-    font-family: monospace;
-    font-size: 0.8rem;
-}
-
-.btn-task {
-    background: var(--bg-black);
-    border: 1px solid var(--neon-red);
-    color: var(--text-white);
-    padding: 10px;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 800;
-    cursor: pointer;
-    transition: background 0.2s;
-    text-transform: uppercase;
-}
-
-.btn-task:active {
-    background: var(--neon-red-dim);
-}
-
-.btn-task.completed {
-    border-color: #00ff88;
-    color: #00ff88;
-    opacity: 0.7;
-    pointer-events: none;
-}
-
-/* Bottom Nav */
+/* ===== BOTTOM NAV ===== */
 .bottom-nav {
     position: absolute;
     bottom: 0;
@@ -733,10 +735,6 @@ body {
     transition: color 0.2s;
 }
 
-.nav-btn.active {
-    color: var(--neon-red);
-}
+.nav-btn.active { color: var(--neon-red); }
 
-.hidden {
-    display: none !important;
-}
+.hidden { display: none !important; }
