@@ -68,23 +68,7 @@ body {
     margin: auto;
 }
 
-/* Header */
-.app-header {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 15px 20px 5px 20px;
-    background: transparent;
-    position: relative;
-    z-index: 100;
-}
-
-.header-logo-img {
-    height: 55px;
-    width: auto;
-    object-fit: contain;
-    filter: drop-shadow(0 0 10px rgba(255, 0, 34, 0.6));
-}
+/* Removed header CSS as logo is deleted */
 
 .fallback-logo {
     display: flex;
@@ -178,8 +162,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 45px auto 15px auto;
-    margin: 80px auto 15px auto;
+    margin: 100px auto 15px auto;
     perspective: 1200px;
 }
 
@@ -187,7 +170,7 @@ body {
     width: 290px;
     height: 400px;
     position: relative;
-    transform: translateX(14px) scale(1);
+    transform: scale(1);
     cursor: pointer;
     transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.25s ease, opacity 0.3s ease;
     transform-style: preserve-3d;
@@ -206,7 +189,7 @@ body {
 }
 
 .booster-pack-wrapper:hover {
-    transform: translateX(14px) scale(1.04);
+    transform: scale(1.04);
 }
 
 .booster-pack-wrapper.shaking {
