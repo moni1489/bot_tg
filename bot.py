@@ -515,6 +515,18 @@ async def get_client_tg_id_by_order(order_id: int):
             return res['user_tg_id']
         return None
 
+async def get_order_details(order_id: int):
+    async with pool.acquire() as db:
+        res = await db.fetchrow("""
+            SELECT o.id, o.items, o.total_price, o.paid_amount, o.status, o.photo_id, c.user_tg_id 
+            FROM orders o
+            JOIN clients c ON o.client_id = c.id
+            WHERE o.id = $1
+        """, order_id)
+        if res:
+            return dict(res)
+        return None
+
 async def delete_order_db(order_id: int):
     async with pool.acquire() as db:
         await db.execute("DELETE FROM orders WHERE id = $1", order_id)
@@ -560,10 +572,74 @@ STATUSES = [
     "Заказ едет на склад США",
     "Заказ начал сортировку на складе США",
     "Заказ отправлен из США на наш склад в Россию",
+    "Ожидает выхода в продажу",
     "Заказ проходит таможенное оформление",
     "Заказ прибыл в магазин и готов к выдаче",
     "Выдано"
 ]
+
+STATUS_METADATA = {
+    "Заказ принят в обработку": {
+        "emoji": "📝",
+        "desc": "Ваш заказ успешно принят в обработку и оформляется."
+    },
+    "Заказ ожидает отправки из магазина": {
+        "emoji": "📦",
+        "desc": "Заказ выкуплен и ожидает отправки со склада магазина."
+    },
+    "Заказ едет на склад США": {
+        "emoji": "🚚",
+        "desc": "Магазин отправил посылку. Заказ находится в пути на наш склад в США."
+    },
+    "Заказ начал сортировку на складе США": {
+        "emoji": "🏢",
+        "desc": "Посылка поступила на наш склад в США и проходит обработку перед отправкой."
+    },
+    "Заказ отправлен из США на наш склад в Россию": {
+        "emoji": "✈️",
+        "desc": "Упаковка завершена и посылка отправлена в РФ."
+    },
+    "Ожидает выхода в продажу": {
+        "emoji": "⏳",
+        "desc": "Товар оформлен и ожидает официального релиза / выхода в продажу."
+    },
+    "Заказ проходит таможенное оформление": {
+        "emoji": "🛃",
+        "desc": "Посылка прибыла на границу и проходит таможенное оформление."
+    },
+    "Заказ прибыл в магазин и готов к выдаче": {
+        "emoji": "🏠",
+        "desc": "Ваш заказ приехал в магазин. Обратитесь к менеджеру для его получения. Обязательно обращайтесь прикрепляя скриншот данного уведомления!"
+    },
+    "Выдано": {
+        "emoji": "✅",
+        "desc": "Заказ успешно вручен! Спасибо, что выбираете FunkoSTOP!"
+    }
+}
+
+def format_status_notification(order: dict) -> str:
+    status_name = order['status']
+    meta = STATUS_METADATA.get(status_name, {
+        "emoji": "📦",
+        "desc": "Статус вашего заказа обновлен."
+    })
+    
+    order_id = order['id']
+    items = order['items']
+    total_price = order['total_price'] or 0
+    paid_amount = order['paid_amount'] or 0
+    remaining = total_price - paid_amount
+    
+    msg = f"**Изменение статуса!**\n"
+    msg += f"Наименование позиции: {items}\n"
+    msg += f"Track - ID: {order_id}\n"
+    msg += f"Новый статус: {status_name} {meta['emoji']}\n\n"
+    msg += f"{meta['desc']}\n"
+    
+    if remaining > 0:
+        msg += f"\nОстаток доплаты за заказ: {remaining}р."
+        
+    return msg
 
 def get_status_kb(order_id):
     kb = InlineKeyboardMarkup(inline_keyboard=[])
@@ -877,10 +953,15 @@ async def set_order_status(callback: CallbackQuery):
         
     await callback.answer("Статус обновлен")
     
-    client_tg_id = await get_client_tg_id_by_order(order_id)
-    if client_tg_id:
+    order_details = await get_order_details(order_id)
+    if order_details and order_details.get('user_tg_id'):
+        client_tg_id = order_details['user_tg_id']
         try:
-            await bot.send_message(client_tg_id, f"🔔 **Обновление по заказу #{order_id}**\n\nНовый статус: _{new_status}_", parse_mode="Markdown")
+            notify_msg = format_status_notification(order_details)
+            if order_details.get('photo_id'):
+                await bot.send_photo(chat_id=client_tg_id, photo=order_details['photo_id'], caption=notify_msg, parse_mode="Markdown")
+            else:
+                await bot.send_message(chat_id=client_tg_id, text=notify_msg, parse_mode="Markdown")
         except Exception as e:
             logging.error(f"Не удалось отправить уведомление клиенту {client_tg_id}: {e}")
 
@@ -918,6 +999,18 @@ async def update_payment_value(message: Message, state: FSMContext):
     await update_order_payment(order_id, new_paid)
     await message.answer(f"✅ Сумма оплаты по заказу #{order_id} обновлена до {new_paid}.", reply_markup=get_admin_kb())
     await state.clear()
+    
+    order_details = await get_order_details(order_id)
+    if order_details and order_details.get('user_tg_id'):
+        client_tg_id = order_details['user_tg_id']
+        try:
+            notify_msg = format_status_notification(order_details)
+            if order_details.get('photo_id'):
+                await bot.send_photo(chat_id=client_tg_id, photo=order_details['photo_id'], caption=notify_msg, parse_mode="Markdown")
+            else:
+                await bot.send_message(chat_id=client_tg_id, text=notify_msg, parse_mode="Markdown")
+        except Exception as e:
+            logging.error(f"Не удалось отправить уведомление об оплате клиенту {client_tg_id}: {e}")
 
 # --- ADMIN: ARCHIVE LIST ---
 @router.message(F.text == "🗃 Архив заказов (Админ)")
@@ -1144,7 +1237,9 @@ async def handle_link(message: Message, state: FSMContext):
         return
         
     price = float(result.get("price", 0.0) or 0.0)
-    shipping = float(result.get("shipping", 0.0) or 0.0)
+    raw_shipping = float(result.get("shipping", 0.0) or 0.0)
+    # Add +$2.00 to US shipping cost as requested
+    shipping = raw_shipping + 2.0
     weight = result.get("weight")
     name = result.get("name", "Товар")
     
@@ -1160,7 +1255,7 @@ async def handle_link(message: Message, state: FSMContext):
     )
 
     if weight is None:
-        await message.answer(f"📦 **{name}**\n💵 Цена: ${price}\n\n⚖️ Вес товара не найден на странице.\nПожалуйста, напишите примерный вес товара в **кг** (например, 0.5):", parse_mode="Markdown")
+        await message.answer(f"📦 **{name}**\n💵 Цена: ${price}\n🚚 Доставка по США: ${shipping:.2f}\n\n⚖️ Вес товара не найден на странице.\nПожалуйста, напишите примерный вес товара в **кг** (например, 0.5):", parse_mode="Markdown")
         await state.set_state(ParseLink.waiting_for_weight)
     else:
         await calculate_and_send_result(message, state, float(weight))
@@ -1207,7 +1302,8 @@ async def calculate_and_send_result(message: Message, state: FSMContext, weight:
     ])
     
     response = f"📦 **{name}**\n\n"
-    response += f"💵 Цена на сайте: ${price}\n"
+    response += f"💵 Цена на сайте: ${price:.2f}\n"
+    response += f"🚚 Доставка по США: ${shipping:.2f}\n"
     response += f"⚖️ Вес: {weight} кг\n\n"
     response += f"💰 **Итого к оплате: ~{final_price_rub} ₽**\n"
     response += f"_(Включая доставку в РФ и комиссию сервиса)_\n\n"
