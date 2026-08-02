@@ -954,16 +954,21 @@ async def set_order_status(callback: CallbackQuery):
     await callback.answer("Статус обновлен")
     
     order_details = await get_order_details(order_id)
+    logging.info(f"[NOTIFY] order_details for #{order_id}: {order_details}")
     if order_details and order_details.get('user_tg_id'):
         client_tg_id = order_details['user_tg_id']
+        logging.info(f"[NOTIFY] Sending to {client_tg_id}, status: {new_status}")
         try:
             notify_msg = format_status_notification(order_details)
             if order_details.get('photo_id'):
                 await bot.send_photo(chat_id=client_tg_id, photo=order_details['photo_id'], caption=notify_msg, parse_mode="Markdown")
             else:
                 await bot.send_message(chat_id=client_tg_id, text=notify_msg, parse_mode="Markdown")
+            logging.info(f"[NOTIFY] Sent OK to {client_tg_id}")
         except Exception as e:
-            logging.error(f"Не удалось отправить уведомление клиенту {client_tg_id}: {e}")
+            logging.error(f"[NOTIFY] FAILED for {client_tg_id}: {e}")
+    else:
+        logging.warning(f"[NOTIFY] No user_tg_id for order #{order_id} — user not linked")
 
 # --- ADMIN: UPDATE PAYMENT ---
 @router.message(F.text == "💰 Изменить оплату по заказу")
