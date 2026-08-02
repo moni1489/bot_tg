@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FunkoStop Cards</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/cards/cards.css?v=3">
+    <link rel="stylesheet" href="/cards/cards.css?v=35">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
@@ -23,10 +23,30 @@
         <!-- MAIN VIEW (Pack Opening) -->
         <main id="view-home" class="tab-view active">
             
+            <!-- Animated Background Particles -->
+            <div class="bg-particles">
+                <div class="particle p-crown">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5z"/></svg>
+                </div>
+                <div class="particle p-ruble">₽</div>
+                <div class="particle p-heart">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                </div>
+                <div class="particle p-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="14" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="22"></line><path d="M12 8H8a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2h0c1.1 0 2 .9 2 2v0c0 1.1.9 2 2 2z"></path><path d="M12 8h4a2 2 0 0 0 2-2v0a2 2 0 0 0-2-2h0c-1.1 0-2 .9-2 2v0c0 1.1-.9 2-2 2z"></path></svg>
+                </div>
+                <div class="particle p-crown-2">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5z"/></svg>
+                </div>
+                <div class="particle p-ruble-2">₽</div>
+            </div>
+            
             <!-- Pack Area -->
             <div class="pack-stage">
                 <div class="booster-pack-wrapper" id="booster-pack">
-                    <img src="/cards/images/pack1.png?v=4" class="booster-pack-img" alt="Booster Pack">
+                    <img src="/cards/images/backcard.png" class="pack-inside-card" id="pack-inside-card" alt="">
+                    <img src="/cards/images/pack1.png?v=4" class="booster-pack-img pack-bottom-part" id="pack-bottom" alt="Booster Pack">
+                    <img src="/cards/images/pack1.png?v=4" class="booster-pack-img pack-top-part" id="pack-top" alt="Booster Pack">
                 </div>
 
                 <!-- Opened card will appear as fixed overlay -->
@@ -39,9 +59,9 @@
                     <span class="packs-counter-badge" id="packs-count-badge">5</span>
                 </button>
             </div>
-            <div style="display:flex; justify-content:center; gap:8px; margin-top:-5px; margin-bottom:15px;">
-                <button id="add-test-packs-btn" style="background: rgba(255,0,34,0.1); border: 1px dashed var(--neon-red); color: #fff; font-size: 0.7rem; font-weight: 800; padding: 6px 10px; border-radius: 12px; cursor: pointer;">⚡️ +10 ПАКОВ</button>
-                <button id="reset-test-daily-btn" style="background: rgba(0,255,136,0.1); border: 1px dashed #00ff88; color: #fff; font-size: 0.7rem; font-weight: 800; padding: 6px 10px; border-radius: 12px; cursor: pointer;">🔄 СБРОСИТЬ ТАЙМЕР</button>
+            <div style="position: absolute; top: 15px; left: 15px; display:flex; flex-direction:column; gap:8px; opacity: 0.15; z-index: 1000; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.15'">
+                <button id="add-test-packs-btn" style="background: rgba(255,0,34,0.1); border: 1px dashed var(--neon-red); color: #fff; font-size: 0.6rem; font-weight: 800; padding: 4px 8px; border-radius: 8px; cursor: pointer;">⚡️ +10</button>
+                <button id="reset-test-daily-btn" style="background: rgba(0,255,136,0.1); border: 1px dashed #00ff88; color: #fff; font-size: 0.6rem; font-weight: 800; padding: 4px 8px; border-radius: 8px; cursor: pointer;">🔄 СБРОС</button>
             </div>
 
             <!-- What's Inside Block -->
@@ -52,26 +72,25 @@
                 <div class="inside-grid">
                     <div class="inside-item">
                         <div class="item-icon-box">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M8 6h8M8 10h8M8 14h4"/></svg>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff0022" stroke-width="2" style="filter: drop-shadow(0 0 3px #ff0022);"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M8 6h8M8 10h8M8 14h4"/></svg>
                         </div>
                         <div class="item-label">КАРТОЧКА</div>
                     </div>
                     <div class="inside-item">
                         <div class="item-icon-box">
-                            <!-- Discount % Icon -->
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff0022" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 3px #ff0022);"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>
                         </div>
                         <div class="item-label">СКИДКА</div>
                     </div>
                     <div class="inside-item">
                         <div class="item-icon-box">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><rect x="3" y="8" width="18" height="14" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="22"></line><path d="M12 8H8a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2h0c1.1 0 2 .9 2 2v0c0 1.1.9 2 2 2z"></path><path d="M12 8h4a2 2 0 0 0 2-2v0a2 2 0 0 0-2-2h0c-1.1 0-2 .9-2 2v0c0 1.1-.9 2-2 2z"></path></svg>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff0022" stroke-width="2" style="filter: drop-shadow(0 0 3px #ff0022);"><rect x="3" y="8" width="18" height="14" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="22"></line><path d="M12 8H8a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2h0c1.1 0 2 .9 2 2v0c0 1.1.9 2 2 2z"></path><path d="M12 8h4a2 2 0 0 0 2-2v0a2 2 0 0 0-2-2h0c-1.1 0-2 .9-2 2v0c0 1.1-.9 2-2 2z"></path></svg>
                         </div>
                         <div class="item-label">БОНУСНЫЙ ПАК</div>
                     </div>
                     <div class="inside-item">
                         <div class="item-icon-box">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><circle cx="12" cy="8" r="4"></circle><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"></path></svg>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff0022" stroke-width="2" style="filter: drop-shadow(0 0 3px #ff0022);"><circle cx="12" cy="8" r="4"></circle><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"></path></svg>
                         </div>
                         <div class="item-label">ФИГУРКА</div>
                     </div>
@@ -83,6 +102,24 @@
         <main id="view-collection" class="tab-view hidden">
             <div class="collection-header">
                 <h2>КОЛЛЕКЦИЯ</h2>
+                <div class="collection-stats-box">
+                    <div class="stat-item">
+                        <div class="stat-val stat-white" id="stat-total">28</div>
+                        <div class="stat-label">ВСЕГО</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-val stat-green" id="stat-collected">0</div>
+                        <div class="stat-label">СОБРАНО</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-val stat-red" id="stat-missing">28</div>
+                        <div class="stat-label">ОТСУТСТВУЕТ</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-val stat-white" id="stat-dupes">0</div>
+                        <div class="stat-label">ДУБЛИКАТЫ</div>
+                    </div>
+                </div>
             </div>
             
             <div class="series-list" id="series-container">
@@ -152,18 +189,43 @@
 
     <!-- Card Reveal Overlay (Shorts-style full-screen, outside all containers) -->
     <div class="opened-card-stage hidden" id="card-stage">
+        <div id="svet-bg"></div>
+        <div id="backcards-bg">
+            <img src="/cards/images/backcard.png" class="floating-backcard fb-1" alt="">
+            <img src="/cards/images/backcard.png" class="floating-backcard fb-2" alt="">
+            <img src="/cards/images/backcard.png" class="floating-backcard fb-3" alt="">
+        </div>
         <div class="card-3d-wrapper" id="card-3d">
             <div class="card-face card-back">
                 <div class="card-back-pattern">
-                    <div>FunkoSTOP</div>
+                    <img src="/cards/images/backcard.png" class="backcard-img" alt="Card Back">
                 </div>
             </div>
             <div class="card-face card-front" id="card-front">
                 <!-- Injected dynamically -->
             </div>
         </div>
+        <button id="btn-flip-card" class="hidden" style="position: absolute; bottom: 100px; z-index: 10; font-size: 1.0rem; font-weight: 900; color: #fff; background: transparent; border: none; outline: none; letter-spacing: 2px; text-shadow: 0 0 10px rgba(255,0,34,0.8);">ОТКРЫТЬ</button>
+        <div class="opened-card-actions hidden" id="opened-card-actions">
+            <button id="btn-next-pack" class="btn-action-primary">ОТКРЫТЬ СЛЕДУЮЩУЮ</button>
+            <button id="btn-exit-pack" class="btn-action-secondary">ВЫЙТИ</button>
+        </div>
     </div>
 
-    <script src="/cards/cards.js?v=3"></script>
+    <!-- Collection Card Lightbox -->
+    <div class="card-lightbox hidden" id="card-lightbox">
+        <div class="card-lightbox-overlay" id="lightbox-close"></div>
+        <div class="card-lightbox-content">
+            <img class="card-lightbox-img" id="lightbox-img" src="" alt="">
+            <div class="card-lightbox-info">
+                <div class="card-lightbox-name" id="lightbox-name"></div>
+                <div class="card-lightbox-rarity" id="lightbox-rarity"></div>
+                <div class="card-lightbox-series" id="lightbox-series"></div>
+            </div>
+            <button class="card-lightbox-close" id="lightbox-close-btn">✕ Закрыть</button>
+        </div>
+    </div>
+
+    <script src="/cards/cards.js?v=6"></script>
 </body>
 </html>
