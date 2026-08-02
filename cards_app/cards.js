@@ -81,10 +81,10 @@ const SERIES_CONFIG = [
         name: 'Death Note',
         theme: 'death_note',
         cards: [
-            { index: 1, name: 'Ryuk', rarity: 'legendary', img: '/cards/images/card_death_note_1.png' },
-            { index: 2, name: 'L', rarity: 'epic', img: '/cards/images/card_death_note_2.png' },
-            { index: 3, name: 'Light Yagami', rarity: 'rare', img: '/cards/images/card_death_note_3.png' },
-            { index: 4, name: 'Misa Aane', rarity: 'common', img: '/cards/images/card_death_note_4.png' }
+            { index: 1, name: 'Misa Amane', rarity: 'common',    img: '/cards/images/card_death_note_1.png' },
+            { index: 2, name: 'Ryuk',       rarity: 'rare',      img: '/cards/images/card_death_note_2.png' },
+            { index: 3, name: 'L',          rarity: 'epic',      img: '/cards/images/card_death_note_3.png' },
+            { index: 4, name: 'Light Yagami', rarity: 'legendary', img: '/cards/images/card_death_note_4.png' }
         ]
     },
     {
@@ -414,6 +414,8 @@ function rollRandomCard() {
 }
 
 // Pack Opening Flow — Shorts-style: card shoots from bottom of screen
+let fastOpen = false;
+
 openPackBtn.addEventListener('click', async () => {
     if (isOpening) return;
     if (userData.packs_count <= 0) {
@@ -422,21 +424,28 @@ openPackBtn.addEventListener('click', async () => {
     }
 
     isOpening = true;
+    const isFast = fastOpen;
+    fastOpen = false; // reset for next time
     userData.packs_count--;
     updateUI();
 
-    // Phase 1: Pack shakes & explodes
+    // Phase 1: Pack tearing and card peeking (No shaking)
     card3d.classList.remove('flipped', 'aura-epic', 'aura-legendary', 'card-fly-in');
-    boosterPack.classList.add('shaking');
+    
+    const packTop = document.getElementById('pack-top');
+    const packInside = document.getElementById('pack-inside-card');
+
+    boosterPack.classList.add('is-tearing');
+    packTop.classList.add('tearing-left');
+    packInside.classList.add('peeking');
 
     setTimeout(() => {
         // Phase 2: Pack disappears, prepare drop
-        boosterPack.classList.remove('shaking');
         boosterPack.classList.add('hidden');
 
-        const drop = rollRandomCard();
-        const cardKey = `${drop.series.slug}_${drop.card.index}`;
-        userCards[cardKey] = (userCards[cardKey] || 0) + 1;
+            const drop = rollRandomCard();
+            const cardKey = `${drop.series.slug}_${drop.card.index}`;
+            userCards[cardKey] = (userCards[cardKey] || 0) + 1;
 
         cardFront.innerHTML = `
             <div class="card-frame ${drop.series.theme}">
@@ -454,11 +463,19 @@ openPackBtn.addEventListener('click', async () => {
         card3d.style.transform = 'translateY(120vh) rotateY(0deg)';
         card3d.style.transition = 'none';
         card3d.style.opacity = '0';
+        
+        // Reset and prepare background elements
+        const svetBg = document.getElementById('svet-bg');
+        const actions = document.getElementById('opened-card-actions');
+        if(svetBg) svetBg.className = '';
+        if(svetBg) svetBg.style.opacity = '0';
+        cardStage.classList.remove('show-backcards');
+        actions.classList.add('hidden');
 
-        // Phase 4: Card SHOOTS UP from bottom (Shorts-style)
+        // Phase 4: Card SHOOTS UP from bottom
         requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                card3d.style.transition = 'transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.25s ease';
+                const flySpeed = isFast ? '0.8s' : '1.2s';
+                card3d.style.transition = `transform ${flySpeed} cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.4s ease`;
                 card3d.style.transform = 'translateY(0) rotateY(0deg)';
                 card3d.style.opacity = '1';
 
@@ -470,10 +487,16 @@ openPackBtn.addEventListener('click', async () => {
                     // Extra screen flash for legendary
                     flashScreen();
                 }
-
-                // Phase 6: Card flips to reveal face after landing
-                setTimeout(() => {
-                    card3d.style.transition = 'transform 0.75s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease';
+                
+                // Phase 6: Wait for tap to flip
+                const btnFlipCard = document.getElementById('btn-flip-card');
+                
+                const handleTapToFlip = () => {
+                    btnFlipCard.removeEventListener('click', handleTapToFlip);
+                    btnFlipCard.classList.add('hidden');
+                    
+                    const flipSpeed = isFast ? '0.7s' : '1.0s';
+                    card3d.style.transition = `transform ${flipSpeed} cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease`;
                     card3d.style.transform = 'translateY(0) rotateY(180deg)';
 
                     // Confetti burst on reveal
@@ -492,32 +515,82 @@ openPackBtn.addEventListener('click', async () => {
 
                         syncOpenedCard(drop.series.slug, drop.card.index);
 
-                        // Tap-to-dismiss overlay
-                        cardStage.classList.add('tap-to-close');
-                        cardStage.onclick = () => {
-                            cardStage.onclick = null;
-                            cardStage.classList.remove('tap-to-close');
+                        // Show action buttons
+                        actions.classList.remove('hidden');
+
+                        const closeStageFn = (hideCompletely) => {
+                            if (hideCompletely) {
+                                cardStage.style.opacity = '0';
+                                cardStage.style.visibility = 'hidden';
+                                setTimeout(() => {
+                                    cardStage.classList.add('hidden');
+                                    cardStage.style.opacity = '';
+                                    cardStage.style.visibility = '';
+                                }, 400);
+                            }
+                            card3d.style.transition = 'none';
+                            
+                            cardStage.classList.remove('show-backcards');
+                            if(svetBg) svetBg.style.opacity = '0';
+                            actions.classList.add('hidden');
+                            if (hideCompletely) {
+                                boosterPack.classList.remove('hidden', 'shaking', 'is-tearing');
+                                packTop.classList.remove('tearing-left');
+                                packInside.classList.remove('peeking');
+                                isOpening = false;
+                                renderCollection();
+                            }
+                        };
+
+                        const exitBtn = document.getElementById('btn-exit-pack');
+                        const nextBtn = document.getElementById('btn-next-pack');
+                        
+                        // Clear old listeners
+                        const newExit = exitBtn.cloneNode(true);
+                        const newNext = nextBtn.cloneNode(true);
+                        exitBtn.parentNode.replaceChild(newExit, exitBtn);
+                        nextBtn.parentNode.replaceChild(newNext, nextBtn);
+                        
+                        newExit.addEventListener('click', () => {
                             card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
                             card3d.style.transform = 'translateY(-120vh) rotateY(180deg)';
                             card3d.style.opacity = '0';
+                            setTimeout(() => closeStageFn(true), 400);
+                        });
+                        
+                        newNext.addEventListener('click', () => {
+                            if (userData.packs_count <= 0) {
+                                alert("У вас больше нет паков!");
+                                return;
+                            }
+                            card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
+                            card3d.style.transform = 'translateY(120vh) rotateY(180deg)';
+                            card3d.style.opacity = '0';
                             setTimeout(() => {
+                                closeStageFn(false);
                                 isOpening = false;
-                                boosterPack.classList.remove('hidden');
-                                cardStage.classList.add('hidden');
-                                card3d.style.transform = '';
-                                card3d.style.transition = '';
-                                card3d.style.opacity = '';
-                                card3d.classList.remove('aura-epic', 'aura-legendary');
-                                renderCollection();
+                                fastOpen = true; // Set flag for next open
+                                document.getElementById('open-pack-btn').click();
                             }, 400);
-                        };
+                        });
 
-                    }, 200);
-                }, 600);
+                    }, isFast ? 200 : 350); // Small wait after flip starts before confetti
+                };
+
+                // Allow tapping to flip once the card has flown in
+                setTimeout(() => {
+                    btnFlipCard.classList.remove('hidden');
+                    btnFlipCard.style.animation = 'fadeInSlideUp 0.4s ease forwards';
+                    btnFlipCard.addEventListener('click', handleTapToFlip);
+                }, isFast ? 500 : 900);
+                
+                // Trigger glow (backcards disabled as requested)
+                if(svetBg) svetBg.classList.add('svet-' + drop.card.rarity);
+                if(svetBg) svetBg.style.opacity = '1';
             });
-        });
 
-    }, 1200);
+    }, isFast ? 50 : 1500); // end of Phase 1 (Tearing duration)
+
 });
 
 function flashScreen() {
@@ -547,6 +620,42 @@ async function syncOpenedCard(seriesSlug, cardIndex) {
 }
 
 // Render Collection
+const MANAGER_URL = 'https://t.me/Funko_Stop';
+
+function openLightbox(card, series, isCollected) {
+    const lb = document.getElementById('card-lightbox');
+    const img = document.getElementById('lightbox-img');
+    const name = document.getElementById('lightbox-name');
+    const rarity = document.getElementById('lightbox-rarity');
+    const seriesEl = document.getElementById('lightbox-series');
+
+    if (!isCollected) {
+        img.src = card.img;
+        img.style.filter = 'brightness(0) saturate(0) contrast(1.2)';
+        name.textContent = '???';
+    } else {
+        img.src = card.img;
+        img.style.filter = 'none';
+        name.textContent = card.name;
+    }
+
+    const rarityLabels = { common: 'Common', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' };
+    rarity.textContent = rarityLabels[card.rarity] || card.rarity;
+    rarity.className = `card-lightbox-rarity lightbox-rarity-${card.rarity}`;
+    seriesEl.textContent = series.name;
+
+    lb.classList.remove('hidden');
+}
+
+function closeLightbox() {
+    document.getElementById('card-lightbox').classList.add('hidden');
+}
+
+function setupLightboxClose() {
+    document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+    document.getElementById('lightbox-close-btn').addEventListener('click', closeLightbox);
+}
+
 function renderCollection() {
     seriesContainer.innerHTML = '';
     let totalCollected = 0;
@@ -567,33 +676,21 @@ function renderCollection() {
         if (count > 1) totalDupes += (count - 1);
     });
 
-    // We can inject stats right above the container
-    const statsHtml = `
-        <div class="collection-stats">
-            <div class="stat-box">
-                <span class="stat-val">${totalCards}</span>
-                <span class="stat-label">ВСЕГО</span>
-            </div>
-            <div class="stat-box">
-                <span class="stat-val" style="color:#00ff88;">${totalCollected}</span>
-                <span class="stat-label">СОБРАНО</span>
-            </div>
-            <div class="stat-box">
-                <span class="stat-val" style="color:var(--neon-red);">${missing}</span>
-                <span class="stat-label">ОТСУТСТВУЕТ</span>
-            </div>
-            <div class="stat-box">
-                <span class="stat-val">${totalDupes}</span>
-                <span class="stat-label">ДУБЛИКАТЫ</span>
-            </div>
-        </div>
-        <br>
-    `;
-    seriesContainer.innerHTML = statsHtml;
+    // Update global header stats in DOM
+    const elTotal = document.getElementById('stat-total');
+    if (elTotal) elTotal.textContent = totalCards;
+    const elCollected = document.getElementById('stat-collected');
+    if (elCollected) elCollected.textContent = totalCollected;
+    const elMissing = document.getElementById('stat-missing');
+    if (elMissing) elMissing.textContent = missing;
+    const elDupes = document.getElementById('stat-dupes');
+    if (elDupes) elDupes.textContent = totalDupes;
 
     SERIES_CONFIG.forEach(series => {
         let seriesCollectedCount = 0;
         series.cards.forEach(c => { if ((userCards[`${series.slug}_${c.index}`] || 0) > 0) seriesCollectedCount++; });
+        const isFull = seriesCollectedCount === 4;
+        const progressPct = Math.round((seriesCollectedCount / 4) * 100);
 
         const seriesBlock = document.createElement('div');
         seriesBlock.className = 'series-card-block';
@@ -607,7 +704,7 @@ function renderCollection() {
         `;
         seriesBlock.appendChild(titleRow);
 
-        // Card grid (visual cards, not list)
+        // Card grid (4 columns)
         const grid = document.createElement('div');
         grid.className = 'cards-grid-view';
 
@@ -618,6 +715,7 @@ function renderCollection() {
 
             const cardWrap = document.createElement('div');
             cardWrap.className = `coll-card rarity-border-${card.rarity} ${isCollected ? 'collected' : 'locked'}`;
+            cardWrap.style.cursor = 'pointer';
 
             const imgContainer = document.createElement('div');
             imgContainer.className = 'coll-card-img-wrap';
@@ -639,13 +737,40 @@ function renderCollection() {
 
             cardWrap.appendChild(imgContainer);
             cardWrap.appendChild(label);
+
+            // Click to preview
+            cardWrap.addEventListener('click', () => openLightbox(card, series, isCollected));
+
             grid.appendChild(cardWrap);
         });
 
         seriesBlock.appendChild(grid);
+
+        // Progress bar
+        const progressWrap = document.createElement('div');
+        progressWrap.className = 'series-progress-wrap';
+        progressWrap.innerHTML = `
+            <div class="series-progress-bar-bg">
+                <div class="series-progress-bar-fill ${isFull ? 'full' : ''}" style="width:${progressPct}%"></div>
+            </div>
+        `;
+        seriesBlock.appendChild(progressWrap);
+
+        // Prize banner when series is complete
+        if (isFull) {
+            const prizeBanner = document.createElement('div');
+            prizeBanner.className = 'series-prize-banner';
+            prizeBanner.innerHTML = `
+                <div class="series-prize-text">🏆 Коллекция собрана!<br>Напишите менеджеру за призом!</div>
+                <button class="series-prize-btn" onclick="window.open('${MANAGER_URL}','_blank')">Написать →</button>
+            `;
+            seriesBlock.appendChild(prizeBanner);
+        }
+
         seriesContainer.appendChild(seriesBlock);
     });
 }
+
 
 function setupTestButton() {
     const addTestPacksBtn = document.getElementById('add-test-packs-btn');
@@ -696,6 +821,7 @@ function initApp() {
     setupTasks();
     setupDailyPackButton();
     setupTestButton();
+    setupLightboxClose();
     fetchProfile();
 }
 
