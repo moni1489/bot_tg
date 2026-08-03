@@ -119,9 +119,10 @@ body {
     transform: scale(0.92);
 }
 
-.daily-gift-icon svg {
-    width: 20px;
-    height: 20px;
+.daily-gift-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
 }
 
 .daily-gift-text {
