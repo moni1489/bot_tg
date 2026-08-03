@@ -41,17 +41,19 @@ let userCards = {};
 let isOpening = false;
 let dailyTimerInterval = null;
 
-// 7 Series Configurations (28 total cards)
+// 7 Series Configurations
+const RARITY_ORDER = { common: 0, rare: 1, epic: 2, legendary: 3 };
+
 const SERIES_CONFIG = [
     {
         slug: 'breaking_bad',
         name: 'Breaking Bad',
         theme: 'breaking_bad',
         cards: [
-            { index: 1, name: 'Walter White', rarity: 'legendary', img: '/cards/images/card_breaking_bad_1.png' },
-            { index: 2, name: 'Jesse Pinkman', rarity: 'common', img: '/cards/images/card_breaking_bad_2.png' },
-            { index: 3, name: 'Saul Goodman', rarity: 'rare', img: '/cards/images/card_breaking_bad_3.png' },
-            { index: 4, name: 'Gustavo Fring', rarity: 'epic', img: '/cards/images/card_breaking_bad_4.png' }
+            { index: 1, name: 'Walter White',  rarity: 'legendary', img: '/cards/images/card_breaking_bad_1.png' },
+            { index: 2, name: 'Jesse Pinkman', rarity: 'common',   img: '/cards/images/card_breaking_bad_2.png' },
+            { index: 3, name: 'Saul Goodman',  rarity: 'rare',     img: '/cards/images/card_breaking_bad_3.png' },
+            { index: 4, name: 'Gustavo Fring', rarity: 'epic',     img: '/cards/images/card_breaking_bad_4.png' }
         ]
     },
     {
@@ -59,21 +61,21 @@ const SERIES_CONFIG = [
         name: 'Marvel',
         theme: 'marvel',
         cards: [
-            { index: 1, name: 'Iron Man', rarity: 'legendary', img: '/cards/images/card_marvel_1.png' },
-            { index: 2, name: 'Spider-Man', rarity: 'epic', img: '/cards/images/card_marvel_2.png' },
-            { index: 3, name: 'Captain America', rarity: 'rare', img: '/cards/images/card_marvel_3.png' },
-            { index: 4, name: 'Deadpool', rarity: 'common', img: '/cards/images/card_marvel_4.png' }
+            { index: 1, name: 'Iron Man',         rarity: 'legendary', img: '/cards/images/card_marvel_1.png' },
+            { index: 2, name: 'Spider-Man',       rarity: 'epic',      img: '/cards/images/card_marvel_2.png' },
+            { index: 3, name: 'Captain America',  rarity: 'rare',      img: '/cards/images/card_marvel_3.png' },
+            { index: 4, name: 'Deadpool',         rarity: 'common',    img: '/cards/images/card_marvel_4.png' }
         ]
     },
     {
-        slug: 'dc',
-        name: 'DC Comics',
-        theme: 'dc',
+        slug: 'resident_evil',
+        name: 'Resident Evil',
+        theme: 'resident_evil',
         cards: [
-            { index: 1, name: 'Batman', rarity: 'legendary', img: '/cards/images/card_dc_1.png' },
-            { index: 2, name: 'Superman', rarity: 'epic', img: '/cards/images/card_dc_2.png' },
-            { index: 3, name: 'Joker', rarity: 'rare', img: '/cards/images/card_dc_3.png' },
-            { index: 4, name: 'Flash', rarity: 'common', img: '/cards/images/card_dc_4.png' }
+            { index: 1, name: 'Zombie',          rarity: 'common',    img: '/cards/images/card_residennt_evil_1.png' },
+            { index: 2, name: 'Leon S. Kennedy', rarity: 'rare',      img: '/cards/images/card_residennt_evil_2.png' },
+            { index: 3, name: 'Jill Valentine',  rarity: 'epic',      img: '/cards/images/card_residennt_evil_3.png' },
+            { index: 4, name: 'Albert Wesker',   rarity: 'legendary', img: '/cards/images/card_residennt_evil_4.png' }
         ]
     },
     {
@@ -81,9 +83,9 @@ const SERIES_CONFIG = [
         name: 'Death Note',
         theme: 'death_note',
         cards: [
-            { index: 1, name: 'Misa Amane', rarity: 'common',    img: '/cards/images/card_death_note_1.png' },
-            { index: 2, name: 'Ryuk',       rarity: 'rare',      img: '/cards/images/card_death_note_2.png' },
-            { index: 3, name: 'L',          rarity: 'epic',      img: '/cards/images/card_death_note_3.png' },
+            { index: 1, name: 'Misa Amane',   rarity: 'common',    img: '/cards/images/card_death_note_1.png' },
+            { index: 2, name: 'Ryuk',         rarity: 'rare',      img: '/cards/images/card_death_note_2.png' },
+            { index: 3, name: 'L',            rarity: 'epic',      img: '/cards/images/card_death_note_3.png' },
             { index: 4, name: 'Light Yagami', rarity: 'legendary', img: '/cards/images/card_death_note_4.png' }
         ]
     },
@@ -92,10 +94,10 @@ const SERIES_CONFIG = [
         name: 'Invincible',
         theme: 'invincible',
         cards: [
-            { index: 1, name: 'Omni-Man', rarity: 'legendary', img: '/cards/images/card_invincible_1.png' },
-            { index: 2, name: 'Invincible', rarity: 'epic', img: '/cards/images/card_invincible_2.png' },
-            { index: 3, name: 'Atom Eve', rarity: 'rare', img: '/cards/images/card_invincible_3.png' },
-            { index: 4, name: 'Allen', rarity: 'common', img: '/cards/images/card_invincible_4.png' }
+            { index: 1, name: 'Mark Grayson', rarity: 'common',    img: '/cards/images/card_invincible_1.png' },
+            { index: 2, name: 'Atom Eve',     rarity: 'rare',      img: '/cards/images/card_invincible_2.png' },
+            { index: 3, name: 'Invincible',   rarity: 'epic',      img: '/cards/images/card_invincible_3.png' },
+            { index: 4, name: 'Omni-Man',     rarity: 'legendary', img: '/cards/images/card_invincible_4.png' }
         ]
     },
     {
@@ -104,9 +106,9 @@ const SERIES_CONFIG = [
         theme: 'one_piece',
         cards: [
             { index: 1, name: 'Luffy', rarity: 'legendary', img: '/cards/images/card_one_piece_1.png' },
-            { index: 2, name: 'Zoro', rarity: 'epic', img: '/cards/images/card_one_piece_2.png' },
-            { index: 3, name: 'Sanji', rarity: 'rare', img: '/cards/images/card_one_piece_3.png' },
-            { index: 4, name: 'Nami', rarity: 'common', img: '/cards/images/card_one_piece_4.png' }
+            { index: 2, name: 'Zoro',  rarity: 'epic',      img: '/cards/images/card_one_piece_2.png' },
+            { index: 3, name: 'Sanji', rarity: 'rare',      img: '/cards/images/card_one_piece_3.png' },
+            { index: 4, name: 'Nami',  rarity: 'common',    img: '/cards/images/card_one_piece_4.png' }
         ]
     },
     {
@@ -115,9 +117,9 @@ const SERIES_CONFIG = [
         theme: 'universal',
         cards: [
             { index: 1, name: 'Funko Gold Crown', rarity: 'legendary', img: '/cards/images/card_universal_1.png' },
-            { index: 2, name: 'Funko Silver', rarity: 'epic', img: '/cards/images/card_universal_2.png' },
-            { index: 3, name: 'Funko Bronze', rarity: 'rare', img: '/cards/images/card_universal_3.png' },
-            { index: 4, name: 'Funko Classic', rarity: 'common', img: '/cards/images/card_universal_4.png' }
+            { index: 2, name: 'Funko Silver',     rarity: 'epic',      img: '/cards/images/card_universal_2.png' },
+            { index: 3, name: 'Funko Bronze',     rarity: 'rare',      img: '/cards/images/card_universal_3.png' },
+            { index: 4, name: 'Funko Classic',    rarity: 'common',    img: '/cards/images/card_universal_4.png' }
         ]
     }
 ];
@@ -154,6 +156,16 @@ function updateUI() {
     } else {
         openPackBtn.style.opacity = '1';
     }
+    
+    // Always restore booster pack visibility on UI update if not actively tearing
+    if (boosterPack && !isOpening) {
+        boosterPack.classList.remove('hidden', 'is-tearing', 'shaking');
+        const packTop = document.getElementById('pack-top');
+        const packInside = document.getElementById('pack-inside-card');
+        if (packTop) packTop.classList.remove('tearing-left');
+        if (packInside) packInside.classList.remove('peeking');
+    }
+    
     updateTaskButtons();
     renderCollection();
 }
@@ -396,9 +408,9 @@ async function fetchProfile() {
 function rollRandomCard() {
     const rand = Math.random() * 100;
     let selectedRarity = 'common';
-    if (rand <= 3) selectedRarity = 'legendary';
-    else if (rand <= 15) selectedRarity = 'epic';
-    else if (rand <= 40) selectedRarity = 'rare';
+    if (rand <= 2.5) selectedRarity = 'legendary';
+    else if (rand <= 12.5) selectedRarity = 'epic'; // 10% chance
+    else if (rand <= 37.5) selectedRarity = 'rare'; // 25% chance
     else selectedRarity = 'common';
 
     const matching = [];
@@ -430,7 +442,9 @@ openPackBtn.addEventListener('click', async () => {
     updateUI();
 
     // Phase 1: Pack tearing and card peeking (No shaking)
-    card3d.classList.remove('flipped', 'aura-epic', 'aura-legendary', 'card-fly-in');
+    // Remove ALL aura classes so previous card's glow doesn't carry over
+    card3d.classList.remove('flipped', 'aura-common', 'aura-rare', 'aura-epic', 'aura-legendary', 'card-fly-in');
+    card3d.style.filter = ''; // also clear any inline filter
     
     const packTop = document.getElementById('pack-top');
     const packInside = document.getElementById('pack-inside-card');
@@ -448,19 +462,26 @@ openPackBtn.addEventListener('click', async () => {
             userCards[cardKey] = (userCards[cardKey] || 0) + 1;
 
         cardFront.innerHTML = `
-            <div class="card-frame ${drop.series.theme}">
-                <img src="${drop.card.img}" class="full-card-image" alt="${drop.card.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <div class="card-fallback-frame" style="display:none; width:100%; height:100%; flex-direction:column; justify-content:space-between; align-items:center; padding:10px;">
-                    <div class="card-series-tag">${drop.series.name}</div>
-                    <div class="card-character-name">${drop.card.name}</div>
-                    <div class="card-rarity-badge rarity-${drop.card.rarity}">${drop.card.rarity}</div>
+            <div class="card-frame ${drop.series.theme}" style="padding: 0; border: none; background: transparent; box-shadow: none; position: relative;">
+                <div style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 900; text-align: center; color: #fff; text-shadow: 0 2px 10px #000; padding: 20px; z-index: 0;">
+                    ${drop.card.name}
                 </div>
+                <img src="${drop.card.img}" class="full-card-image" alt="${drop.card.name}" style="position: relative; z-index: 1;" onerror="this.style.display='none'; this.previousElementSibling.style.display='flex';">
             </div>
         `;
 
         // Phase 3: Show card stage, card starts below screen
+        cardStage.style.opacity = ''; // Reset any inline opacity from previous close
+        cardStage.style.visibility = ''; // Reset visibility
         cardStage.classList.remove('hidden');
-        card3d.style.transform = 'translateY(120vh) rotateY(0deg)';
+        
+        // Show backcard initially, hide front
+        const cardBack = card3d.querySelector('.card-back');
+        const cardFrontEl = card3d.querySelector('.card-front');
+        if (cardBack) { cardBack.style.display = ''; cardBack.style.opacity = '1'; }
+        if (cardFrontEl) { cardFrontEl.style.display = 'none'; }
+        
+        card3d.style.transform = 'translateY(120vh) scaleX(1)';
         card3d.style.transition = 'none';
         card3d.style.opacity = '0';
         
@@ -473,121 +494,150 @@ openPackBtn.addEventListener('click', async () => {
         actions.classList.add('hidden');
 
         // Phase 4: Card SHOOTS UP from bottom
-        requestAnimationFrame(() => {
-                const flySpeed = isFast ? '0.8s' : '1.2s';
-                card3d.style.transition = `transform ${flySpeed} cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.4s ease`;
-                card3d.style.transform = 'translateY(0) rotateY(0deg)';
-                card3d.style.opacity = '1';
+        card3d.style.transition = 'none';
+        card3d.style.transform = 'translateY(120vh) scaleX(1)';
+        card3d.style.opacity = '0';
+        
+        // Force reflow synchronously to ensure start state is applied
+        void card3d.offsetHeight;
 
-                // Phase 5: Aura on arrival
-                if (drop.card.rarity === 'epic') {
-                    card3d.classList.add('aura-epic');
-                } else if (drop.card.rarity === 'legendary') {
-                    card3d.classList.add('aura-legendary');
-                    // Extra screen flash for legendary
-                    flashScreen();
+        const flySpeed = isFast ? '0.6s' : '0.9s';
+        card3d.style.transition = `transform ${flySpeed} cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.3s ease`;
+        card3d.style.transform = 'translateY(0) scaleX(1)';
+        card3d.style.opacity = '1';
+
+        // Phase 5: NO AURA before flip — don't spoil the rarity!
+        
+        // Phase 6: Wait for tap to flip
+        const btnFlipCard = document.getElementById('btn-flip-card');
+        
+        const handleTapToFlip = (e) => {
+            if (e && e.target && e.target.closest('#opened-card-actions')) return;
+            btnFlipCard.removeEventListener('click', handleTapToFlip);
+            card3d.removeEventListener('click', handleTapToFlip);
+            btnFlipCard.classList.add('hidden');
+            
+            // FAKE FLIP: scaleX 1 → 0 → 1 (swap content at midpoint)
+            const halfSpeed = isFast ? 200 : 300;
+            card3d.style.transition = `transform ${halfSpeed}ms ease-in`;
+            card3d.style.transform = 'scaleX(0)';
+            
+            setTimeout(() => {
+                // Midpoint: swap backcard → front card
+                const cardBack = card3d.querySelector('.card-back');
+                const cardFrontEl = card3d.querySelector('.card-front');
+                if (cardBack) cardBack.style.display = 'none';
+                if (cardFrontEl) { cardFrontEl.style.display = 'block'; cardFrontEl.style.opacity = '1'; }
+                
+                // NOW apply aura (rarity is revealed)
+                card3d.classList.remove('aura-common', 'aura-rare', 'aura-epic', 'aura-legendary');
+                card3d.classList.add('aura-' + drop.card.rarity);
+                if (drop.card.rarity === 'legendary') flashScreen();
+                svetnFlash();
+                
+                // Complete flip: scaleX 0 → 1
+                card3d.style.transition = `transform ${Math.round(halfSpeed * 1.2)}ms cubic-bezier(0.175, 0.885, 0.32, 1.4)`;
+                card3d.style.transform = 'scaleX(1)';
+            }, halfSpeed);
+
+            // Confetti burst on reveal
+            setTimeout(() => {
+                if (window.confetti) {
+                    confetti({
+                        particleCount: drop.card.rarity === 'legendary' ? 200 : (drop.card.rarity === 'epic' ? 100 : 50),
+                        spread: drop.card.rarity === 'legendary' ? 120 : 80,
+                        origin: { y: 0.5 },
+                        colors: drop.card.rarity === 'legendary' ? ['#ffc107','#ff9800','#fff'] :
+                                drop.card.rarity === 'epic' ? ['#e040fb','#9c27b0','#fff'] :
+                                drop.card.rarity === 'rare' ? ['#2196f3','#00bcd4','#fff'] :
+                                ['#4caf50','#8bc34a','#fff']
+                    });
                 }
-                
-                // Phase 6: Wait for tap to flip
-                const btnFlipCard = document.getElementById('btn-flip-card');
-                
-                const handleTapToFlip = () => {
-                    btnFlipCard.removeEventListener('click', handleTapToFlip);
-                    btnFlipCard.classList.add('hidden');
-                    
-                    const flipSpeed = isFast ? '0.7s' : '1.0s';
-                    card3d.style.transition = `transform ${flipSpeed} cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease`;
-                    card3d.style.transform = 'translateY(0) rotateY(180deg)';
 
-                    // Confetti burst on reveal
-                    setTimeout(() => {
-                        if (window.confetti) {
-                            confetti({
-                                particleCount: drop.card.rarity === 'legendary' ? 200 : (drop.card.rarity === 'epic' ? 100 : 50),
-                                spread: drop.card.rarity === 'legendary' ? 120 : 80,
-                                origin: { y: 0.5 },
-                                colors: drop.card.rarity === 'legendary' ? ['#ffc107','#ff9800','#fff'] :
-                                        drop.card.rarity === 'epic' ? ['#e040fb','#9c27b0','#fff'] :
-                                        drop.card.rarity === 'rare' ? ['#2196f3','#00bcd4','#fff'] :
-                                        ['#4caf50','#8bc34a','#fff']
-                            });
-                        }
+                syncOpenedCard(drop.series.slug, drop.card.index);
 
-                        syncOpenedCard(drop.series.slug, drop.card.index);
+                // Show action buttons
+                actions.classList.remove('hidden');
 
-                        // Show action buttons
-                        actions.classList.remove('hidden');
-
-                        const closeStageFn = (hideCompletely) => {
-                            if (hideCompletely) {
-                                cardStage.style.opacity = '0';
-                                cardStage.style.visibility = 'hidden';
-                                setTimeout(() => {
-                                    cardStage.classList.add('hidden');
-                                    cardStage.style.opacity = '';
-                                    cardStage.style.visibility = '';
-                                }, 400);
-                            }
-                            card3d.style.transition = 'none';
+                const closeStageFn = (hideCompletely) => {
+                    if (hideCompletely) {
+                        cardStage.style.opacity = '0';
+                        cardStage.style.visibility = 'hidden';
+                        setTimeout(() => {
+                            cardStage.classList.add('hidden');
+                            cardFront.innerHTML = '';
                             
-                            cardStage.classList.remove('show-backcards');
-                            if(svetBg) svetBg.style.opacity = '0';
-                            actions.classList.add('hidden');
-                            if (hideCompletely) {
-                                boosterPack.classList.remove('hidden', 'shaking', 'is-tearing');
-                                packTop.classList.remove('tearing-left');
-                                packInside.classList.remove('peeking');
-                                isOpening = false;
-                                renderCollection();
-                            }
-                        };
-
-                        const exitBtn = document.getElementById('btn-exit-pack');
-                        const nextBtn = document.getElementById('btn-next-pack');
-                        
-                        // Clear old listeners
-                        const newExit = exitBtn.cloneNode(true);
-                        const newNext = nextBtn.cloneNode(true);
-                        exitBtn.parentNode.replaceChild(newExit, exitBtn);
-                        nextBtn.parentNode.replaceChild(newNext, nextBtn);
-                        
-                        newExit.addEventListener('click', () => {
-                            card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
-                            card3d.style.transform = 'translateY(-120vh) rotateY(180deg)';
-                            card3d.style.opacity = '0';
-                            setTimeout(() => closeStageFn(true), 400);
-                        });
-                        
-                        newNext.addEventListener('click', () => {
-                            if (userData.packs_count <= 0) {
-                                alert("У вас больше нет паков!");
-                                return;
-                            }
-                            card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
-                            card3d.style.transform = 'translateY(120vh) rotateY(180deg)';
-                            card3d.style.opacity = '0';
-                            setTimeout(() => {
-                                closeStageFn(false);
-                                isOpening = false;
-                                fastOpen = true; // Set flag for next open
-                                document.getElementById('open-pack-btn').click();
-                            }, 400);
-                        });
-
-                    }, isFast ? 200 : 350); // Small wait after flip starts before confetti
+                            // Hide svet glow
+                            const svetBg = document.getElementById('svet-bg');
+                            if (svetBg) svetBg.classList.remove('show');
+                            
+                            updateUI();
+                            if (typeof onComplete === 'function') onComplete();
+                            cardStage.style.visibility = '';
+                        }, 400);
+                    }
+                    card3d.style.transition = 'none';
+                    
+                    cardStage.classList.remove('show-backcards');
+                    if(svetBg) svetBg.style.opacity = '0';
+                    actions.classList.add('hidden');
+                    if (hideCompletely) {
+                        boosterPack.classList.remove('hidden', 'shaking', 'is-tearing');
+                        packTop.classList.remove('tearing-left');
+                        packInside.classList.remove('peeking');
+                        isOpening = false;
+                        renderCollection();
+                    }
                 };
 
-                // Allow tapping to flip once the card has flown in
-                setTimeout(() => {
-                    btnFlipCard.classList.remove('hidden');
-                    btnFlipCard.style.animation = 'fadeInSlideUp 0.4s ease forwards';
-                    btnFlipCard.addEventListener('click', handleTapToFlip);
-                }, isFast ? 500 : 900);
+                const exitBtn = document.getElementById('btn-exit-pack');
+                const nextBtn = document.getElementById('btn-next-pack');
                 
-                // Trigger glow (backcards disabled as requested)
-                if(svetBg) svetBg.classList.add('svet-' + drop.card.rarity);
-                if(svetBg) svetBg.style.opacity = '1';
-            });
+                // Clear old listeners
+                const newExit = exitBtn.cloneNode(true);
+                const newNext = nextBtn.cloneNode(true);
+                exitBtn.parentNode.replaceChild(newExit, exitBtn);
+                nextBtn.parentNode.replaceChild(newNext, nextBtn);
+                
+                newExit.addEventListener('click', (e) => {
+                    if (e) e.stopPropagation();
+                    card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
+                    card3d.style.transform = 'translateY(-120vh) rotateY(180deg)';
+                    card3d.style.opacity = '0';
+                    setTimeout(() => closeStageFn(true), 400);
+                });
+                
+                newNext.addEventListener('click', (e) => {
+                    if (e) e.stopPropagation();
+                    if (userData.packs_count <= 0) {
+                        alert("У вас больше нет паков!");
+                        return;
+                    }
+                    card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
+                    card3d.style.transform = 'translateY(120vh) rotateY(180deg)';
+                    card3d.style.opacity = '0';
+                    setTimeout(() => {
+                        closeStageFn(false);
+                        isOpening = false;
+                        fastOpen = true; // Set flag for next open
+                        document.getElementById('open-pack-btn').click();
+                    }, 400);
+                });
+
+            }, isFast ? 200 : 350); // Small wait after flip starts before confetti
+        };
+
+        // Allow tapping either the button or the card itself to flip
+        setTimeout(() => {
+            btnFlipCard.classList.remove('hidden');
+            btnFlipCard.style.animation = 'fadeInSlideUp 0.4s ease forwards';
+            btnFlipCard.addEventListener('click', handleTapToFlip);
+            card3d.addEventListener('click', handleTapToFlip);
+        }, isFast ? 400 : 800);
+        
+        // Trigger glow
+        if(svetBg) svetBg.classList.add('svet-' + drop.card.rarity);
+        if(svetBg) svetBg.style.opacity = '1';
 
     }, isFast ? 50 : 1500); // end of Phase 1 (Tearing duration)
 
@@ -601,6 +651,13 @@ function flashScreen() {
     document.head.appendChild(style);
     document.body.appendChild(flash);
     setTimeout(() => { flash.remove(); style.remove(); }, 600);
+}
+
+function svetnFlash() {
+    const svetBg = document.getElementById('svet-bg');
+    if (svetBg) {
+        svetBg.classList.add('show');
+    }
 }
 
 async function syncOpenedCard(seriesSlug, cardIndex) {
@@ -704,11 +761,15 @@ function renderCollection() {
         `;
         seriesBlock.appendChild(titleRow);
 
-        // Card grid (4 columns)
+        // Card grid (4 columns) — sorted common → rare → epic → legendary
         const grid = document.createElement('div');
         grid.className = 'cards-grid-view';
 
-        series.cards.forEach(card => {
+        const sortedCards = [...series.cards].sort((a, b) => 
+            RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity]
+        );
+
+        sortedCards.forEach(card => {
             const cardKey = `${series.slug}_${card.index}`;
             const count = userCards[cardKey] || 0;
             const isCollected = count > 0;
