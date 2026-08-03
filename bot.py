@@ -45,56 +45,83 @@ pool = None
 
 cards_dir = os.path.join(os.path.dirname(__file__), "cards_app")
 
+def safe_int(val, default=0):
+    try:
+        if val is None: return default
+        s = str(val).strip()
+        if s in ("", "undefined", "null", "NaN"): return default
+        return int(s)
+    except Exception:
+        return default
+
 async def get_card_profile(request):
-    tg_id = int(request.query.get("tg_id", 0))
-    if not tg_id:
-        return web.json_response({"error": "tg_id missing"}, status=400)
-    
-    async with pool.acquire() as db:
-        user = await db.fetchrow("SELECT packs_count, last_daily_pack, completed_tasks FROM card_users WHERE telegram_id = $1", tg_id)
-        if not user:
-            # Give 3 starting free packs
-            await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 3) ON CONFLICT DO NOTHING", tg_id)
-            packs_count = 3
-            last_daily = None
-            completed_tasks = []
-        else:
-            packs_count = user["packs_count"]
-            if user["last_daily_pack"]:
-                ld = user["last_daily_pack"]
-                if hasattr(ld, 'tzinfo') and ld.tzinfo is not None:
-                    last_daily = ld.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-                else:
-                    last_daily = ld.strftime("%Y-%m-%dT%H:%M:%SZ")
-            else:
-                last_daily = None
-
-            try:
-                completed_tasks = json.loads(user["completed_tasks"] or "[]")
-            except Exception:
-                completed_tasks = []
-            
-        cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
-        user_cards = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in cards_rows}
+    try:
+        tg_id = safe_int(request.query.get("tg_id"))
+        if not tg_id:
+            return web.json_response({
+                "packs_count": 3,
+                "last_daily_pack": None,
+                "user_cards": {},
+                "completed_tasks": [],
+                "ref_count": 0,
+                "bot_username": "funkostop_bot"
+            })
         
-        # Count referred friends
-        ref_count = await db.fetchval("SELECT COUNT(*) FROM card_users WHERE referred_by = $1", tg_id) or 0
+        async with pool.acquire() as db:
+            user = await db.fetchrow("SELECT packs_count, last_daily_pack, completed_tasks FROM card_users WHERE telegram_id = $1", tg_id)
+            if not user:
+                # Give 3 starting free packs
+                await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 3) ON CONFLICT DO NOTHING", tg_id)
+                packs_count = 3
+                last_daily = None
+                completed_tasks = []
+            else:
+                packs_count = user["packs_count"]
+                if user["last_daily_pack"]:
+                    ld = user["last_daily_pack"]
+                    if hasattr(ld, 'tzinfo') and ld.tzinfo is not None:
+                        last_daily = ld.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    else:
+                        last_daily = ld.strftime("%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    last_daily = None
 
-        bot_username = "funkostop_bot"
-        try:
-            bot_info = await bot.get_me()
-            if bot_info and bot_info.username:
-                bot_username = bot_info.username
-        except Exception:
-            pass
+                try:
+                    completed_tasks = json.loads(user["completed_tasks"] or "[]")
+                except Exception:
+                    completed_tasks = []
+                
+            cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
+            user_cards = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in cards_rows}
+            
+            # Count referred friends
+            ref_count = await db.fetchval("SELECT COUNT(*) FROM card_users WHERE referred_by = $1", tg_id) or 0
 
+            bot_username = "funkostop_bot"
+            try:
+                bot_info = await bot.get_me()
+                if bot_info and bot_info.username:
+                    bot_username = bot_info.username
+            except Exception:
+                pass
+
+            return web.json_response({
+                "packs_count": packs_count,
+                "last_daily_pack": last_daily,
+                "user_cards": user_cards,
+                "completed_tasks": completed_tasks,
+                "ref_count": ref_count,
+                "bot_username": bot_username
+            })
+    except Exception as e:
+        logging.error(f"get_card_profile error: {e}")
         return web.json_response({
-            "packs_count": packs_count,
-            "last_daily_pack": last_daily,
-            "user_cards": user_cards,
-            "completed_tasks": completed_tasks,
-            "ref_count": ref_count,
-            "bot_username": bot_username
+            "packs_count": 3,
+            "last_daily_pack": None,
+            "user_cards": {},
+            "completed_tasks": [],
+            "ref_count": 0,
+            "bot_username": "funkostop_bot"
         })
 
 async def claim_task_reward(request):
