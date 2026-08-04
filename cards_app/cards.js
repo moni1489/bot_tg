@@ -70,14 +70,14 @@ const SERIES_CONFIG = [
         ]
     },
     {
-        slug: 'marvel',
-        name: 'Marvel',
-        theme: 'marvel',
+        slug: 'stranger_things',
+        name: 'Stranger Things',
+        theme: 'stranger_things',
         cards: [
-            { index: 1, name: 'Iron Man',         rarity: 'legendary', img: '/cards/images/card_marvel_1.png' },
-            { index: 2, name: 'Spider-Man',       rarity: 'epic',      img: '/cards/images/card_marvel_2.png' },
-            { index: 3, name: 'Captain America',  rarity: 'rare',      img: '/cards/images/card_marvel_3.png' },
-            { index: 4, name: 'Deadpool',         rarity: 'common',    img: '/cards/images/card_marvel_4.png' }
+            { index: 1, name: 'Steve',         rarity: 'common',    img: '/cards/images/card_stranger_things_1.png' },
+            { index: 2, name: 'Mike',          rarity: 'rare',      img: '/cards/images/card_stranger_things_2.png' },
+            { index: 3, name: 'Will Byers',    rarity: 'epic',      img: '/cards/images/card_stranger_things_3.png' },
+            { index: 4, name: 'Demogorgon',    rarity: 'legendary', img: '/cards/images/card_stranger_things_4.png' }
         ]
     },
     {
