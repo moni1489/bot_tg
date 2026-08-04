@@ -598,13 +598,13 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: rgba(0, 0, 0, 0.92);
-    backdrop-filter: blur(6px);
+    background: rgba(0, 0, 0, 0.95);
     border-radius: 20px;
     overflow: hidden;
     opacity: 1;
     visibility: visible;
     transition: opacity 0.4s ease, visibility 0.4s ease;
+    perspective: 1200px;
 }
 
 .opened-card-stage.hidden {
@@ -615,7 +615,7 @@ body {
     pointer-events: none !important;
 }
 
-/* Glowing Background */
+/* Glowing Background - Mobile-optimized for iOS Safari & Android WebView */
 #svet-bg {
     position: absolute;
     inset: 0;
@@ -623,8 +623,12 @@ body {
     z-index: 1;
     transition: opacity 0.8s ease;
     opacity: 0;
-    background: url('images/svet.png') center / cover no-repeat, url('/cards/images/svet.png') center / cover no-repeat;
+    background: radial-gradient(circle at center, rgba(255, 0, 34, 0.4) 0%, transparent 65%), url('images/svet.png') center / cover no-repeat, url('/cards/images/svet.png') center / cover no-repeat;
     mix-blend-mode: screen;
+    -webkit-mix-blend-mode: screen;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: opacity;
 }
 
 #svet-bg.show {
@@ -766,12 +770,12 @@ body {
 /* Action Buttons */
 .opened-card-actions {
     position: absolute;
-    bottom: 40px;
+    bottom: 30px;
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
     z-index: 600;
     opacity: 1;
     transition: opacity 0.3s;
@@ -1949,4 +1953,55 @@ body {
         transform: translateY(-800px) rotate(360deg);
         opacity: 0;
     }
+}
+
+/* Drop Rarity Badge */
+.drop-rarity-badge {
+    position: absolute;
+    top: calc(50% + 185px);
+    z-index: 20;
+    padding: 8px 24px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+}
+
+.drop-rarity-badge.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.drop-rarity-badge.reveal-common {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+}
+.drop-rarity-badge.reveal-rare {
+    background: rgba(33, 150, 243, 0.2);
+    color: #2196f3;
+    box-shadow: 0 0 15px rgba(33, 150, 243, 0.4);
+    border: 1px solid rgba(33, 150, 243, 0.5);
+}
+.drop-rarity-badge.reveal-epic {
+    background: rgba(156, 39, 176, 0.2);
+    color: #e040fb;
+    box-shadow: 0 0 15px rgba(156, 39, 176, 0.4);
+    border: 1px solid rgba(156, 39, 176, 0.5);
+}
+.drop-rarity-badge.reveal-legendary {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ffc107;
+    box-shadow: 0 0 15px rgba(255, 152, 0, 0.4);
+    border: 1px solid rgba(255, 152, 0, 0.5);
 }
