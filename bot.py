@@ -914,9 +914,8 @@ async def check_player_collection(message: Message, state: FSMContext):
     async with pool.acquire() as db:
         user = await db.fetchrow("SELECT packs_count FROM card_users WHERE telegram_id = $1", target_id)
         if not user:
-            # Let's try to calculate ref_count just in case the column ref_count is actually dynamic
-            user_exists = await db.fetchval("SELECT 1 FROM card_users WHERE telegram_id = $1", target_id)
-            if not user_exists:
+            user_exists_in_cards = await db.fetchval("SELECT 1 FROM user_cards WHERE telegram_id = $1 LIMIT 1", target_id)
+            if not user_exists_in_cards:
                 await message.answer("❌ Игрок с таким ID не найден в базе.", reply_markup=get_admin_kb())
                 await state.clear()
                 return
