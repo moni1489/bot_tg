@@ -714,9 +714,9 @@ async def start_handler(message: Message, state: FSMContext):
                             INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 6)
                             ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 1
                         """, inviter_id)
-                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный **+1 пак** (Всего 6 стартовых паков)!", parse_mode="Markdown")
+                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный <b>+1 пак</b> (Всего 6 стартовых паков)!", parse_mode="HTML")
                         try:
-                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислен **+1 пак**!", parse_mode="Markdown")
+                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислен <b>+1 пак</b>!", parse_mode="HTML")
                         except Exception as notify_err:
                             logging.error(f"Notify error: {notify_err}")
                     elif not user["referred_by"]:
@@ -725,9 +725,9 @@ async def start_handler(message: Message, state: FSMContext):
                             INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 6)
                             ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 1
                         """, inviter_id)
-                        await message.answer("🎉 Вы активировали реферальную ссылку и получили бонусный **+1 пак**!", parse_mode="Markdown")
+                        await message.answer("🎉 Вы активировали реферальную ссылку и получили бонусный <b>+1 пак</b>!", parse_mode="HTML")
                         try:
-                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислен **+1 пак**!", parse_mode="Markdown")
+                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислен <b>+1 пак</b>!", parse_mode="HTML")
                         except Exception as notify_err:
                             logging.error(f"Notify error: {notify_err}")
         except Exception as e:
