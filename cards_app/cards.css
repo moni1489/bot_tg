@@ -769,8 +769,7 @@ body {
 
 /* Action Buttons */
 .opened-card-actions {
-    position: absolute;
-    bottom: 30px;
+    position: relative;
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -782,8 +781,10 @@ body {
 }
 
 .opened-card-actions.hidden {
-    opacity: 0;
-    pointer-events: none;
+    display: flex !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 .btn-action-primary {
@@ -1957,8 +1958,7 @@ body {
 
 /* Drop Rarity Badge */
 .drop-rarity-badge {
-    position: absolute;
-    top: calc(50% + 185px);
+    position: relative;
     z-index: 20;
     padding: 8px 24px;
     border-radius: 8px;
@@ -1974,6 +1974,15 @@ body {
     opacity: 0;
     transform: translateY(20px);
     pointer-events: none;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.drop-rarity-badge.hidden {
+    display: block !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 .drop-rarity-badge.show {
