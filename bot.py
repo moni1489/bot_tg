@@ -313,7 +313,7 @@ async def start_webserver():
             card_w = w / 4
             card_h = h / 2
             
-            names_r1 = ["breaking_bad", "marvel", "dc", "death_note"]
+            names_r1 = ["breaking_bad", "stranger_things", "dc", "death_note"]
             for i, name in enumerate(names_r1):
                 box = (int(i * card_w), 0, int((i + 1) * card_w), int(card_h))
                 cropped = img.crop(box)
