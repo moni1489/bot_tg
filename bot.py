@@ -151,13 +151,18 @@ async def claim_task_reward(request):
             if task_id == 'tg_sub':
                 try:
                     member = await bot.get_chat_member(chat_id="@FunkoStop", user_id=tg_id)
-                    if member.status not in ["member", "administrator", "creator"]:
+                    status = member.status if isinstance(member.status, str) else member.status.value
+                    if status not in ["member", "administrator", "creator"]:
                         return web.json_response({
                             "success": False, 
                             "message": "Вы еще не подписались на канал @FunkoStop! Подпишитесь и попробуйте снова."
                         })
                 except Exception as sub_err:
-                    logging.warning(f"Sub check warning (bot might not be admin in channel): {sub_err}")
+                    logging.warning(f"Sub check warning: {sub_err}")
+                    return web.json_response({
+                        "success": False, 
+                        "message": "❌ Не удалось проверить подписку. Убедитесь, что бот является администратором канала @FunkoStop."
+                    })
             
             # Verify Order > 2000 Rubles in Database
             elif task_id == 'order_2000':
@@ -566,19 +571,22 @@ async def unarchive_order_db(order_id: int):
         await db.execute("UPDATE orders SET archived = FALSE WHERE id = $1", order_id)
 
 # --- KEYBOARDS ---
-def get_start_kb():
+def get_start_kb(user_id=None):
+    url = f"{WEBAPP_URL}?tg_id={user_id}" if user_id else WEBAPP_URL
     return ReplyKeyboardMarkup(
         keyboard=[
+            [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))],
             [KeyboardButton(text="🧮 Калькулятор стоимости")],
             [KeyboardButton(text="📦 Отследить заказы"), KeyboardButton(text="🗃 Архив заказов")]
         ],
         resize_keyboard=True
     )
 
-def get_admin_kb():
+def get_admin_kb(user_id=None):
+    url = f"{WEBAPP_URL}?tg_id={user_id}" if user_id else WEBAPP_URL
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=WEBAPP_URL))],
+            [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))],
             [KeyboardButton(text="👥 Список клиентов")],
             [KeyboardButton(text="👤 Создать клиента"), KeyboardButton(text="➕ Добавить заказ")],
             [KeyboardButton(text="🔄 Изменить статус заказа"), KeyboardButton(text="💰 Изменить оплату")],
@@ -703,6 +711,8 @@ async def start_handler(message: Message, state: FSMContext):
     
     # Handle Referral deep link (e.g. /start ref_12345)
     args = message.text.split()
+    is_referral = False
+    
     if len(args) > 1 and args[1].startswith("ref_"):
         try:
             inviter_id = int(args[1].replace("ref_", ""))
@@ -711,7 +721,9 @@ async def start_handler(message: Message, state: FSMContext):
                     user = await db.fetchrow("SELECT telegram_id, referred_by FROM card_users WHERE telegram_id = $1", message.from_user.id)
                     if not user:
                         # Give 5 base packs + 1 bonus pack = 6 to new user
-                        await db.execute("INSERT INTO card_users (telegram_id, packs_count, referred_by) VALUES ($1, 6, $2)", message.from_user.id, inviter_id)
+                        await db.execute("INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 6, $4)", 
+                                         message.from_user.id, message.from_user.username, message.from_user.first_name, inviter_id)
+                        is_referral = True
                         # Give +1 pack to inviter
                         await db.execute("""
                             INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 6)
@@ -723,7 +735,9 @@ async def start_handler(message: Message, state: FSMContext):
                         except Exception as notify_err:
                             logging.error(f"Notify error: {notify_err}")
                     elif not user["referred_by"]:
-                        await db.execute("UPDATE card_users SET referred_by = $1, packs_count = packs_count + 1 WHERE telegram_id = $2", inviter_id, message.from_user.id)
+                        await db.execute("UPDATE card_users SET referred_by = $1, packs_count = packs_count + 1, username = $3, first_name = $4 WHERE telegram_id = $2", 
+                                         inviter_id, message.from_user.id, message.from_user.username, message.from_user.first_name)
+                        is_referral = True
                         await db.execute("""
                             INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 6)
                             ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 1
@@ -736,10 +750,21 @@ async def start_handler(message: Message, state: FSMContext):
         except Exception as e:
             logging.error(f"Ref error: {e}")
 
+    # Ensure user is in db if not created by referral
+    if not is_referral:
+        async with pool.acquire() as db:
+            await db.execute("""
+                INSERT INTO card_users (telegram_id, username, first_name, packs_count)
+                VALUES ($1, $2, $3, 3)
+                ON CONFLICT (telegram_id) DO UPDATE SET 
+                    username = EXCLUDED.username,
+                    first_name = EXCLUDED.first_name
+            """, message.from_user.id, message.from_user.username, message.from_user.first_name)
+
     if await is_admin(message.from_user.id):
-        await message.answer("Добро пожаловать в панель администратора!", reply_markup=get_admin_kb())
+        await message.answer("Добро пожаловать в панель администратора!", reply_markup=get_admin_kb(message.from_user.id))
     else:
-        await message.answer("Добро пожаловать в Личный Кабинет! Нажмите кнопку ниже, чтобы проверить свои заказы.", reply_markup=get_start_kb())
+        await message.answer("Добро пожаловать в Личный Кабинет! Нажмите кнопку ниже, чтобы проверить свои заказы.", reply_markup=get_start_kb(message.from_user.id))
 
 @router.message(Command("reset_daily"), StateFilter("*"))
 async def reset_daily_cmd(message: Message, state: FSMContext):
@@ -785,7 +810,7 @@ async def admin_login_start(message: Message, state: FSMContext):
     if len(args) == 3:
         login, password = args[1], args[2]
         if await authenticate_admin(login, password, message.from_user.id):
-            await message.answer("Авторизация успешна. Вы добавлены как администратор.", reply_markup=get_admin_kb())
+            await message.answer("Авторизация успешна. Вы добавлены как администратор.", reply_markup=get_admin_kb(message.from_user.id))
         else:
             await message.answer("Неверный логин или пароль администратора.")
     else:
@@ -797,7 +822,7 @@ async def admin_logout_cmd(message: Message, state: FSMContext):
     await state.clear()
     async with pool.acquire() as db:
         await db.execute("UPDATE users SET user_tg_id = NULL WHERE user_tg_id = $1 AND role = 'admin'", message.from_user.id)
-    await message.answer("🚪 Вы вышли из режима администратора. Теперь вы видите меню обычного пользователя.", reply_markup=get_start_kb())
+    await message.answer("🚪 Вы вышли из режима администратора. Теперь вы видите меню обычного пользователя.", reply_markup=get_start_kb(message.from_user.id))
 
 @router.message(Command("add_admin"))
 async def add_new_admin(message: Message):
@@ -899,24 +924,34 @@ async def game_stats(message: Message):
 async def check_player_start(message: Message, state: FSMContext):
     if not await is_admin(message.from_user.id):
         return
-    await message.answer("Введите Telegram ID игрока, которого нужно проверить:", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Введите Telegram ID или @username игрока, которого нужно проверить:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(CheckPlayerCollection.waiting_for_id)
 
 @router.message(CheckPlayerCollection.waiting_for_id)
 async def check_player_collection(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("❌ ID должен быть числом.", reply_markup=get_admin_kb())
-        await state.clear()
-        return
-        
-    target_id = int(message.text)
+    target_id = None
+    if message.text.isdigit():
+        target_id = int(message.text)
     
     async with pool.acquire() as db:
-        user = await db.fetchrow("SELECT packs_count FROM card_users WHERE telegram_id = $1", target_id)
+        user = None
+        if target_id:
+            user = await db.fetchrow("SELECT telegram_id, packs_count FROM card_users WHERE telegram_id = $1", target_id)
+        else:
+            username = message.text.replace("@", "")
+            user = await db.fetchrow("SELECT telegram_id, packs_count FROM card_users WHERE username ILIKE $1", username)
+            if user:
+                target_id = user['telegram_id']
+                
         if not user:
-            user_exists_in_cards = await db.fetchval("SELECT 1 FROM user_cards WHERE telegram_id = $1 LIMIT 1", target_id)
-            if not user_exists_in_cards:
-                await message.answer("❌ Игрок с таким ID не найден в базе.", reply_markup=get_admin_kb())
+            if target_id:
+                user_exists_in_cards = await db.fetchval("SELECT 1 FROM user_cards WHERE telegram_id = $1 LIMIT 1", target_id)
+                if not user_exists_in_cards:
+                    await message.answer("❌ Игрок не найден в базе. Возможно, он еще не запускал игру через бота (или у него случайный ID, если он открыл игру из браузера).", reply_markup=get_admin_kb(message.from_user.id))
+                    await state.clear()
+                    return
+            else:
+                await message.answer("❌ Игрок с таким username не найден в базе.", reply_markup=get_admin_kb(message.from_user.id))
                 await state.clear()
                 return
             packs_count = 0
@@ -958,7 +993,7 @@ async def check_player_collection(message: Message, state: FSMContext):
             for idx, cnt in items:
                 msg += f"  - Карточка №{idx} (x{cnt} шт)\n"
                 
-    await message.answer(msg, parse_mode="Markdown", reply_markup=get_admin_kb())
+    await message.answer(msg, parse_mode="Markdown", reply_markup=get_admin_kb(message.from_user.id))
     await state.clear()
 
 # --- ADMIN: CREATE ORDER ---
