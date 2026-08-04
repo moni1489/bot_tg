@@ -398,24 +398,7 @@ function startDailyCountdown(secondsLeft) {
     dailyTimerInterval = setInterval(tick, 1000);
 }
 
-// API Calls
-async function fetchProfile() {
-    try {
-        const res = await fetch(`/api/cards/profile?tg_id=${userData.telegram_id}`);
-        if (res.ok) {
-            const data = await res.json();
-            userData.packs_count = data.packs_count;
-            userData.last_daily_pack = data.last_daily_pack;
-            userCards = data.user_cards || {};
-            userData.completed_tasks = data.completed_tasks || [];
-            checkDailyTimer();
-            updateUI();
-        }
-    } catch (e) {
-        console.log("Using default profile");
-        checkDailyTimer();
-    }
-}
+
 
 // Roll Card
 function rollRandomCard() {
@@ -542,7 +525,7 @@ openPackBtn.addEventListener('click', async () => {
             btnFlipCard.classList.add('hidden');
             
             // 3D FLIP: rotateY(0) → rotateY(-90deg) → swap → rotateY(90deg) → rotateY(0)
-            const halfSpeed = isFast ? 200 : 300;
+            const halfSpeed = 500; // Always 1s total
             card3d.style.transition = `transform ${halfSpeed}ms ease-in`;
             card3d.style.transform = 'rotateY(-90deg)';
             
@@ -565,13 +548,12 @@ openPackBtn.addEventListener('click', async () => {
                 card3d.classList.add('aura-' + drop.card.rarity);
                 if (drop.card.rarity === 'legendary') flashScreen();
                 
-                // Trigger glow here (after flip)
-                if(svetBg) {
+                // Trigger glow here (after flip) ONLY for epic and legendary
+                if(svetBg && (drop.card.rarity === 'epic' || drop.card.rarity === 'legendary')) {
                     svetBg.classList.add('svet-' + drop.card.rarity);
                     svetBg.style.transition = 'opacity 0.2s ease';
                     svetBg.style.opacity = '1';
                 }
-                svetnFlash();
                 
                 if (rarityBadge) {
                     rarityBadge.textContent = drop.card.rarity;
