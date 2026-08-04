@@ -383,6 +383,9 @@ class UpdatePayment(StatesGroup):
 class ParseLink(StatesGroup):
     waiting_for_weight = State()
 
+class CheckPlayerCollection(StatesGroup):
+    waiting_for_id = State()
+
 # --- DATABASE ---
 async def init_db():
     global pool
@@ -578,8 +581,8 @@ def get_admin_kb():
             [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=WEBAPP_URL))],
             [KeyboardButton(text="👥 Список клиентов")],
             [KeyboardButton(text="👤 Создать клиента"), KeyboardButton(text="➕ Добавить заказ")],
-            [KeyboardButton(text="🔄 Изменить статус заказа")],
-            [KeyboardButton(text="💰 Изменить оплату по заказу")],
+            [KeyboardButton(text="🔄 Изменить статус заказа"), KeyboardButton(text="💰 Изменить оплату")],
+            [KeyboardButton(text="📊 Статистика Игры"), KeyboardButton(text="🔍 Проверить Игрока")],
             [KeyboardButton(text="🗃 Архив заказов (Админ)")]
         ],
         resize_keyboard=True
@@ -856,6 +859,108 @@ async def list_clients(message: Message):
         response += f"🆔 ID: `{client[0]}` | 🔑 Пароль: `{client[1]}`\n"
         
     await message.answer(response, parse_mode="Markdown")
+
+# --- ADMIN: GAME STATS ---
+@router.message(F.text == "📊 Статистика Игры")
+async def game_stats(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+        
+    async with pool.acquire() as db:
+        total_players = await db.fetchval("SELECT COUNT(*) FROM card_users") or 0
+        total_cards_collected = await db.fetchval("SELECT SUM(count) FROM user_cards") or 0
+        
+        leaderboard = await db.fetch("""
+            SELECT u.telegram_id, COUNT(c.series_slug) as unique_cards, SUM(c.count) as total_cards
+            FROM card_users u
+            LEFT JOIN user_cards c ON u.telegram_id = c.telegram_id
+            GROUP BY u.telegram_id
+            ORDER BY unique_cards DESC, total_cards DESC
+            LIMIT 10
+        """)
+        
+    msg = f"📊 **Статистика Funko Cards**\n\n"
+    msg += f"👥 Всего игроков: {total_players}\n"
+    msg += f"🎴 Всего выбито карт (с повторками): {total_cards_collected}\n\n"
+    msg += f"🏆 **ТОП-10 КОЛЛЕКЦИОНЕРОВ:**\n"
+    
+    if not leaderboard:
+        msg += "Пока нет данных."
+    else:
+        for i, row in enumerate(leaderboard, 1):
+            unique = row['unique_cards'] or 0
+            total = row['total_cards'] or 0
+            msg += f"{i}. ID: `{row['telegram_id']}` — {unique} уникальных (всего {total})\n"
+            
+    await message.answer(msg, parse_mode="Markdown")
+
+# --- ADMIN: CHECK PLAYER ---
+@router.message(F.text == "🔍 Проверить Игрока")
+async def check_player_start(message: Message, state: FSMContext):
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer("Введите Telegram ID игрока, которого нужно проверить:", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(CheckPlayerCollection.waiting_for_id)
+
+@router.message(CheckPlayerCollection.waiting_for_id)
+async def check_player_collection(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("❌ ID должен быть числом.", reply_markup=get_admin_kb())
+        await state.clear()
+        return
+        
+    target_id = int(message.text)
+    
+    async with pool.acquire() as db:
+        user = await db.fetchrow("SELECT packs_count, ref_count FROM card_users WHERE telegram_id = $1", target_id)
+        if not user:
+            # Let's try to calculate ref_count just in case the column ref_count is actually dynamic
+            user_exists = await db.fetchval("SELECT 1 FROM card_users WHERE telegram_id = $1", target_id)
+            if not user_exists:
+                await message.answer("❌ Игрок с таким ID не найден в базе.", reply_markup=get_admin_kb())
+                await state.clear()
+                return
+            packs_count = 0
+        else:
+            packs_count = user['packs_count']
+            
+        ref_count = await db.fetchval("SELECT COUNT(*) FROM card_users WHERE referred_by = $1", target_id) or 0
+        
+        cards = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", target_id)
+        
+    SERIES_TOTALS = 4
+    
+    msg = f"👤 **Статистика Игрока** `{target_id}`\n\n"
+    msg += f"📦 Доступно паков: {packs_count}\n"
+    msg += f"🤝 Приглашено друзей: {ref_count}\n\n"
+    msg += f"🎴 **Коллекция Карточек:**\n"
+    
+    if not cards:
+        msg += "Игрок пока не выбил ни одной карты."
+    else:
+        # Group by series
+        collection = {}
+        for row in cards:
+            slug = row['series_slug']
+            idx = row['card_index']
+            cnt = row['count']
+            if slug not in collection:
+                collection[slug] = []
+            collection[slug].append((idx, cnt))
+            
+        for slug, items in collection.items():
+            items.sort(key=lambda x: x[0]) # sort by card index
+            unique_in_series = len(items)
+            msg += f"\n🔹 **Серия {slug.upper()}** ({unique_in_series}/{SERIES_TOTALS} собрано)"
+            if unique_in_series >= SERIES_TOTALS:
+                msg += " ✅"
+            msg += "\n"
+            
+            for idx, cnt in items:
+                msg += f"  - Карточка №{idx} (x{cnt} шт)\n"
+                
+    await message.answer(msg, parse_mode="Markdown", reply_markup=get_admin_kb())
+    await state.clear()
 
 # --- ADMIN: CREATE ORDER ---
 @router.message(F.text == "➕ Добавить заказ")
