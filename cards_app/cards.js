@@ -118,10 +118,10 @@ const SERIES_CONFIG = [
         name: 'One Piece',
         theme: 'one_piece',
         cards: [
-            { index: 1, name: 'Luffy', rarity: 'legendary', img: '/cards/images/card_one_piece_1.png' },
-            { index: 2, name: 'Zoro',  rarity: 'epic',      img: '/cards/images/card_one_piece_2.png' },
-            { index: 3, name: 'Sanji', rarity: 'rare',      img: '/cards/images/card_one_piece_3.png' },
-            { index: 4, name: 'Nami',  rarity: 'common',    img: '/cards/images/card_one_piece_4.png' }
+            { index: 1, name: 'Nami',  rarity: 'common',    img: '/cards/images/card_one_piece_1.png' },
+            { index: 2, name: 'Zoro',  rarity: 'rare',      img: '/cards/images/card_one_piece_2.png' },
+            { index: 3, name: 'Sanji', rarity: 'epic',      img: '/cards/images/card_one_piece_3.png' },
+            { index: 4, name: 'Luffy', rarity: 'legendary', img: '/cards/images/card_one_piece_4.png' }
         ]
     },
     {
@@ -458,6 +458,17 @@ openPackBtn.addEventListener('click', async () => {
     card3d.classList.remove('flipped', 'aura-common', 'aura-rare', 'aura-epic', 'aura-legendary', 'card-fly-in');
     card3d.style.filter = ''; // also clear any inline filter
     
+    const rarityBadge = document.getElementById('drop-rarity-badge');
+    if (rarityBadge) {
+        rarityBadge.className = 'drop-rarity-badge hidden';
+    }
+    
+    const svetBg = document.getElementById('svet-bg');
+    if (svetBg) {
+        svetBg.classList.remove('svet-common', 'svet-rare', 'svet-epic', 'svet-legendary', 'show');
+        svetBg.style.opacity = '0';
+    }
+    
     const packTop = document.getElementById('pack-top');
     const packInside = document.getElementById('pack-inside-card');
 
@@ -493,7 +504,7 @@ openPackBtn.addEventListener('click', async () => {
         if (cardBack) { cardBack.style.display = ''; cardBack.style.opacity = '1'; }
         if (cardFrontEl) { cardFrontEl.style.display = 'none'; }
         
-        card3d.style.transform = 'translateY(120vh) scaleX(1)';
+        card3d.style.transform = 'translateY(120vh) rotateY(0deg)';
         card3d.style.transition = 'none';
         card3d.style.opacity = '0';
         
@@ -507,7 +518,7 @@ openPackBtn.addEventListener('click', async () => {
 
         // Phase 4: Card SHOOTS UP from bottom
         card3d.style.transition = 'none';
-        card3d.style.transform = 'translateY(120vh) scaleX(1)';
+        card3d.style.transform = 'translateY(120vh) rotateY(0deg)';
         card3d.style.opacity = '0';
         
         // Force reflow synchronously to ensure start state is applied
@@ -515,7 +526,7 @@ openPackBtn.addEventListener('click', async () => {
 
         const flySpeed = isFast ? '0.6s' : '0.9s';
         card3d.style.transition = `transform ${flySpeed} cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.3s ease`;
-        card3d.style.transform = 'translateY(0) scaleX(1)';
+        card3d.style.transform = 'translateY(0) rotateY(0deg)';
         card3d.style.opacity = '1';
 
         // Phase 5: NO AURA before flip — don't spoil the rarity!
@@ -529,10 +540,10 @@ openPackBtn.addEventListener('click', async () => {
             card3d.removeEventListener('click', handleTapToFlip);
             btnFlipCard.classList.add('hidden');
             
-            // FAKE FLIP: scaleX 1 → 0 → 1 (swap content at midpoint)
+            // 3D FLIP: rotateY(0) → rotateY(-90deg) → swap → rotateY(90deg) → rotateY(0)
             const halfSpeed = isFast ? 200 : 300;
             card3d.style.transition = `transform ${halfSpeed}ms ease-in`;
-            card3d.style.transform = 'scaleX(0)';
+            card3d.style.transform = 'rotateY(-90deg)';
             
             setTimeout(() => {
                 // Midpoint: swap backcard → front card
@@ -541,15 +552,37 @@ openPackBtn.addEventListener('click', async () => {
                 if (cardBack) cardBack.style.display = 'none';
                 if (cardFrontEl) { cardFrontEl.style.display = 'block'; cardFrontEl.style.opacity = '1'; }
                 
+                // Snap to opposite side
+                card3d.style.transition = 'none';
+                card3d.style.transform = 'rotateY(90deg)';
+                
+                // Force reflow
+                void card3d.offsetWidth;
+                
                 // NOW apply aura (rarity is revealed)
                 card3d.classList.remove('aura-common', 'aura-rare', 'aura-epic', 'aura-legendary');
                 card3d.classList.add('aura-' + drop.card.rarity);
                 if (drop.card.rarity === 'legendary') flashScreen();
+                
+                // Trigger glow here (after flip)
+                if(svetBg) {
+                    svetBg.classList.add('svet-' + drop.card.rarity);
+                    svetBg.style.transition = 'opacity 0.2s ease';
+                    svetBg.style.opacity = '1';
+                }
                 svetnFlash();
                 
-                // Complete flip: scaleX 0 → 1
+                if (rarityBadge) {
+                    rarityBadge.textContent = drop.card.rarity;
+                    rarityBadge.classList.remove('hidden');
+                    void rarityBadge.offsetWidth;
+                    rarityBadge.classList.add('reveal-' + drop.card.rarity);
+                    rarityBadge.classList.add('show');
+                }
+                
+                // Complete flip: rotateY 90deg → 0deg
                 card3d.style.transition = `transform ${Math.round(halfSpeed * 1.2)}ms cubic-bezier(0.175, 0.885, 0.32, 1.4)`;
-                card3d.style.transform = 'scaleX(1)';
+                card3d.style.transform = 'rotateY(0deg)';
             }, halfSpeed);
 
             // Confetti burst on reveal
@@ -613,9 +646,16 @@ openPackBtn.addEventListener('click', async () => {
                 
                 newExit.addEventListener('click', (e) => {
                     if (e) e.stopPropagation();
+                    actions.classList.add('hidden');
+                    if (rarityBadge) rarityBadge.classList.remove('show');
+                    
                     card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
                     card3d.style.transform = 'translateY(-120vh) rotateY(180deg)';
                     card3d.style.opacity = '0';
+                    if (svetBg) {
+                        svetBg.style.transition = 'opacity 0.4s ease';
+                        svetBg.style.opacity = '0';
+                    }
                     setTimeout(() => closeStageFn(true), 400);
                 });
                 
@@ -625,9 +665,16 @@ openPackBtn.addEventListener('click', async () => {
                         alert("У вас больше нет паков!");
                         return;
                     }
+                    actions.classList.add('hidden');
+                    if (rarityBadge) rarityBadge.classList.remove('show');
+                    
                     card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
                     card3d.style.transform = 'translateY(120vh) rotateY(180deg)';
                     card3d.style.opacity = '0';
+                    if (svetBg) {
+                        svetBg.style.transition = 'opacity 0.4s ease';
+                        svetBg.style.opacity = '0';
+                    }
                     setTimeout(() => {
                         closeStageFn(false);
                         isOpening = false;
@@ -647,9 +694,7 @@ openPackBtn.addEventListener('click', async () => {
             card3d.addEventListener('click', handleTapToFlip);
         }, isFast ? 400 : 800);
         
-        // Trigger glow
-        if(svetBg) svetBg.classList.add('svet-' + drop.card.rarity);
-        if(svetBg) svetBg.style.opacity = '1';
+        // Removed svetBg trigger from here so it happens on flip
 
     }, isFast ? 50 : 1500); // end of Phase 1 (Tearing duration)
 
