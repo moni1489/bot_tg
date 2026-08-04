@@ -229,7 +229,8 @@ function setupRefLink() {
 
 async function fetchProfile() {
     try {
-        const res = await fetch(`/api/cards/profile?tg_id=${userData.telegram_id}`);
+        const timestamp = new Date().getTime();
+        const res = await fetch(`/api/cards/profile?tg_id=${userData.telegram_id}&t=${timestamp}`, { cache: 'no-store' });
         if (res.ok) {
             const data = await res.json();
             if (typeof data.packs_count === 'number') userData.packs_count = data.packs_count;
