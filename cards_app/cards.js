@@ -85,10 +85,10 @@ const SERIES_CONFIG = [
         name: 'Resident Evil',
         theme: 'resident_evil',
         cards: [
-            { index: 1, name: 'Zombie',          rarity: 'common',    img: '/cards/images/card_residennt_evil_1.png' },
-            { index: 2, name: 'Leon S. Kennedy', rarity: 'rare',      img: '/cards/images/card_residennt_evil_2.png' },
-            { index: 3, name: 'Jill Valentine',  rarity: 'epic',      img: '/cards/images/card_residennt_evil_3.png' },
-            { index: 4, name: 'Albert Wesker',   rarity: 'legendary', img: '/cards/images/card_residennt_evil_4.png' }
+            { index: 1, name: 'Chainsaw Villager', rarity: 'common',    img: '/cards/images/card_residennt_evil_1.png' },
+            { index: 2, name: 'Jill Valentine',    rarity: 'rare',      img: '/cards/images/card_residennt_evil_2.png' },
+            { index: 3, name: 'Albert Wesker',     rarity: 'epic',      img: '/cards/images/card_residennt_evil_3.png' },
+            { index: 4, name: 'Leon Kennedy',      rarity: 'legendary', img: '/cards/images/card_residennt_evil_4.png' }
         ]
     },
     {
@@ -107,10 +107,10 @@ const SERIES_CONFIG = [
         name: 'Invincible',
         theme: 'invincible',
         cards: [
-            { index: 1, name: 'Mark Grayson', rarity: 'common',    img: '/cards/images/card_invincible_1.png' },
-            { index: 2, name: 'Atom Eve',     rarity: 'rare',      img: '/cards/images/card_invincible_2.png' },
-            { index: 3, name: 'Invincible',   rarity: 'epic',      img: '/cards/images/card_invincible_3.png' },
-            { index: 4, name: 'Omni-Man',     rarity: 'legendary', img: '/cards/images/card_invincible_4.png' }
+            { index: 1, name: 'Atom Eve',        rarity: 'common',    img: '/cards/images/card_invincible_1.png' },
+            { index: 2, name: 'Allen the Alien', rarity: 'rare',      img: '/cards/images/card_invincible_2.png' },
+            { index: 3, name: 'Omni-Man',        rarity: 'epic',      img: '/cards/images/card_invincible_3.png' },
+            { index: 4, name: 'Invincible',      rarity: 'legendary', img: '/cards/images/card_invincible_4.png' }
         ]
     },
     {
@@ -118,10 +118,10 @@ const SERIES_CONFIG = [
         name: 'One Piece',
         theme: 'one_piece',
         cards: [
-            { index: 1, name: 'Nami',  rarity: 'common',    img: '/cards/images/card_one_piece_1.png' },
-            { index: 2, name: 'Zoro',  rarity: 'rare',      img: '/cards/images/card_one_piece_2.png' },
-            { index: 3, name: 'Sanji', rarity: 'epic',      img: '/cards/images/card_one_piece_3.png' },
-            { index: 4, name: 'Luffy', rarity: 'legendary', img: '/cards/images/card_one_piece_4.png' }
+            { index: 1, name: 'Nami',          rarity: 'common',    img: '/cards/images/card_one_piece_1.png' },
+            { index: 2, name: 'Sanji',         rarity: 'rare',      img: '/cards/images/card_one_piece_2.png' },
+            { index: 3, name: 'Roronoa Zorro', rarity: 'epic',      img: '/cards/images/card_one_piece_3.png' },
+            { index: 4, name: 'Monkey D Luffy', rarity: 'legendary', img: '/cards/images/card_one_piece_4.png' }
         ]
     },
     {
