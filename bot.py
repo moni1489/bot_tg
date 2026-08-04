@@ -912,7 +912,7 @@ async def check_player_collection(message: Message, state: FSMContext):
     target_id = int(message.text)
     
     async with pool.acquire() as db:
-        user = await db.fetchrow("SELECT packs_count, ref_count FROM card_users WHERE telegram_id = $1", target_id)
+        user = await db.fetchrow("SELECT packs_count FROM card_users WHERE telegram_id = $1", target_id)
         if not user:
             # Let's try to calculate ref_count just in case the column ref_count is actually dynamic
             user_exists = await db.fetchval("SELECT 1 FROM card_users WHERE telegram_id = $1", target_id)
