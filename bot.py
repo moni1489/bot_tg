@@ -350,21 +350,6 @@ async def generate_series_code(request):
         logging.error(f"Generate code error: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
-async def start_webserver():
-    images_dir = os.path.join(cards_dir, "images")
-    os.makedirs(images_dir, exist_ok=True)
-    
-    # Copy official logo if present
-    logo_src = r"C:\Users\kraie\.gemini\antigravity-ide\brain\e27b6ef9-e81b-4a8e-980a-b4b4d8458b05\media__1785225617410.png"
-    logo_dst = os.path.join(cards_dir, "logo.png")
-    if os.path.exists(logo_src):
-        try:
-            import shutil
-            shutil.copy(logo_src, logo_dst)
-            shutil.copy(logo_src, os.path.join(images_dir, "logo.png"))
-        except Exception:
-            pass
-
 async def notify_order_status_api(request):
     try:
         body = await request.json()
@@ -393,7 +378,23 @@ async def notify_order_status_api(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+async def start_webserver():
+    images_dir = os.path.join(cards_dir, "images")
+    os.makedirs(images_dir, exist_ok=True)
+    
+    # Copy official logo if present
+    logo_src = r"C:\Users\kraie\.gemini\antigravity-ide\brain\e27b6ef9-e81b-4a8e-980a-b4b4d8458b05\media__1785225617410.png"
+    logo_dst = os.path.join(cards_dir, "logo.png")
+    if os.path.exists(logo_src):
+        try:
+            import shutil
+            shutil.copy(logo_src, logo_dst)
+            shutil.copy(logo_src, os.path.join(images_dir, "logo.png"))
+        except Exception:
+            pass
+
     # Slice 7 series frames if available
+
     frames_src = r"C:\Users\kraie\.gemini\antigravity-ide\brain\e27b6ef9-e81b-4a8e-980a-b4b4d8458b05\media__1785321073494.png"
     if os.path.exists(frames_src):
         try:
