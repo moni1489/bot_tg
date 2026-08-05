@@ -249,6 +249,24 @@ async def open_card_pack(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+async def claim_bonus_packs_api(request):
+    try:
+        body = await request.json()
+        tg_id = int(body.get("telegram_id", 0))
+        bonus_id = int(body.get("bonus_id", 0))
+        packs_to_add = int(body.get("packs", 0))
+        
+        if not tg_id or not packs_to_add:
+            return web.json_response({"error": "Invalid params"}, status=400)
+            
+        async with pool.acquire() as db:
+            await db.execute("UPDATE card_users SET packs_count = packs_count + $1 WHERE telegram_id = $2", packs_to_add, tg_id)
+            new_count = await db.fetchval("SELECT packs_count FROM card_users WHERE telegram_id = $1", tg_id)
+            
+        return web.json_response({"success": True, "packs_count": new_count})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 async def serve_cards_app(request):
     index_path = os.path.join(cards_dir, "index.html")
     if os.path.exists(index_path):
@@ -310,8 +328,14 @@ async def generate_series_code(request):
             code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
             await db.execute("INSERT INTO series_codes (telegram_id, series_slug, code) VALUES ($1, $2, $3)", tg_id, series_slug, code)
             
+            # Get all admin IDs (from .env + from database)
+            admin_targets = set(ADMIN_IDS)
+            db_admins = await db.fetch("SELECT user_tg_id FROM users WHERE role = 'admin' AND user_tg_id IS NOT NULL")
+            for r in db_admins:
+                admin_targets.add(r['user_tg_id'])
+                
             # Send notification to admins
-            for admin_id in ADMIN_IDS:
+            for admin_id in admin_targets:
                 try:
                     await bot.send_message(
                         chat_id=admin_id,
@@ -340,6 +364,34 @@ async def start_webserver():
             shutil.copy(logo_src, os.path.join(images_dir, "logo.png"))
         except Exception:
             pass
+
+async def notify_order_status_api(request):
+    try:
+        body = await request.json()
+        order_id = int(body.get("order_id", 0))
+        new_status = body.get("status", "")
+        
+        if not order_id or not new_status:
+            return web.json_response({"error": "Missing order_id or status"}, status=400)
+            
+        order_details = await get_order_details(order_id)
+        if order_details and order_details.get('user_tg_id'):
+            client_tg_id = order_details['user_tg_id']
+            # We assume the DB is already updated by the website, so order_details has the NEW status
+            # If not, we can format the message manually:
+            order_details['status'] = new_status
+            notify_msg = format_status_notification(order_details)
+            
+            if order_details.get('photo_id'):
+                await bot.send_photo(chat_id=client_tg_id, photo=order_details['photo_id'], caption=notify_msg, parse_mode="Markdown")
+            else:
+                await bot.send_message(chat_id=client_tg_id, text=notify_msg, parse_mode="Markdown")
+                
+            return web.json_response({"success": True, "message": f"Notified user {client_tg_id}"})
+        else:
+            return web.json_response({"error": "Order or linked user not found"}, status=404)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
 
     # Slice 7 series frames if available
     frames_src = r"C:\Users\kraie\.gemini\antigravity-ide\brain\e27b6ef9-e81b-4a8e-980a-b4b4d8458b05\media__1785321073494.png"
@@ -379,6 +431,8 @@ async def start_webserver():
     app.router.add_post('/api/cards/give_test_packs', give_test_packs_api)
     app.router.add_post('/api/cards/reset_daily_test', reset_daily_test_api)
     app.router.add_post('/api/cards/generate_code', generate_series_code)
+    app.router.add_post('/api/cards/claim_bonus_packs', claim_bonus_packs_api)
+    app.router.add_post('/api/notify_order_status', notify_order_status_api)
     
     if os.path.exists(cards_dir):
         app.router.add_static('/cards', cards_dir)
@@ -817,6 +871,8 @@ async def start_handler(message: Message, state: FSMContext):
 @router.message(Command("reset_daily"), StateFilter("*"))
 async def reset_daily_cmd(message: Message, state: FSMContext):
     await state.clear()
+    if not await is_admin(message.from_user.id):
+        return
     try:
         async with pool.acquire() as db:
             await db.execute("UPDATE card_users SET last_daily_pack = NULL WHERE telegram_id = $1", message.from_user.id)
@@ -827,6 +883,8 @@ async def reset_daily_cmd(message: Message, state: FSMContext):
 @router.message(Command("give_packs", "give", "packs"), StateFilter("*"))
 async def give_packs_cmd(message: Message, state: FSMContext):
     await state.clear()
+    if not await is_admin(message.from_user.id):
+        return
     args = message.text.split()
     if len(args) == 2:
         # /give_packs 10 -> gives 10 packs to current user
@@ -975,10 +1033,10 @@ async def game_stats(message: Message):
         total_cards_collected = await db.fetchval("SELECT SUM(count) FROM user_cards") or 0
         
         leaderboard = await db.fetch("""
-            SELECT u.telegram_id, COUNT(c.series_slug) as unique_cards, SUM(c.count) as total_cards
+            SELECT u.telegram_id, u.username, u.first_name, COUNT(c.series_slug) as unique_cards, SUM(c.count) as total_cards
             FROM card_users u
             LEFT JOIN user_cards c ON u.telegram_id = c.telegram_id
-            GROUP BY u.telegram_id
+            GROUP BY u.telegram_id, u.username, u.first_name
             ORDER BY unique_cards DESC, total_cards DESC
             LIMIT 10
         """)
@@ -994,7 +1052,12 @@ async def game_stats(message: Message):
         for i, row in enumerate(leaderboard, 1):
             unique = row['unique_cards'] or 0
             total = row['total_cards'] or 0
-            msg += f"{i}. ID: [{row['telegram_id']}](tg://user?id={row['telegram_id']}) — {unique} уникальных (всего {total})\n"
+            tg_id = row['telegram_id']
+            username = row['username']
+            first_name = row['first_name'] or "Без имени"
+            
+            name_str = f"@{username}" if username else first_name
+            msg += f"{i}. {name_str} (ID: `{tg_id}`) — {unique} уникальных (всего {total})\n"
             
     await message.answer(msg, parse_mode="Markdown")
 
