@@ -288,6 +288,44 @@ async def reset_daily_test_api(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+async def generate_series_code(request):
+    try:
+        body = await request.json()
+        tg_id = int(body.get("telegram_id", 0))
+        series_slug = body.get("series_slug")
+        
+        if not tg_id or not series_slug:
+            return web.json_response({"error": "Invalid params"}, status=400)
+            
+        async with pool.acquire() as db:
+            # Verify user has all 4 cards of this series
+            cards_count = await db.fetchval("SELECT COUNT(*) FROM user_cards WHERE telegram_id = $1 AND series_slug = $2 AND count > 0", tg_id, series_slug)
+            if cards_count < 4:
+                return web.json_response({"error": "Серия не собрана полностью!"}, status=400)
+                
+            existing_code = await db.fetchval("SELECT code FROM series_codes WHERE telegram_id = $1 AND series_slug = $2", tg_id, series_slug)
+            if existing_code:
+                return web.json_response({"success": True, "code": existing_code})
+                
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            await db.execute("INSERT INTO series_codes (telegram_id, series_slug, code) VALUES ($1, $2, $3)", tg_id, series_slug, code)
+            
+            # Send notification to admins
+            for admin_id in ADMIN_IDS:
+                try:
+                    await bot.send_message(
+                        chat_id=admin_id,
+                        text=f"🎁 Игрок [{tg_id}](tg://user?id={tg_id}) собрал серию **{series_slug.upper()}**!\n\nСгенерирован код: `{code}`",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+                    
+            return web.json_response({"success": True, "code": code})
+    except Exception as e:
+        logging.error(f"Generate code error: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
 async def start_webserver():
     images_dir = os.path.join(cards_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
@@ -340,6 +378,7 @@ async def start_webserver():
     app.router.add_post('/api/cards/tasks/claim', claim_task_reward)
     app.router.add_post('/api/cards/give_test_packs', give_test_packs_api)
     app.router.add_post('/api/cards/reset_daily_test', reset_daily_test_api)
+    app.router.add_post('/api/cards/generate_code', generate_series_code)
     
     if os.path.exists(cards_dir):
         app.router.add_static('/cards', cards_dir)
@@ -449,6 +488,17 @@ async def init_db():
                 card_index INTEGER,
                 count INTEGER DEFAULT 1,
                 PRIMARY KEY (telegram_id, series_slug, card_index)
+            )
+        """)
+        
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS series_codes (
+                id SERIAL PRIMARY KEY,
+                telegram_id BIGINT,
+                series_slug TEXT,
+                code TEXT UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (telegram_id, series_slug)
             )
         """)
         
@@ -572,10 +622,8 @@ async def unarchive_order_db(order_id: int):
 
 # --- KEYBOARDS ---
 def get_start_kb(user_id=None):
-    url = f"{WEBAPP_URL}?tg_id={user_id}" if user_id else WEBAPP_URL
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))],
             [KeyboardButton(text="🧮 Калькулятор стоимости")],
             [KeyboardButton(text="📦 Отследить заказы"), KeyboardButton(text="🗃 Архив заказов")]
         ],
@@ -803,6 +851,37 @@ async def give_packs_cmd(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer(f"❌ Ошибка: {e}")
 
+@router.message(Command("check", "c"), StateFilter("*"))
+async def check_code_cmd(message: Message, state: FSMContext):
+    await state.clear()
+    if not await is_admin(message.from_user.id):
+        return
+        
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer("⚠️ Использование: `/check A1B2C3D4`", parse_mode="Markdown")
+        return
+        
+    code = args[1].upper()
+    
+    async with pool.acquire() as db:
+        record = await db.fetchrow("SELECT telegram_id, series_slug, created_at FROM series_codes WHERE code = $1", code)
+        
+    if record:
+        tg_id = record['telegram_id']
+        series = record['series_slug'].upper()
+        date = record['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        await message.answer(
+            f"✅ **Код действителен!**\n\n"
+            f"👤 Игрок: [ID: {tg_id}](tg://user?id={tg_id})\n"
+            f"🎁 Серия: **{series}**\n"
+            f"📅 Сгенерирован: {date}",
+            parse_mode="Markdown"
+        )
+    else:
+        await message.answer(f"❌ **Код `{code}` не найден!** Возможно, он недействителен или написан с ошибкой.", parse_mode="Markdown")
+
 @router.message(Command("admin_login"))
 async def admin_login_start(message: Message, state: FSMContext):
     await state.clear()
@@ -915,7 +994,7 @@ async def game_stats(message: Message):
         for i, row in enumerate(leaderboard, 1):
             unique = row['unique_cards'] or 0
             total = row['total_cards'] or 0
-            msg += f"{i}. ID: `{row['telegram_id']}` — {unique} уникальных (всего {total})\n"
+            msg += f"{i}. ID: [{row['telegram_id']}](tg://user?id={row['telegram_id']}) — {unique} уникальных (всего {total})\n"
             
     await message.answer(msg, parse_mode="Markdown")
 
