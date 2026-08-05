@@ -50,7 +50,7 @@ let userData = {
     ref_code: 'ref_' + effectiveTgId
 };
 
-let userCards = {}; 
+let userCards = {};
 let isOpening = false;
 let dailyTimerInterval = null;
 
@@ -63,10 +63,10 @@ const SERIES_CONFIG = [
         name: 'Breaking Bad',
         theme: 'breaking_bad',
         cards: [
-            { index: 1, name: 'Walter White',  rarity: 'legendary', img: '/cards/images/card_breaking_bad_1.png' },
-            { index: 2, name: 'Jesse Pinkman', rarity: 'common',   img: '/cards/images/card_breaking_bad_2.png' },
-            { index: 3, name: 'Saul Goodman',  rarity: 'rare',     img: '/cards/images/card_breaking_bad_3.png' },
-            { index: 4, name: 'Gustavo Fring', rarity: 'epic',     img: '/cards/images/card_breaking_bad_4.png' }
+            { index: 1, name: 'Walter White', rarity: 'legendary', img: '/cards/images/card_breaking_bad_1.png' },
+            { index: 2, name: 'Jesse Pinkman', rarity: 'common', img: '/cards/images/card_breaking_bad_2.png' },
+            { index: 3, name: 'Saul Goodman', rarity: 'rare', img: '/cards/images/card_breaking_bad_3.png' },
+            { index: 4, name: 'Gustavo Fring', rarity: 'epic', img: '/cards/images/card_breaking_bad_4.png' }
         ]
     },
     {
@@ -74,10 +74,10 @@ const SERIES_CONFIG = [
         name: 'Stranger Things',
         theme: 'stranger_things',
         cards: [
-            { index: 1, name: 'Steve',         rarity: 'common',    img: '/cards/images/card_stranger_things_1.png' },
-            { index: 2, name: 'Mike',          rarity: 'rare',      img: '/cards/images/card_stranger_things_2.png' },
-            { index: 3, name: 'Will Byers',    rarity: 'epic',      img: '/cards/images/card_stranger_things_3.png' },
-            { index: 4, name: 'Demogorgon',    rarity: 'legendary', img: '/cards/images/card_stranger_things_4.png' }
+            { index: 1, name: 'Steve', rarity: 'common', img: '/cards/images/card_stranger_things_1.png' },
+            { index: 2, name: 'Mike', rarity: 'rare', img: '/cards/images/card_stranger_things_2.png' },
+            { index: 3, name: 'Will Byers', rarity: 'epic', img: '/cards/images/card_stranger_things_3.png' },
+            { index: 4, name: 'Demogorgon', rarity: 'legendary', img: '/cards/images/card_stranger_things_4.png' }
         ]
     },
     {
@@ -85,10 +85,10 @@ const SERIES_CONFIG = [
         name: 'Resident Evil',
         theme: 'resident_evil',
         cards: [
-            { index: 1, name: 'Chainsaw Villager', rarity: 'common',    img: '/cards/images/card_residennt_evil_1.png' },
-            { index: 2, name: 'Jill Valentine',    rarity: 'rare',      img: '/cards/images/card_residennt_evil_2.png' },
-            { index: 3, name: 'Albert Wesker',     rarity: 'epic',      img: '/cards/images/card_residennt_evil_3.png' },
-            { index: 4, name: 'Leon Kennedy',      rarity: 'legendary', img: '/cards/images/card_residennt_evil_4.png' }
+            { index: 1, name: 'Chainsaw Villager', rarity: 'common', img: '/cards/images/card_residennt_evil_1.png' },
+            { index: 2, name: 'Jill Valentine', rarity: 'rare', img: '/cards/images/card_residennt_evil_2.png' },
+            { index: 3, name: 'Albert Wesker', rarity: 'epic', img: '/cards/images/card_residennt_evil_3.png' },
+            { index: 4, name: 'Leon Kennedy', rarity: 'legendary', img: '/cards/images/card_residennt_evil_4.png' }
         ]
     },
     {
@@ -96,9 +96,9 @@ const SERIES_CONFIG = [
         name: 'Death Note',
         theme: 'death_note',
         cards: [
-            { index: 1, name: 'Misa Amane',   rarity: 'common',    img: '/cards/images/card_death_note_1.png' },
-            { index: 2, name: 'Ryuk',         rarity: 'rare',      img: '/cards/images/card_death_note_2.png' },
-            { index: 3, name: 'L',            rarity: 'epic',      img: '/cards/images/card_death_note_3.png' },
+            { index: 1, name: 'Misa Amane', rarity: 'common', img: '/cards/images/card_death_note_1.png' },
+            { index: 2, name: 'Ryuk', rarity: 'rare', img: '/cards/images/card_death_note_2.png' },
+            { index: 3, name: 'L', rarity: 'epic', img: '/cards/images/card_death_note_3.png' },
             { index: 4, name: 'Light Yagami', rarity: 'legendary', img: '/cards/images/card_death_note_4.png' }
         ]
     },
@@ -107,10 +107,10 @@ const SERIES_CONFIG = [
         name: 'Invincible',
         theme: 'invincible',
         cards: [
-            { index: 1, name: 'Atom Eve',        rarity: 'common',    img: '/cards/images/card_invincible_1.png' },
-            { index: 2, name: 'Allen the Alien', rarity: 'rare',      img: '/cards/images/card_invincible_2.png' },
-            { index: 3, name: 'Omni-Man',        rarity: 'epic',      img: '/cards/images/card_invincible_3.png' },
-            { index: 4, name: 'Invincible',      rarity: 'legendary', img: '/cards/images/card_invincible_4.png' }
+            { index: 1, name: 'Atom Eve', rarity: 'common', img: '/cards/images/card_invincible_1.png' },
+            { index: 2, name: 'Allen the Alien', rarity: 'rare', img: '/cards/images/card_invincible_2.png' },
+            { index: 3, name: 'Omni-Man', rarity: 'epic', img: '/cards/images/card_invincible_3.png' },
+            { index: 4, name: 'Invincible', rarity: 'legendary', img: '/cards/images/card_invincible_4.png' }
         ]
     },
     {
@@ -118,9 +118,9 @@ const SERIES_CONFIG = [
         name: 'One Piece',
         theme: 'one_piece',
         cards: [
-            { index: 1, name: 'Nami',          rarity: 'common',    img: '/cards/images/card_one_piece_1.png' },
-            { index: 2, name: 'Sanji',         rarity: 'rare',      img: '/cards/images/card_one_piece_2.png' },
-            { index: 3, name: 'Roronoa Zorro', rarity: 'epic',      img: '/cards/images/card_one_piece_3.png' },
+            { index: 1, name: 'Nami', rarity: 'common', img: '/cards/images/card_one_piece_1.png' },
+            { index: 2, name: 'Sanji', rarity: 'rare', img: '/cards/images/card_one_piece_2.png' },
+            { index: 3, name: 'Roronoa Zorro', rarity: 'epic', img: '/cards/images/card_one_piece_3.png' },
             { index: 4, name: 'Monkey D Luffy', rarity: 'legendary', img: '/cards/images/card_one_piece_4.png' }
         ]
     },
@@ -129,10 +129,10 @@ const SERIES_CONFIG = [
         name: 'Universal',
         theme: 'universal',
         cards: [
-            { index: 1, name: 'Funko Gold Crown', rarity: 'legendary', img: '/cards/images/card_universal_1.png' },
-            { index: 2, name: 'Funko Silver',     rarity: 'epic',      img: '/cards/images/card_universal_2.png' },
-            { index: 3, name: 'Funko Bronze',     rarity: 'rare',      img: '/cards/images/card_universal_3.png' },
-            { index: 4, name: 'Funko Classic',    rarity: 'common',    img: '/cards/images/card_universal_4.png' }
+            { index: 1, name: 'Tony Soprano', rarity: 'legendary', img: '/cards/images/card_universal_1.png' },
+            { index: 2, name: 'BMO', rarity: 'legendary', img: '/cards/images/card_universal_2.png' },
+            { index: 3, name: 'Paul Atreides', rarity: 'legendary', img: '/cards/images/card_universal_3.png' },
+            { index: 4, name: 'Derpy', rarity: 'legendary', img: '/cards/images/card_universal_4.png' }
         ]
     }
 ];
@@ -169,7 +169,7 @@ function updateUI() {
     } else {
         openPackBtn.style.opacity = '1';
     }
-    
+
     // Always restore booster pack visibility on UI update if not actively tearing
     if (boosterPack && !isOpening) {
         boosterPack.classList.remove('hidden', 'is-tearing', 'shaking');
@@ -178,7 +178,7 @@ function updateUI() {
         if (packTop) packTop.classList.remove('tearing-left');
         if (packInside) packInside.classList.remove('peeking');
     }
-    
+
     updateTaskButtons();
     renderCollection();
 }
@@ -191,7 +191,7 @@ function setupNavigation() {
                 v.classList.add('hidden');
                 v.classList.remove('active');
             });
-            
+
             btn.classList.add('active');
             const targetId = btn.getAttribute('data-target');
             const targetView = document.getElementById(targetId);
@@ -256,14 +256,14 @@ function setupTasks() {
     document.querySelectorAll('.btn-task[data-task]').forEach(btn => {
         btn.addEventListener('click', async () => {
             if (btn.classList.contains('completed')) return;
-            
+
             const taskId = btn.getAttribute('data-task');
-            
+
             // Open official Telegram channel if tg_sub task
             if (taskId === 'tg_sub') {
                 window.open('https://t.me/FunkoStop', '_blank');
             }
-            
+
             try {
                 const res = await fetch('/api/cards/tasks/claim', {
                     method: 'POST',
@@ -271,12 +271,12 @@ function setupTasks() {
                     body: JSON.stringify({ telegram_id: userData.telegram_id, task_id: taskId })
                 });
                 const data = await res.json();
-                
+
                 if (data.success) {
                     userData.packs_count = data.packs_count;
                     userData.completed_tasks = data.completed_tasks;
                     updateUI();
-                    
+
                     if (window.confetti) {
                         confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
                     }
@@ -310,7 +310,7 @@ function updateTaskButtons() {
 // Daily Pack Claiming
 function setupDailyPackButton() {
     if (!dailyGiftBtn) return;
-    
+
     dailyGiftBtn.addEventListener('click', async () => {
         const isReady = dailyTimer.textContent === "ГОТОВО";
         if (!isReady) {
@@ -330,7 +330,7 @@ function setupDailyPackButton() {
                 userData.last_daily_pack = new Date().toISOString();
                 updateUI();
                 startDailyCountdown(86400);
-                
+
                 if (window.confetti) {
                     confetti({ particleCount: 100, spread: 70, origin: { y: 0.5 } });
                 }
@@ -421,11 +421,50 @@ function rollRandomCard() {
     return matching[Math.floor(Math.random() * matching.length)];
 }
 
+// Roll Bonus Card
+function rollBonusCard() {
+    const rand = Math.random() * 100;
+    // Probabilities:
+    // 91.95% nothing
+    // 3% - 300r discount (7)
+    // 2% - 5 bonus packs (8)
+    // 1% - 500r discount (4)
+    // 0.5% - 1000r discount (5)
+    // 0.5% - 10 bonus packs (6)
+    // 0.5% - 20% discount (2)
+    // 0.5% - 25% discount avito (3)
+    // 0.05% - jackpot (1)
+
+    if (rand <= 0.05) return { id: 1, name: "Funko Pop", img: "/cards/images/bonus_card (1).png" };
+    if (rand <= 0.55) return { id: 2, name: "Скидка 20%", img: "/cards/images/bonus_card (2).png" };
+    if (rand <= 1.05) return { id: 3, name: "Скидка 25% (Авито)", img: "/cards/images/bonus_card (3).png" };
+    if (rand <= 1.55) return { id: 5, name: "Скидка 1000₽", img: "/cards/images/bonus_card (5).png" };
+    if (rand <= 2.05) return { id: 6, name: "10 Бонус Паков", packs: 10, img: "/cards/images/bonus_card (6).png" };
+    if (rand <= 3.05) return { id: 4, name: "Скидка 500₽", img: "/cards/images/bonus_card (4).png" };
+    if (rand <= 5.05) return { id: 8, name: "5 Бонус Паков", packs: 5, img: "/cards/images/bonus_card (8).png" };
+    if (rand <= 8.05) return { id: 7, name: "Скидка 300₽", img: "/cards/images/bonus_card (7).png" };
+
+    return null;
+}
+
 // Pack Opening Flow — Shorts-style: card shoots from bottom of screen
 let fastOpen = false;
 
 openPackBtn.addEventListener('click', async () => {
     if (isOpening) return;
+
+    let hasSeenFaq = false;
+    try {
+        hasSeenFaq = localStorage.getItem('funko_cards_has_seen_faq') === 'true';
+    } catch (e) { }
+
+    if (Object.keys(userCards).length === 0 && !hasSeenFaq) {
+        if (typeof openFAQ === 'function') {
+            openFAQ();
+            return;
+        }
+    }
+
     if (userData.packs_count <= 0) {
         alert("У вас закончились паки! Заберите ежедневный пак или выполняйте задания.");
         return;
@@ -441,18 +480,18 @@ openPackBtn.addEventListener('click', async () => {
     // Remove ALL aura classes so previous card's glow doesn't carry over
     card3d.classList.remove('flipped', 'aura-common', 'aura-rare', 'aura-epic', 'aura-legendary', 'card-fly-in');
     card3d.style.filter = ''; // also clear any inline filter
-    
+
     const rarityBadge = document.getElementById('drop-rarity-badge');
     if (rarityBadge) {
         rarityBadge.className = 'drop-rarity-badge hidden';
     }
-    
+
     const svetBg = document.getElementById('svet-bg');
     if (svetBg) {
         svetBg.classList.remove('svet-common', 'svet-rare', 'svet-epic', 'svet-legendary', 'show');
         svetBg.style.opacity = '0';
     }
-    
+
     const packTop = document.getElementById('pack-top');
     const packInside = document.getElementById('pack-inside-card');
 
@@ -464,9 +503,10 @@ openPackBtn.addEventListener('click', async () => {
         // Phase 2: Pack disappears, prepare drop
         boosterPack.classList.add('hidden');
 
-            const drop = rollRandomCard();
-            const cardKey = `${drop.series.slug}_${drop.card.index}`;
-            userCards[cardKey] = (userCards[cardKey] || 0) + 1;
+        const drop = rollRandomCard();
+        let currentBonus = rollBonusCard();
+        const cardKey = `${drop.series.slug}_${drop.card.index}`;
+        userCards[cardKey] = (userCards[cardKey] || 0) + 1;
 
         cardFront.innerHTML = `
             <div class="card-frame ${drop.series.theme}" style="padding: 0; border: none; background: transparent; box-shadow: none; position: relative;">
@@ -481,22 +521,22 @@ openPackBtn.addEventListener('click', async () => {
         cardStage.style.opacity = ''; // Reset any inline opacity from previous close
         cardStage.style.visibility = ''; // Reset visibility
         cardStage.classList.remove('hidden');
-        
+
         // Show backcard initially, hide front
         const cardBack = card3d.querySelector('.card-back');
         const cardFrontEl = card3d.querySelector('.card-front');
         if (cardBack) { cardBack.style.display = ''; cardBack.style.opacity = '1'; }
         if (cardFrontEl) { cardFrontEl.style.display = 'none'; }
-        
+
         card3d.style.transform = 'translateY(120vh) rotateY(0deg)';
         card3d.style.transition = 'none';
         card3d.style.opacity = '0';
-        
+
         // Reset and prepare background elements
         const svetBg = document.getElementById('svet-bg');
         const actions = document.getElementById('opened-card-actions');
-        if(svetBg) svetBg.className = '';
-        if(svetBg) svetBg.style.opacity = '0';
+        if (svetBg) svetBg.className = '';
+        if (svetBg) svetBg.style.opacity = '0';
         cardStage.classList.remove('show-backcards');
         actions.classList.add('hidden');
 
@@ -504,7 +544,7 @@ openPackBtn.addEventListener('click', async () => {
         card3d.style.transition = 'none';
         card3d.style.transform = 'translateY(120vh) rotateY(0deg)';
         card3d.style.opacity = '0';
-        
+
         // Force reflow synchronously to ensure start state is applied
         void card3d.offsetHeight;
 
@@ -514,55 +554,55 @@ openPackBtn.addEventListener('click', async () => {
         card3d.style.opacity = '1';
 
         // Phase 5: NO AURA before flip — don't spoil the rarity!
-        
+
         // Phase 6: Wait for tap to flip
         const btnFlipCard = document.getElementById('btn-flip-card');
-        
+
         const handleTapToFlip = (e) => {
             if (e && e.target && e.target.closest('#opened-card-actions')) return;
             btnFlipCard.removeEventListener('click', handleTapToFlip);
             card3d.removeEventListener('click', handleTapToFlip);
             btnFlipCard.classList.add('hidden');
-            
+
             // 3D FLIP: rotateY(0) → rotateY(-90deg) → swap → rotateY(90deg) → rotateY(0)
             const halfSpeed = 500; // Always 1s total
             card3d.style.transition = `transform ${halfSpeed}ms ease-in`;
             card3d.style.transform = 'rotateY(-90deg)';
-            
+
             setTimeout(() => {
                 // Midpoint: swap backcard → front card
                 const cardBack = card3d.querySelector('.card-back');
                 const cardFrontEl = card3d.querySelector('.card-front');
                 if (cardBack) cardBack.style.display = 'none';
                 if (cardFrontEl) { cardFrontEl.style.display = 'block'; cardFrontEl.style.opacity = '1'; }
-                
+
                 // Snap to opposite side
                 card3d.style.transition = 'none';
                 card3d.style.transform = 'rotateY(90deg)';
-                
+
                 // Force reflow
                 void card3d.offsetWidth;
-                
+
                 // NOW apply aura (rarity is revealed)
                 card3d.classList.remove('aura-common', 'aura-rare', 'aura-epic', 'aura-legendary');
                 card3d.classList.add('aura-' + drop.card.rarity);
                 if (drop.card.rarity === 'legendary') flashScreen();
-                
+
                 // Trigger glow here (after flip) ONLY for epic and legendary
-                if(svetBg && (drop.card.rarity === 'epic' || drop.card.rarity === 'legendary')) {
+                if (svetBg && (drop.card.rarity === 'epic' || drop.card.rarity === 'legendary')) {
                     svetBg.classList.add('svet-' + drop.card.rarity);
                     svetBg.style.transition = 'opacity 0.2s ease';
                     svetBg.style.opacity = '1';
                 }
-                
+
                 if (rarityBadge) {
-                    rarityBadge.textContent = drop.card.rarity;
+                    rarityBadge.innerHTML = `<div style="font-size: 1.3rem; font-weight: 900; margin-bottom: 2px;">${drop.card.name.toUpperCase()}</div><div style="font-size: 0.9rem; opacity: 0.8; letter-spacing: 3px;">${drop.card.rarity.toUpperCase()}</div>`;
                     rarityBadge.classList.remove('hidden');
                     void rarityBadge.offsetWidth;
                     rarityBadge.classList.add('reveal-' + drop.card.rarity);
                     rarityBadge.classList.add('show');
                 }
-                
+
                 // Complete flip: rotateY 90deg → 0deg
                 card3d.style.transition = `transform ${Math.round(halfSpeed * 1.2)}ms cubic-bezier(0.175, 0.885, 0.32, 1.4)`;
                 card3d.style.transform = 'rotateY(0deg)';
@@ -575,10 +615,10 @@ openPackBtn.addEventListener('click', async () => {
                         particleCount: drop.card.rarity === 'legendary' ? 200 : (drop.card.rarity === 'epic' ? 100 : 50),
                         spread: drop.card.rarity === 'legendary' ? 120 : 80,
                         origin: { y: 0.5 },
-                        colors: drop.card.rarity === 'legendary' ? ['#ffc107','#ff9800','#fff'] :
-                                drop.card.rarity === 'epic' ? ['#e040fb','#9c27b0','#fff'] :
-                                drop.card.rarity === 'rare' ? ['#2196f3','#00bcd4','#fff'] :
-                                ['#4caf50','#8bc34a','#fff']
+                        colors: drop.card.rarity === 'legendary' ? ['#ffc107', '#ff9800', '#fff'] :
+                            drop.card.rarity === 'epic' ? ['#e040fb', '#9c27b0', '#fff'] :
+                                drop.card.rarity === 'rare' ? ['#2196f3', '#00bcd4', '#fff'] :
+                                    ['#4caf50', '#8bc34a', '#fff']
                     });
                 }
 
@@ -587,6 +627,12 @@ openPackBtn.addEventListener('click', async () => {
                 // Show action buttons
                 actions.classList.remove('hidden');
 
+                const originalNextText = document.getElementById('btn-next-pack').textContent;
+                if (currentBonus) {
+                    document.getElementById('btn-next-pack').textContent = "ЗАБРАТЬ БОНУС!";
+                    document.getElementById('btn-exit-pack').classList.add('hidden');
+                }
+
                 const closeStageFn = (hideCompletely) => {
                     if (hideCompletely) {
                         cardStage.style.opacity = '0';
@@ -594,20 +640,20 @@ openPackBtn.addEventListener('click', async () => {
                         setTimeout(() => {
                             cardStage.classList.add('hidden');
                             cardFront.innerHTML = '';
-                            
+
                             // Hide svet glow
                             const svetBg = document.getElementById('svet-bg');
                             if (svetBg) svetBg.classList.remove('show');
-                            
+
                             updateUI();
                             if (typeof onComplete === 'function') onComplete();
                             cardStage.style.visibility = '';
                         }, 400);
                     }
                     card3d.style.transition = 'none';
-                    
+
                     cardStage.classList.remove('show-backcards');
-                    if(svetBg) svetBg.style.opacity = '0';
+                    if (svetBg) svetBg.style.opacity = '0';
                     actions.classList.add('hidden');
                     if (hideCompletely) {
                         boosterPack.classList.remove('hidden', 'shaking', 'is-tearing');
@@ -620,18 +666,17 @@ openPackBtn.addEventListener('click', async () => {
 
                 const exitBtn = document.getElementById('btn-exit-pack');
                 const nextBtn = document.getElementById('btn-next-pack');
-                
-                // Clear old listeners
+
                 const newExit = exitBtn.cloneNode(true);
                 const newNext = nextBtn.cloneNode(true);
                 exitBtn.parentNode.replaceChild(newExit, exitBtn);
                 nextBtn.parentNode.replaceChild(newNext, nextBtn);
-                
+
                 newExit.addEventListener('click', (e) => {
                     if (e) e.stopPropagation();
                     actions.classList.add('hidden');
                     if (rarityBadge) rarityBadge.classList.remove('show');
-                    
+
                     card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
                     card3d.style.transform = 'translateY(-120vh) rotateY(180deg)';
                     card3d.style.opacity = '0';
@@ -641,16 +686,113 @@ openPackBtn.addEventListener('click', async () => {
                     }
                     setTimeout(() => closeStageFn(true), 400);
                 });
-                
+
                 newNext.addEventListener('click', (e) => {
                     if (e) e.stopPropagation();
+
+                    if (currentBonus) {
+                        actions.classList.add('hidden');
+                        if (rarityBadge) rarityBadge.classList.remove('show');
+
+                        card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
+                        card3d.style.transform = 'translateY(-120vh) rotateY(180deg)';
+                        card3d.style.opacity = '0';
+                        if (svetBg) {
+                            svetBg.style.transition = 'opacity 0.4s ease';
+                            svetBg.style.opacity = '0';
+                        }
+
+                        setTimeout(() => {
+                            card3d.classList.remove('flipped', 'aura-common', 'aura-rare', 'aura-epic', 'aura-legendary');
+                            cardFront.innerHTML = `
+                                <div class="card-frame universal" style="padding: 0; border: none; background: transparent; box-shadow: none; position: relative;">
+                                    <img src="${currentBonus.img}" class="full-card-image" alt="${currentBonus.name}" style="position: relative; z-index: 1;">
+                                </div>
+                            `;
+
+                            const cardBack = card3d.querySelector('.card-back');
+                            const cardFrontEl = card3d.querySelector('.card-front');
+                            if (cardBack) { cardBack.style.display = ''; cardBack.style.opacity = '1'; }
+                            if (cardFrontEl) { cardFrontEl.style.display = 'none'; }
+
+                            card3d.style.transition = 'none';
+                            card3d.style.transform = 'translateY(120vh) rotateY(0deg)';
+                            card3d.style.opacity = '0';
+                            void card3d.offsetHeight;
+
+                            card3d.style.transition = 'transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.3s ease';
+                            card3d.style.transform = 'translateY(0) rotateY(0deg)';
+                            card3d.style.opacity = '1';
+
+                            btnFlipCard.classList.remove('hidden');
+
+                            const handleBonusFlip = () => {
+                                btnFlipCard.removeEventListener('click', handleBonusFlip);
+                                card3d.removeEventListener('click', handleBonusFlip);
+                                btnFlipCard.classList.add('hidden');
+
+                                card3d.style.transition = 'transform 500ms ease-in';
+                                card3d.style.transform = 'rotateY(-90deg)';
+
+                                setTimeout(() => {
+                                    if (cardBack) cardBack.style.display = 'none';
+                                    if (cardFrontEl) { cardFrontEl.style.display = 'block'; cardFrontEl.style.opacity = '1'; }
+                                    card3d.style.transition = 'none';
+                                    card3d.style.transform = 'rotateY(90deg)';
+                                    void card3d.offsetWidth;
+
+                                    card3d.classList.add('aura-legendary');
+                                    flashScreen();
+
+                                    if (rarityBadge) {
+                                        rarityBadge.innerHTML = `<div style="font-size: 1.3rem; font-weight: 900; margin-bottom: 2px;">${currentBonus.name.toUpperCase()}</div><div style="font-size: 0.9rem; opacity: 0.8; letter-spacing: 3px; color: #ff0022;">BONUS</div>`;
+                                        rarityBadge.classList.remove('hidden');
+                                        void rarityBadge.offsetWidth;
+                                        rarityBadge.classList.add('reveal-legendary');
+                                        rarityBadge.classList.add('show');
+                                    }
+
+                                    card3d.style.transition = 'transform 600ms cubic-bezier(0.175, 0.885, 0.32, 1.4)';
+                                    card3d.style.transform = 'rotateY(0deg)';
+                                }, 500);
+
+                                setTimeout(() => {
+                                    if (window.confetti) confetti({ particleCount: 200, spread: 120, origin: { y: 0.5 }, colors: ['#ff0022', '#ffffff'] });
+
+                                    if (currentBonus.packs) {
+                                        fetch('/api/cards/claim_bonus_packs', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ telegram_id: userData.telegram_id, count: currentBonus.packs })
+                                        }).then(res => res.json()).then(d => {
+                                            if (d.success) {
+                                                userData.packs_count = d.packs_count;
+                                                updateUI();
+                                            }
+                                        }).catch(console.error);
+                                    }
+
+                                    newNext.textContent = originalNextText;
+                                    newExit.classList.remove('hidden');
+                                    actions.classList.remove('hidden');
+                                    currentBonus = null; // Clear so next click does normal flow
+                                }, 1000);
+                            };
+
+                            btnFlipCard.addEventListener('click', handleBonusFlip);
+                            card3d.addEventListener('click', handleBonusFlip);
+
+                        }, 400);
+                        return;
+                    }
+
                     if (userData.packs_count <= 0) {
                         alert("У вас больше нет паков!");
                         return;
                     }
                     actions.classList.add('hidden');
                     if (rarityBadge) rarityBadge.classList.remove('show');
-                    
+
                     card3d.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
                     card3d.style.transform = 'translateY(120vh) rotateY(180deg)';
                     card3d.style.opacity = '0';
@@ -676,7 +818,7 @@ openPackBtn.addEventListener('click', async () => {
             btnFlipCard.addEventListener('click', handleTapToFlip);
             card3d.addEventListener('click', handleTapToFlip);
         }, isFast ? 400 : 800);
-        
+
         // Removed svetBg trigger from here so it happens on flip
 
     }, isFast ? 50 : 1500); // end of Phase 1 (Tearing duration)
@@ -756,7 +898,7 @@ function setupLightboxClose() {
 function renderCollection() {
     seriesContainer.innerHTML = '';
     let totalCollected = 0;
-    
+
     // Calculate total first
     SERIES_CONFIG.forEach(series => {
         series.cards.forEach(card => {
@@ -805,7 +947,7 @@ function renderCollection() {
         const grid = document.createElement('div');
         grid.className = 'cards-grid-view';
 
-        const sortedCards = [...series.cards].sort((a, b) => 
+        const sortedCards = [...series.cards].sort((a, b) =>
             RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity]
         );
 
@@ -862,58 +1004,88 @@ function renderCollection() {
             const prizeBanner = document.createElement('div');
             prizeBanner.className = 'series-prize-banner';
             prizeBanner.innerHTML = `
-                <div class="series-prize-text">🏆 Коллекция собрана!<br>Напишите менеджеру за призом!</div>
-                <button class="series-prize-btn" onclick="window.open('${MANAGER_URL}','_blank')">Написать →</button>
+                <div class="series-prize-text">🏆 Коллекция собрана!</div>
+                <button class="series-prize-btn" id="claim-btn-${series.slug}">Забрать приз →</button>
             `;
             seriesBlock.appendChild(prizeBanner);
+
+            setTimeout(() => {
+                const btn = document.getElementById(`claim-btn-${series.slug}`);
+                if (btn) {
+                    btn.addEventListener('click', async () => {
+                        const originalText = btn.textContent;
+                        btn.textContent = 'Генерация...';
+                        btn.disabled = true;
+                        try {
+                            const res = await fetch('/api/cards/generate_code', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ telegram_id: userData.telegram_id, series_slug: series.slug })
+                            });
+                            const data = await res.json();
+                            if (data.success || data.code) {
+                                const code = data.code;
+                                const msg = encodeURIComponent(`Здравствуйте! Я собрал серию ${series.name}, мой код: ${code}`);
+                                window.open(`https://t.me/Funko_Stop?text=${msg}`, '_blank');
+                            } else {
+                                alert('Ошибка: ' + (data.error || 'Не удалось сгенерировать код.'));
+                            }
+                        } catch (e) {
+                            alert('Ошибка сети.');
+                        } finally {
+                            btn.textContent = originalText;
+                            btn.disabled = false;
+                        }
+                    });
+                }
+            }, 0);
         }
 
         seriesContainer.appendChild(seriesBlock);
     });
 }
 
+function renderPrizes() {
+    const container = document.getElementById('prizes-container');
+    if (!container) return;
+    container.innerHTML = '';
 
-function setupTestButton() {
-    const addTestPacksBtn = document.getElementById('add-test-packs-btn');
-    if (addTestPacksBtn) {
-        addTestPacksBtn.addEventListener('click', async () => {
-            userData.packs_count += 10;
-            updateUI();
-            if (window.confetti) {
-                confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } });
-            }
-            try {
-                const res = await fetch('/api/cards/give_test_packs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ telegram_id: userData.telegram_id })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    userData.packs_count = data.packs_count;
-                    updateUI();
-                }
-            } catch (e) {
-                console.log("Local test pack addition");
-            }
-        });
-    }
+    const prizesGrid = document.createElement('div');
+    prizesGrid.className = 'prizes-grid';
 
-    const resetTestDailyBtn = document.getElementById('reset-test-daily-btn');
-    if (resetTestDailyBtn) {
-        resetTestDailyBtn.addEventListener('click', async () => {
-            userData.last_daily_pack = null;
-            if (dailyTimerInterval) clearInterval(dailyTimerInterval);
-            checkDailyTimer();
-            try {
-                await fetch('/api/cards/reset_daily_test', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ telegram_id: userData.telegram_id })
-                });
-            } catch (e) {}
-        });
-    }
+    const prizesList = [
+        { name: "Common", rarity: "common", img: "/cards/images/card_breaking_bad_2.png" },
+        { name: "Rare", rarity: "rare", img: "/cards/images/card_death_note_2.png" },
+        { name: "Epic", rarity: "epic", img: "/cards/images/card_invincible_3.png" },
+        { name: "Legendary", rarity: "legendary", img: "/cards/images/card_residennt_evil_4.png" },
+        { name: "Funko Pop", rarity: "bonus", img: "/cards/images/bonus_card (1).png" },
+        { name: "Скидка 20%", rarity: "bonus", img: "/cards/images/bonus_card (2).png" },
+        { name: "Скидка 25%", rarity: "bonus", img: "/cards/images/bonus_card (3).png" },
+        { name: "Скидка 500₽", rarity: "bonus", img: "/cards/images/bonus_card (4).png" },
+        { name: "Скидка 1000₽", rarity: "bonus", img: "/cards/images/bonus_card (5).png" },
+        { name: "10 Паков", rarity: "bonus", img: "/cards/images/bonus_card (6).png" },
+        { name: "Скидка 300₽", rarity: "bonus", img: "/cards/images/bonus_card (7).png" },
+        { name: "5 Паков", rarity: "bonus", img: "/cards/images/bonus_card (8).png" }
+    ];
+
+    prizesList.forEach(prize => {
+        const item = document.createElement('div');
+        item.className = 'prize-item';
+
+        const isFigure = prize.rarity === 'figure';
+
+        item.innerHTML = `
+            <div class="prize-img-wrap">
+                <img src="${prize.img}" class="prize-img ${isFigure ? 'figure' : ''}" alt="${prize.name}">
+            </div>
+            <div class="prize-label prize-label-${prize.rarity}">
+                ${prize.name}
+            </div>
+        `;
+        prizesGrid.appendChild(item);
+    });
+
+    container.appendChild(prizesGrid);
 }
 
 function initApp() {
@@ -921,9 +1093,128 @@ function initApp() {
     setupRefLink();
     setupTasks();
     setupDailyPackButton();
-    setupTestButton();
     setupLightboxClose();
+    renderPrizes();
     fetchProfile();
+}
+
+// FAQ Logic
+let currentFaqIndex = 1;
+const totalFaqImages = 10;
+let faqTouchStartX = 0;
+let faqTouchEndX = 0;
+
+function openFAQ() {
+    currentFaqIndex = 1;
+    updateFaqView('none');
+    document.getElementById('faq-lightbox').classList.remove('hidden');
+
+    try {
+        localStorage.setItem('funko_cards_has_seen_faq', 'true');
+    } catch (e) { }
+}
+
+function closeFAQ() {
+    document.getElementById('faq-lightbox').classList.add('hidden');
+}
+
+function updateFaqView(direction = 'none') {
+    const img = document.getElementById('faq-lightbox-img');
+    if (img) {
+        const prevBtn = document.getElementById('faq-prev-btn');
+        const nextBtn = document.getElementById('faq-next-btn');
+
+        if (prevBtn) {
+            if (currentFaqIndex <= 1) {
+                prevBtn.style.opacity = '0';
+                prevBtn.style.pointerEvents = 'none';
+            } else {
+                prevBtn.style.opacity = '1';
+                prevBtn.style.pointerEvents = 'auto';
+            }
+        }
+
+        if (nextBtn) {
+            if (currentFaqIndex >= totalFaqImages) {
+                nextBtn.style.opacity = '0';
+                nextBtn.style.pointerEvents = 'none';
+            } else {
+                nextBtn.style.opacity = '1';
+                nextBtn.style.pointerEvents = 'auto';
+            }
+        }
+
+        if (direction === 'none') {
+            img.style.opacity = '1';
+            img.style.transform = 'translateX(0) scale(1)';
+            img.src = `/cards/images/faq_${currentFaqIndex}.png`;
+        } else {
+            // Animate out
+            img.style.opacity = '0';
+            img.style.transform = direction === 'next' ? 'translateX(-30px)' : 'translateX(30px)';
+
+            setTimeout(() => {
+                img.src = `/cards/images/faq_${currentFaqIndex}.png`;
+                // Prep for animate in
+                img.style.transform = direction === 'next' ? 'translateX(30px)' : 'translateX(-30px)';
+
+                img.onload = () => {
+                    img.style.opacity = '1';
+                    img.style.transform = 'translateX(0)';
+                };
+            }, 150);
+        }
+    }
+}
+
+function nextFaq() {
+    if (currentFaqIndex < totalFaqImages) {
+        currentFaqIndex++;
+        updateFaqView('next');
+    } else {
+        closeFAQ();
+    }
+}
+
+function prevFaq() {
+    if (currentFaqIndex > 1) {
+        currentFaqIndex--;
+        updateFaqView('prev');
+    }
+}
+
+const faqCloseOverlay = document.getElementById('faq-lightbox-close');
+const faqCloseBtn = document.getElementById('faq-lightbox-close-btn');
+if (faqCloseOverlay) faqCloseOverlay.addEventListener('click', closeFAQ);
+if (faqCloseBtn) faqCloseBtn.addEventListener('click', closeFAQ);
+
+const faqImg = document.getElementById('faq-lightbox-img');
+if (faqImg) {
+    faqImg.addEventListener('touchstart', e => {
+        faqTouchStartX = e.changedTouches[0].screenX;
+    });
+    faqImg.addEventListener('touchend', e => {
+        faqTouchEndX = e.changedTouches[0].screenX;
+        handleFaqSwipe();
+    });
+    faqImg.addEventListener('click', e => {
+        const rect = faqImg.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        if (x > rect.width / 2) {
+            nextFaq();
+        } else {
+            prevFaq();
+        }
+    });
+}
+
+function handleFaqSwipe() {
+    if (faqTouchEndX < faqTouchStartX - 30) {
+        nextFaq();
+    }
+    if (faqTouchEndX > faqTouchStartX + 30) {
+        prevFaq();
+    }
 }
 
 initApp();
