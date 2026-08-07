@@ -254,7 +254,7 @@ async def claim_bonus_packs_api(request):
         body = await request.json()
         tg_id = int(body.get("telegram_id", 0))
         bonus_id = int(body.get("bonus_id", 0))
-        packs_to_add = int(body.get("packs", 0))
+        packs_to_add = int(body.get("packs", body.get("count", 0)))
         
         if not tg_id or not packs_to_add:
             return web.json_response({"error": "Invalid params"}, status=400)
