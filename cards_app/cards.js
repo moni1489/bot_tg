@@ -1082,6 +1082,11 @@ function renderPrizes() {
                 ${prize.name}
             </div>
         `;
+
+        item.onclick = function() {
+            this.classList.toggle('active');
+        };
+        
         prizesGrid.appendChild(item);
     });
 
