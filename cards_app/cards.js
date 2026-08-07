@@ -1222,4 +1222,70 @@ function handleFaqSwipe() {
     }
 }
 
-initApp();
+function preloadImagesAndInit() {
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingBar = document.getElementById('loading-bar');
+    const loadingText = document.getElementById('loading-text');
+    
+    // 1. Сначала запускаем приложение, чтобы оно создало DOM-элементы с картинками
+    initApp();
+    
+    if (!loadingScreen) return;
+    
+    // 2. Собираем все картинки, которые появились на странице
+    const images = Array.from(document.querySelectorAll('img'));
+    
+    // 3. Отфильтруем те, у которых есть src
+    const validImages = images.filter(img => img.src);
+    const totalImages = validImages.length;
+    
+    if (totalImages === 0) {
+        completeLoading();
+        return;
+    }
+    
+    let loadedImages = 0;
+    // Минимальное время показа загрузки, чтобы не было "моргания", если все закешировано
+    const startTime = Date.now();
+    const MIN_LOADING_TIME = 800; 
+    
+    function updateProgress() {
+        loadedImages++;
+        const progress = Math.floor((loadedImages / totalImages) * 100);
+        
+        if (loadingBar) loadingBar.style.width = progress + '%';
+        if (loadingText) loadingText.innerText = 'Загрузка... ' + progress + '%';
+        
+        if (loadedImages >= totalImages) {
+            const elapsedTime = Date.now() - startTime;
+            const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
+            
+            setTimeout(completeLoading, remainingTime);
+        }
+    }
+    
+    function completeLoading() {
+        if (loadingBar) loadingBar.style.width = '100%';
+        if (loadingText) loadingText.innerText = 'Загрузка... 100%';
+        
+        setTimeout(() => {
+            loadingScreen.classList.add('fade-out');
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 500);
+        }, 200);
+    }
+    
+    // Вешаем обработчики на каждую картинку
+    validImages.forEach(img => {
+        if (img.complete) {
+            updateProgress();
+        } else {
+            img.addEventListener('load', updateProgress, { once: true });
+            img.addEventListener('error', updateProgress, { once: true }); // Игнорируем ошибки загрузки, чтобы не зависнуть
+        }
+    });
+}
+
+// Запускаем реальную загрузку
+preloadImagesAndInit();
