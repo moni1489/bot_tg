@@ -2091,3 +2091,62 @@ body {
 .prize-label-legendary { color: #ffc107; }
 .prize-label-bonus { color: #ff0022; }
 .prize-label-figure { color: #fff; }
+
+/* LOADING SCREEN */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background: #000;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+}
+
+.loading-overlay.fade-out {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.loading-logo {
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--neon-red);
+    text-shadow: 0 0 15px var(--neon-red-glow);
+    letter-spacing: 2px;
+}
+
+.loading-bar-container {
+    width: 200px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.loading-bar {
+    width: 0%;
+    height: 100%;
+    background: var(--neon-red);
+    border-radius: 10px;
+    box-shadow: 0 0 10px var(--neon-red);
+    transition: width 0.1s linear;
+}
+
+.loading-text {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
