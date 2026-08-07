@@ -2037,14 +2037,14 @@ body {
     cursor: pointer;
 }
 
-.prize-item:hover {
+.prize-item:hover, .prize-item.active {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(255, 0, 34, 0.2);
     border-color: rgba(255, 0, 34, 0.5);
 }
 
-.prize-item:hover .prize-img {
-    filter: brightness(0.3) contrast(1.1);
+.prize-item:hover .prize-img, .prize-item.active .prize-img {
+    filter: brightness(1) contrast(1.1);
 }
 
 .prize-img-wrap {
