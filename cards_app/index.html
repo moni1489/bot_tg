@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>FunkoStop Cards</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/cards/cards.css?v=58">
+    <link rel="stylesheet" href="/cards/cards.css?v=75">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -23,6 +23,16 @@
                 <div class="loading-bar" id="loading-bar"></div>
             </div>
             <div class="loading-text" id="loading-text">Загрузка... 0%</div>
+            <div id="loading-actions" style="margin-top: 20px; display: flex; flex-direction: column; gap: 15px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto;">
+                <button id="loading-faq-btn" onclick="openFAQ()" style="padding: 14px 24px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); border: 1px solid var(--neon-red); border-radius: 12px; color: white; font-weight: 800; letter-spacing: 1px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.9rem; z-index: 9100; position: relative;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--neon-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    КАК ЭТО РАБОТАЕТ?
+                </button>
+                <button id="loading-play-btn" class="hidden" style="padding: 14px 24px; background: var(--neon-red); border: none; border-radius: 12px; color: white; font-weight: 900; letter-spacing: 2px; cursor: pointer; box-shadow: 0 0 15px var(--neon-red-glow); font-size: 1.1rem;">ИГРАТЬ</button>
+            </div>
         </div>
     </div>
     
@@ -307,24 +317,23 @@
     </div>
 
     <!-- FAQ Lightbox -->
-    <div class="card-lightbox hidden" id="faq-lightbox" style="z-index: 10000; touch-action: pan-y;">
+    <div class="card-lightbox hidden" id="faq-lightbox" style="z-index: 99999; touch-action: pan-y;">
         <div class="card-lightbox-overlay" id="faq-lightbox-close"></div>
         <div class="card-lightbox-content"
-            style="max-width: 95%; max-height: 95%; background: transparent; box-shadow: none; padding: 0; position: relative;">
+            style="max-width: 90%; max-height: 95%; background: transparent; box-shadow: none; padding: 0; position: relative; width: min(360px, 90vw);">
 
             <button id="faq-prev-btn" onclick="prevFaq()"
-                style="position: absolute; left: 10px; top: 40%; transform: translateY(-50%); background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; outline: none; transition: opacity 0.3s, transform 0.1s;">
+                style="position: absolute; left: -15px; top: 45%; transform: translateY(-50%); background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; outline: none; transition: opacity 0.3s, transform 0.1s;">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
             </button>
 
-            <img class="card-lightbox-img" id="faq-lightbox-img" src="" alt=""
-                style="max-height: 80vh; object-fit: contain; width: 100%; border-radius: 12px; position: relative; z-index: 5; transition: opacity 0.15s ease, transform 0.15s ease;">
+            <img class="card-lightbox-img" id="faq-lightbox-img" src="" alt="">
 
             <button id="faq-next-btn" onclick="nextFaq()"
-                style="position: absolute; right: 10px; top: 40%; transform: translateY(-50%); background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; outline: none; transition: opacity 0.3s, transform 0.1s;">
+                style="position: absolute; right: -15px; top: 45%; transform: translateY(-50%); background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; outline: none; transition: opacity 0.3s, transform 0.1s;">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="9 18 15 12 9 6"></polyline>
@@ -339,7 +348,7 @@
         </div>
     </div>
 
-    <script src="/cards/cards.js?v=61"></script>
+    <script src="/cards/cards.js?v=75"></script>
 </body>
 
 </html>
