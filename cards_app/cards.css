@@ -1935,7 +1935,7 @@ body {
     transform: scale(1.3) rotate(-25deg);
 }
 
-/* Override Lightbox Image */
+/* Override Lightbox Image (collection cards) */
 .card-lightbox-img {
     width: 80vw !important;
     max-width: 320px !important;
@@ -1946,6 +1946,7 @@ body {
     box-shadow: 0 0 40px rgba(255, 0, 34, 0.5);
     background: transparent !important;
 }
+
 
 @keyframes floatUp {
     0% {
@@ -2101,7 +2102,7 @@ body {
     height: 100vh;
     height: 100dvh;
     background: #000;
-    z-index: 99999;
+    z-index: 9000;
     display: flex;
     align-items: center;
     justify-content: center;
