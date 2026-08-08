@@ -728,6 +728,12 @@ def get_game_admin_kb(user_id=None):
         resize_keyboard=True
     )
 
+def get_cancel_kb():
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="❌ Отмена")]],
+        resize_keyboard=True
+    )
+
 def get_orders_kb(orders, action="status"):
     kb = InlineKeyboardMarkup(inline_keyboard=[])
     for order in orders:
@@ -837,6 +843,14 @@ def generate_random_password(length=6):
     return ''.join(random.choice(characters) for _ in range(length))
 
 # --- HANDLERS ---
+@router.message(F.text == "❌ Отмена", StateFilter("*"))
+async def cancel_handler(message: Message, state: FSMContext):
+    await state.clear()
+    if await is_admin(message.from_user.id):
+        await message.answer("Действие отменено.", reply_markup=get_game_admin_kb(message.from_user.id))
+    else:
+        await message.answer("Действие отменено.", reply_markup=get_start_kb(message.from_user.id))
+
 @router.message(CommandStart())
 async def start_handler(message: Message, state: FSMContext):
     await state.clear()
@@ -1092,7 +1106,7 @@ async def back_to_main_admin(message: Message):
 async def check_code_btn(message: Message, state: FSMContext):
     if not await is_admin(message.from_user.id):
         return
-    await message.answer("Введите одноразовый промокод игрока (например, A1B2C3D4):", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Введите одноразовый промокод игрока (например, A1B2C3D4):", reply_markup=get_cancel_kb())
     await state.set_state(CheckCode.waiting_for_code)
 
 @router.message(CheckCode.waiting_for_code)
@@ -1180,7 +1194,7 @@ async def game_stats(message: Message):
 async def check_player_start(message: Message, state: FSMContext):
     if not await is_admin(message.from_user.id):
         return
-    await message.answer("Введите Telegram ID или @username игрока (можно без @):", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Введите Telegram ID или @username игрока (можно без @):", reply_markup=get_cancel_kb())
     await state.set_state(CheckPlayerCollection.waiting_for_id)
 
 @router.message(CheckPlayerCollection.waiting_for_id)
@@ -1307,11 +1321,11 @@ async def give_packs_start(message: Message, state: FSMContext):
     if not await is_admin(message.from_user.id):
         return
     await message.answer(
-        "Введите Telegram ID игрока и количество паков через пробел:\n\n"
-        "Пример: `123456789 10`\n"
+        "Введите Telegram ID или @username игрока и количество паков через пробел:\n\n"
+        "Пример: `123456789 10` или `@username 10`\n"
         "Или только количество, чтобы выдать себе: `10`",
         parse_mode="Markdown",
-        reply_markup=ReplyKeyboardRemove()
+        reply_markup=get_cancel_kb()
     )
     await state.set_state(GivePacks.waiting_for_input)
 
@@ -1323,8 +1337,29 @@ async def give_packs_process(message: Message, state: FSMContext):
             target_id = message.from_user.id
             count = int(parts[0])
         elif len(parts) >= 2:
-            target_id = int(parts[0])
+            input_text = parts[0]
             count = int(parts[1])
+            
+            if input_text.isdigit():
+                target_id = int(input_text)
+            else:
+                username_clean = input_text.lstrip("@")
+                target_id = None
+                async with pool.acquire() as db:
+                    row = await db.fetchrow("SELECT telegram_id FROM card_users WHERE username ILIKE $1", username_clean)
+                if row:
+                    target_id = row['telegram_id']
+                else:
+                    try:
+                        chat = await bot.get_chat(f"@{username_clean}")
+                        target_id = chat.id
+                    except Exception:
+                        pass
+                
+                if target_id is None:
+                    await message.answer(f"❌ Игрок `{input_text}` не найден.", parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+                    await state.clear()
+                    return
         else:
             raise ValueError("Wrong format")
             
@@ -1355,7 +1390,7 @@ async def give_packs_process(message: Message, state: FSMContext):
             
     except (ValueError, IndexError):
         await message.answer(
-            "❌ Неверный формат. Введите:\n`123456789 10` — выдать 10 паков игроку\nИли `10` — выдать 10 паков себе",
+            "❌ Неверный формат. Введите:\n`@username 10` — выдать 10 паков\nИли `10` — выдать 10 паков себе",
             parse_mode="Markdown",
             reply_markup=get_game_admin_kb(message.from_user.id)
         )
