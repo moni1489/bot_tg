@@ -230,7 +230,13 @@ function setupRefLink() {
 async function fetchProfile() {
     try {
         const timestamp = new Date().getTime();
-        const res = await fetch(`/api/cards/profile?tg_id=${userData.telegram_id}&t=${timestamp}`, { cache: 'no-store' });
+        const params = new URLSearchParams({
+            tg_id: userData.telegram_id,
+            t: timestamp,
+            username: userData.username,
+            first_name: userData.first_name
+        });
+        const res = await fetch(`/api/cards/profile?${params.toString()}`, { cache: 'no-store' });
         if (res.ok) {
             const data = await res.json();
             if (typeof data.packs_count === 'number') userData.packs_count = data.packs_count;
@@ -1266,14 +1272,29 @@ function preloadImagesAndInit() {
     
     function completeLoading() {
         if (loadingBar) loadingBar.style.width = '100%';
-        if (loadingText) loadingText.innerText = 'Загрузка... 100%';
+        if (loadingText) {
+            loadingText.innerText = 'Загрузка завершена! Можете играть или прочитать FAQ.';
+            loadingText.style.fontSize = '0.9rem';
+            loadingText.style.color = '#00ff88';
+        }
         
-        setTimeout(() => {
-            loadingScreen.classList.add('fade-out');
+        const playBtn = document.getElementById('loading-play-btn');
+        if (playBtn) {
+            playBtn.classList.remove('hidden');
+            playBtn.addEventListener('click', () => {
+                loadingScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 500);
+            });
+        } else {
             setTimeout(() => {
-                loadingScreen.style.display = 'none';
+                loadingScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 500);
             }, 500);
-        }, 200);
+        }
     }
     
     // Вешаем обработчики на каждую картинку
