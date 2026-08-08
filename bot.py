@@ -1123,52 +1123,57 @@ async def process_check_code(message: Message, state: FSMContext):
 async def game_stats(message: Message):
     if not await is_admin(message.from_user.id):
         return
-        
-    async with pool.acquire() as db:
-        total_players = await db.fetchval("SELECT COUNT(*) FROM card_users") or 0
-        total_cards_collected = await db.fetchval("SELECT SUM(count) FROM user_cards") or 0
-        total_unique = await db.fetchval("SELECT COUNT(*) FROM user_cards") or 0
-        
-        leaderboard = await db.fetch("""
-            SELECT u.telegram_id, u.username, u.first_name, COUNT(c.series_slug) as unique_cards, SUM(c.count) as total_cards
-            FROM card_users u
-            LEFT JOIN user_cards c ON u.telegram_id = c.telegram_id
-            GROUP BY u.telegram_id, u.username, u.first_name
-            ORDER BY unique_cards DESC, total_cards DESC
-            LIMIT 10
-        """)
-        
-    msg = f"📊 **Статистика Funko Cards**\n\n"
-    msg += f"👥 Всего игроков: **{total_players}**\n"
-    msg += f"🎴 Всего выбито карт (с повторками): **{total_cards_collected}**\n"
-    msg += f"🗂 Уникальных позиций в коллекциях: **{total_unique}**\n\n"
-    msg += f"🏆 **ТОП-10 КОЛЛЕКЦИОНЕРОВ:**\n"
     
-    if not leaderboard:
-        msg += "Пока нет данных."
-    else:
-        medals = ["🥇", "🥈", "🥉"]
-        for i, row in enumerate(leaderboard, 1):
-            unique = row['unique_cards'] or 0
-            total = row['total_cards'] or 0
-            tg_id = row['telegram_id']
-            username = row['username']
-            first_name = row['first_name']
+    try:
+        async with pool.acquire() as db:
+            total_players = await db.fetchval("SELECT COUNT(*) FROM card_users") or 0
+            total_cards_collected = await db.fetchval("SELECT SUM(count) FROM user_cards") or 0
+            total_unique = await db.fetchval("SELECT COUNT(*) FROM user_cards") or 0
             
-            # Build display name: prefer first_name + username, fallback to ID
-            if first_name and username:
-                name_str = f"{first_name} (@{username})"
-            elif first_name:
-                name_str = first_name
-            elif username:
-                name_str = f"@{username}"
-            else:
-                name_str = f"ID:{tg_id}"
+            leaderboard = await db.fetch("""
+                SELECT u.telegram_id, u.username, u.first_name, COUNT(c.series_slug) as unique_cards, SUM(c.count) as total_cards
+                FROM card_users u
+                LEFT JOIN user_cards c ON u.telegram_id = c.telegram_id
+                GROUP BY u.telegram_id, u.username, u.first_name
+                ORDER BY unique_cards DESC, total_cards DESC
+                LIMIT 10
+            """)
+            
+        import html as html_mod
+        msg = f"📊 <b>Статистика Funko Cards</b>\n\n"
+        msg += f"👥 Всего игроков: <b>{total_players}</b>\n"
+        msg += f"🎴 Карт выбито (с повторками): <b>{total_cards_collected}</b>\n"
+        msg += f"🗂 Уникальных позиций: <b>{total_unique}</b>\n\n"
+        msg += f"🏆 <b>ТОП-10 КОЛЛЕКЦИОНЕРОВ:</b>\n"
+        
+        if not leaderboard:
+            msg += "Пока нет данных."
+        else:
+            medals = ["🥇", "🥈", "🥉"]
+            for i, row in enumerate(leaderboard, 1):
+                unique = row['unique_cards'] or 0
+                total = row['total_cards'] or 0
+                tg_id = row['telegram_id']
+                username = row['username'] or ""
+                first_name = html_mod.escape(row['first_name'] or "")
+                username_esc = html_mod.escape(username)
                 
-            medal = medals[i-1] if i <= 3 else f"{i}."
-            msg += f"{medal} {name_str} — {unique} уник. / {total} всего\n"
-            
-    await message.answer(msg, parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+                if first_name and username:
+                    name_str = f"{first_name} (@{username_esc})"
+                elif first_name:
+                    name_str = first_name
+                elif username:
+                    name_str = f"@{username_esc}"
+                else:
+                    name_str = f"ID:{tg_id}"
+                    
+                medal = medals[i-1] if i <= 3 else f"{i}."
+                msg += f"{medal} <a href='tg://user?id={tg_id}'>{name_str}</a> — {unique} уник. / {total} всего\n"
+                
+        await message.answer(msg, parse_mode="HTML", reply_markup=get_game_admin_kb(message.from_user.id))
+    except Exception as e:
+        await message.answer(f"❌ Ошибка при получении статистики: {e}", reply_markup=get_game_admin_kb(message.from_user.id))
+
 
 # --- ADMIN: CHECK PLAYER ---
 @router.message(F.text == "🔍 Проверить Игрока")
