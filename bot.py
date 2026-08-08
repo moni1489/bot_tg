@@ -57,6 +57,9 @@ def safe_int(val, default=0):
 async def get_card_profile(request):
     try:
         tg_id = safe_int(request.query.get("tg_id"))
+        username = request.query.get("username")
+        first_name = request.query.get("first_name")
+        
         if not tg_id:
             return web.json_response({
                 "packs_count": 3,
@@ -68,10 +71,19 @@ async def get_card_profile(request):
             })
         
         async with pool.acquire() as db:
+            if username or first_name:
+                await db.execute("""
+                    INSERT INTO card_users (telegram_id, username, first_name, packs_count)
+                    VALUES ($1, $2, $3, 3)
+                    ON CONFLICT (telegram_id) DO UPDATE SET
+                        username = COALESCE(EXCLUDED.username, card_users.username),
+                        first_name = COALESCE(EXCLUDED.first_name, card_users.first_name)
+                """, tg_id, username, first_name)
+            else:
+                await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 3) ON CONFLICT DO NOTHING", tg_id)
+
             user = await db.fetchrow("SELECT packs_count, last_daily_pack, completed_tasks FROM card_users WHERE telegram_id = $1", tg_id)
             if not user:
-                # Give 3 starting free packs
-                await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 3) ON CONFLICT DO NOTHING", tg_id)
                 packs_count = 3
                 last_daily = None
                 completed_tasks = []
@@ -485,6 +497,12 @@ class ParseLink(StatesGroup):
 class CheckPlayerCollection(StatesGroup):
     waiting_for_id = State()
 
+class CheckCode(StatesGroup):
+    waiting_for_code = State()
+
+class GivePacks(StatesGroup):
+    waiting_for_input = State()
+
 # --- DATABASE ---
 async def init_db():
     global pool
@@ -686,15 +704,26 @@ def get_start_kb(user_id=None):
     )
 
 def get_admin_kb(user_id=None):
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="👥 Список клиентов")],
+            [KeyboardButton(text="👤 Создать клиента"), KeyboardButton(text="➕ Добавить заказ")],
+            [KeyboardButton(text="🔄 Изменить статус заказа"), KeyboardButton(text="💰 Изменить оплату")],
+            [KeyboardButton(text="🗃 Архив заказов (Админ)")],
+            [KeyboardButton(text="🎮 Админка Игры")]
+        ],
+        resize_keyboard=True
+    )
+
+def get_game_admin_kb(user_id=None):
     url = f"{WEBAPP_URL}?tg_id={user_id}" if user_id else WEBAPP_URL
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))],
-            [KeyboardButton(text="👥 Список клиентов")],
-            [KeyboardButton(text="👤 Создать клиента"), KeyboardButton(text="➕ Добавить заказ")],
-            [KeyboardButton(text="🔄 Изменить статус заказа"), KeyboardButton(text="💰 Изменить оплату")],
             [KeyboardButton(text="📊 Статистика Игры"), KeyboardButton(text="🔍 Проверить Игрока")],
-            [KeyboardButton(text="🗃 Архив заказов (Админ)")]
+            [KeyboardButton(text="🎫 Проверить код"), KeyboardButton(text="🎁 Выдать паки")],
+            [KeyboardButton(text="🏷 Все промокоды")],
+            [KeyboardButton(text="🔙 Назад в гл. меню")]
         ],
         resize_keyboard=True
     )
@@ -869,6 +898,29 @@ async def start_handler(message: Message, state: FSMContext):
     else:
         await message.answer("Добро пожаловать в Личный Кабинет! Нажмите кнопку ниже, чтобы проверить свои заказы.", reply_markup=get_start_kb(message.from_user.id))
 
+@router.message(Command("myid"), StateFilter("*"))
+async def myid_cmd(message: Message):
+    uid = message.from_user.id
+    uname = message.from_user.username or "нет username"
+    fname = message.from_user.first_name or "нет имени"
+    is_adm = await is_admin(uid)
+    await message.answer(
+        f"🆔 **Ваш Telegram ID:** `{uid}`\n"
+        f"👤 Имя: {fname}\n"
+        f"@ Username: @{uname}\n"
+        f"🔑 Вы админ: {'✅ Да' if is_adm else '❌ Нет'}",
+        parse_mode="Markdown"
+    )
+
+@router.message(Command("admin"), StateFilter("*"))
+async def admin_cmd(message: Message, state: FSMContext):
+    await state.clear()
+    if not await is_admin(message.from_user.id):
+        await message.answer("❌ У вас нет прав администратора. Войдите через /admin_login [логин] [пароль]")
+        return
+    await message.answer("🔑 Панель администратора", reply_markup=get_admin_kb(message.from_user.id))
+
+
 @router.message(Command("reset_daily"), StateFilter("*"))
 async def reset_daily_cmd(message: Message, state: FSMContext):
     await state.clear()
@@ -1023,6 +1075,49 @@ async def list_clients(message: Message):
         
     await message.answer(response, parse_mode="Markdown")
 
+# --- ADMIN: GAME ADMIN MENU ---
+@router.message(F.text == "🎮 Админка Игры")
+async def game_admin_menu(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer("Добро пожаловать в админку игры Funko Cards!", reply_markup=get_game_admin_kb(message.from_user.id))
+
+@router.message(F.text == "🔙 Назад в гл. меню")
+async def back_to_main_admin(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer("Возврат в главное меню администратора.", reply_markup=get_admin_kb(message.from_user.id))
+
+@router.message(F.text == "🎫 Проверить код")
+async def check_code_btn(message: Message, state: FSMContext):
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer("Введите одноразовый промокод игрока (например, A1B2C3D4):", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(CheckCode.waiting_for_code)
+
+@router.message(CheckCode.waiting_for_code)
+async def process_check_code(message: Message, state: FSMContext):
+    code = message.text.strip().upper()
+    async with pool.acquire() as db:
+        record = await db.fetchrow("SELECT telegram_id, series_slug, created_at FROM series_codes WHERE code = $1", code)
+        
+    if record:
+        tg_id = record['telegram_id']
+        series = record['series_slug'].upper()
+        date = record['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        await message.answer(
+            f"✅ **Код действителен!**\n\n"
+            f"👤 Игрок: [ID: {tg_id}](tg://user?id={tg_id})\n"
+            f"🎁 Серия: **{series}**\n"
+            f"📅 Сгенерирован: {date}",
+            parse_mode="Markdown",
+            reply_markup=get_game_admin_kb(message.from_user.id)
+        )
+    else:
+        await message.answer(f"❌ **Код `{code}` не найден!** Возможно, он недействителен или написан с ошибкой.", parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+    await state.clear()
+
 # --- ADMIN: GAME STATS ---
 @router.message(F.text == "📊 Статистика Игры")
 async def game_stats(message: Message):
@@ -1032,6 +1127,7 @@ async def game_stats(message: Message):
     async with pool.acquire() as db:
         total_players = await db.fetchval("SELECT COUNT(*) FROM card_users") or 0
         total_cards_collected = await db.fetchval("SELECT SUM(count) FROM user_cards") or 0
+        total_unique = await db.fetchval("SELECT COUNT(*) FROM user_cards") or 0
         
         leaderboard = await db.fetch("""
             SELECT u.telegram_id, u.username, u.first_name, COUNT(c.series_slug) as unique_cards, SUM(c.count) as total_cards
@@ -1043,101 +1139,247 @@ async def game_stats(message: Message):
         """)
         
     msg = f"📊 **Статистика Funko Cards**\n\n"
-    msg += f"👥 Всего игроков: {total_players}\n"
-    msg += f"🎴 Всего выбито карт (с повторками): {total_cards_collected}\n\n"
+    msg += f"👥 Всего игроков: **{total_players}**\n"
+    msg += f"🎴 Всего выбито карт (с повторками): **{total_cards_collected}**\n"
+    msg += f"🗂 Уникальных позиций в коллекциях: **{total_unique}**\n\n"
     msg += f"🏆 **ТОП-10 КОЛЛЕКЦИОНЕРОВ:**\n"
     
     if not leaderboard:
         msg += "Пока нет данных."
     else:
+        medals = ["🥇", "🥈", "🥉"]
         for i, row in enumerate(leaderboard, 1):
             unique = row['unique_cards'] or 0
             total = row['total_cards'] or 0
             tg_id = row['telegram_id']
             username = row['username']
-            first_name = row['first_name'] or "Без имени"
+            first_name = row['first_name']
             
-            name_str = f"@{username}" if username else first_name
-            msg += f"{i}. {name_str} (ID: `{tg_id}`) — {unique} уникальных (всего {total})\n"
+            # Build display name: prefer first_name + username, fallback to ID
+            if first_name and username:
+                name_str = f"{first_name} (@{username})"
+            elif first_name:
+                name_str = first_name
+            elif username:
+                name_str = f"@{username}"
+            else:
+                name_str = f"ID:{tg_id}"
+                
+            medal = medals[i-1] if i <= 3 else f"{i}."
+            msg += f"{medal} {name_str} — {unique} уник. / {total} всего\n"
             
-    await message.answer(msg, parse_mode="Markdown")
+    await message.answer(msg, parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
 
 # --- ADMIN: CHECK PLAYER ---
 @router.message(F.text == "🔍 Проверить Игрока")
 async def check_player_start(message: Message, state: FSMContext):
     if not await is_admin(message.from_user.id):
         return
-    await message.answer("Введите Telegram ID или @username игрока, которого нужно проверить:", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Введите Telegram ID или @username игрока (можно без @):", reply_markup=ReplyKeyboardRemove())
     await state.set_state(CheckPlayerCollection.waiting_for_id)
 
 @router.message(CheckPlayerCollection.waiting_for_id)
 async def check_player_collection(message: Message, state: FSMContext):
     target_id = None
-    if message.text.isdigit():
-        target_id = int(message.text)
+    input_text = message.text.strip()
+    
+    # Numeric ID
+    if input_text.isdigit():
+        target_id = int(input_text)
+    else:
+        # Try username lookup — first in our DB
+        username_clean = input_text.lstrip("@")
+        async with pool.acquire() as db:
+            row = await db.fetchrow("SELECT telegram_id FROM card_users WHERE username ILIKE $1", username_clean)
+        if row:
+            target_id = row['telegram_id']
+        else:
+            # Try resolving via Telegram API
+            try:
+                chat = await bot.get_chat(f"@{username_clean}")
+                target_id = chat.id
+                # Save the username if we found them via API
+                async with pool.acquire() as db:
+                    await db.execute("""
+                        INSERT INTO card_users (telegram_id, username, first_name, packs_count)
+                        VALUES ($1, $2, $3, 0)
+                        ON CONFLICT (telegram_id) DO UPDATE SET
+                            username = COALESCE(EXCLUDED.username, card_users.username),
+                            first_name = COALESCE(EXCLUDED.first_name, card_users.first_name)
+                    """, chat.id, chat.username, chat.first_name)
+            except Exception:
+                target_id = None
+    
+    if target_id is None:
+        await message.answer(
+            f"❌ Игрок **{input_text}** не найден.\n\n"
+            "Возможные причины:\n"
+            "• Он никогда не запускал игру\n"
+            "• Username написан неверно\n"
+            "• У него нет публичного username — попробуйте по Telegram ID",
+            parse_mode="Markdown",
+            reply_markup=get_game_admin_kb(message.from_user.id)
+        )
+        await state.clear()
+        return
     
     async with pool.acquire() as db:
-        user = None
-        if target_id:
-            user = await db.fetchrow("SELECT telegram_id, packs_count FROM card_users WHERE telegram_id = $1", target_id)
-        else:
-            username = message.text.replace("@", "")
-            user = await db.fetchrow("SELECT telegram_id, packs_count FROM card_users WHERE username ILIKE $1", username)
-            if user:
-                target_id = user['telegram_id']
-                
-        if not user:
-            if target_id:
-                user_exists_in_cards = await db.fetchval("SELECT 1 FROM user_cards WHERE telegram_id = $1 LIMIT 1", target_id)
-                if not user_exists_in_cards:
-                    await message.answer("❌ Игрок не найден в базе. Возможно, он еще не запускал игру через бота (или у него случайный ID, если он открыл игру из браузера).", reply_markup=get_admin_kb(message.from_user.id))
-                    await state.clear()
-                    return
-            else:
-                await message.answer("❌ Игрок с таким username не найден в базе.", reply_markup=get_admin_kb(message.from_user.id))
-                await state.clear()
-                return
-            packs_count = 0
-        else:
-            packs_count = user['packs_count']
-            
-        ref_count = await db.fetchval("SELECT COUNT(*) FROM card_users WHERE referred_by = $1", target_id) or 0
+        user = await db.fetchrow("SELECT telegram_id, packs_count, username, first_name FROM card_users WHERE telegram_id = $1", target_id)
+        user_exists_in_cards = await db.fetchval("SELECT 1 FROM user_cards WHERE telegram_id = $1 LIMIT 1", target_id)
         
+        if not user and not user_exists_in_cards:
+            await message.answer(
+                f"❌ Игрок `{target_id}` найден в Telegram, но **ещё не играл** в Funko Cards.",
+                parse_mode="Markdown",
+                reply_markup=get_game_admin_kb(message.from_user.id)
+            )
+            await state.clear()
+            return
+        
+        packs_count = user['packs_count'] if user else 0
+        username = user['username'] if user else None
+        first_name = user['first_name'] if user else None
+        ref_count = await db.fetchval("SELECT COUNT(*) FROM card_users WHERE referred_by = $1", target_id) or 0
         cards = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", target_id)
+        
+    # Build display name
+    if first_name and username:
+        display_name = f"{first_name} (@{username})"
+    elif first_name:
+        display_name = first_name
+    elif username:
+        display_name = f"@{username}"
+    else:
+        display_name = f"ID: {target_id}"
         
     SERIES_TOTALS = 4
     
-    msg = f"👤 **Статистика Игрока** `{target_id}`\n\n"
-    msg += f"📦 Доступно паков: {packs_count}\n"
+    msg = f"👤 **Игрок: {display_name}**\n"
+    msg += f"🆔 Telegram ID: `{target_id}`\n"
+    msg += f"📦 Доступно паков: **{packs_count}**\n"
     msg += f"🤝 Приглашено друзей: {ref_count}\n\n"
-    msg += f"🎴 **Коллекция Карточек:**\n"
+    msg += f"🎴 **Коллекция:**\n"
     
     if not cards:
         msg += "Игрок пока не выбил ни одной карты."
     else:
-        # Group by series
         collection = {}
         for row in cards:
             slug = row['series_slug']
-            idx = row['card_index']
-            cnt = row['count']
             if slug not in collection:
                 collection[slug] = []
-            collection[slug].append((idx, cnt))
+            collection[slug].append((row['card_index'], row['count']))
+            
+        total_unique_cards = sum(len(v) for v in collection.values())
+        total_all_cards = sum(cnt for items in collection.values() for _, cnt in items)
+        msg += f"Всего уникальных: **{total_unique_cards}** | Всего с повторами: **{total_all_cards}**\n"
             
         for slug, items in collection.items():
-            items.sort(key=lambda x: x[0]) # sort by card index
+            items.sort(key=lambda x: x[0])
             unique_in_series = len(items)
-            msg += f"\n🔹 **Серия {slug.upper()}** ({unique_in_series}/{SERIES_TOTALS} собрано)"
-            if unique_in_series >= SERIES_TOTALS:
-                msg += " ✅"
-            msg += "\n"
-            
+            completed = " ✅" if unique_in_series >= SERIES_TOTALS else ""
+            msg += f"\n🔹 **{slug.upper()}** ({unique_in_series}/{SERIES_TOTALS}){completed}\n"
             for idx, cnt in items:
-                msg += f"  - Карточка №{idx} (x{cnt} шт)\n"
+                extra = f" (x{cnt})" if cnt > 1 else ""
+                msg += f"  — Карточка №{idx}{extra}\n"
                 
-    await message.answer(msg, parse_mode="Markdown", reply_markup=get_admin_kb(message.from_user.id))
+    await message.answer(msg, parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
     await state.clear()
+
+# --- ADMIN: GIVE PACKS ---
+@router.message(F.text == "🎁 Выдать паки")
+async def give_packs_start(message: Message, state: FSMContext):
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer(
+        "Введите Telegram ID игрока и количество паков через пробел:\n\n"
+        "Пример: `123456789 10`\n"
+        "Или только количество, чтобы выдать себе: `10`",
+        parse_mode="Markdown",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    await state.set_state(GivePacks.waiting_for_input)
+
+@router.message(GivePacks.waiting_for_input)
+async def give_packs_process(message: Message, state: FSMContext):
+    parts = message.text.strip().split()
+    try:
+        if len(parts) == 1:
+            target_id = message.from_user.id
+            count = int(parts[0])
+        elif len(parts) >= 2:
+            target_id = int(parts[0])
+            count = int(parts[1])
+        else:
+            raise ValueError("Wrong format")
+            
+        if count <= 0 or count > 9999:
+            raise ValueError("Count out of range")
+            
+        async with pool.acquire() as db:
+            await db.execute("""
+                INSERT INTO card_users (telegram_id, packs_count)
+                VALUES ($1, $2)
+                ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + $2
+            """, target_id, count)
+            new_count = await db.fetchval("SELECT packs_count FROM card_users WHERE telegram_id = $1", target_id)
+            
+        await message.answer(
+            f"✅ **Выдано +{count} паков** игроку `{target_id}`\n"
+            f"Теперь у него: **{new_count} паков**",
+            parse_mode="Markdown",
+            reply_markup=get_game_admin_kb(message.from_user.id)
+        )
+        
+        # Try to notify the player
+        try:
+            if target_id != message.from_user.id:
+                await bot.send_message(target_id, f"🎁 Вам выдано **+{count} паков** от администратора! Заходите в игру!", parse_mode="Markdown")
+        except Exception:
+            pass
+            
+    except (ValueError, IndexError):
+        await message.answer(
+            "❌ Неверный формат. Введите:\n`123456789 10` — выдать 10 паков игроку\nИли `10` — выдать 10 паков себе",
+            parse_mode="Markdown",
+            reply_markup=get_game_admin_kb(message.from_user.id)
+        )
+    await state.clear()
+
+# --- ADMIN: ALL CODES ---
+@router.message(F.text == "🏷 Все промокоды")
+async def all_codes(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+    async with pool.acquire() as db:
+        codes = await db.fetch("""
+            SELECT sc.code, sc.series_slug, sc.created_at, cu.username, cu.first_name, sc.telegram_id
+            FROM series_codes sc
+            LEFT JOIN card_users cu ON sc.telegram_id = cu.telegram_id
+            ORDER BY sc.created_at DESC
+            LIMIT 50
+        """)
+    
+    if not codes:
+        await message.answer("📭 Промокодов пока нет.", reply_markup=get_game_admin_kb(message.from_user.id))
+        return
+        
+    msg = f"🏷 **Все промокоды** ({len(codes)} шт):\n\n"
+    for row in codes:
+        if row['first_name'] and row['username']:
+            name = f"{row['first_name']} (@{row['username']})"
+        elif row['first_name']:
+            name = row['first_name']
+        elif row['username']:
+            name = f"@{row['username']}"
+        else:
+            name = f"ID:{row['telegram_id']}"
+        date = row['created_at'].strftime('%d.%m %H:%M')
+        msg += f"`{row['code']}` — **{row['series_slug'].upper()}** — {name} ({date})\n"
+        
+    await message.answer(msg, parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+
+
 
 # --- ADMIN: CREATE ORDER ---
 @router.message(F.text == "➕ Добавить заказ")
