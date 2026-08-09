@@ -1419,20 +1419,21 @@ async def all_codes(message: Message):
         await message.answer("📭 Промокодов пока нет.", reply_markup=get_game_admin_kb(message.from_user.id))
         return
         
-    msg = f"🏷 **Все промокоды** ({len(codes)} шт):\n\n"
+    import html as html_mod
+    msg = f"🏷 <b>Все промокоды</b> ({len(codes)} шт):\n\n"
     for row in codes:
         if row['first_name'] and row['username']:
-            name = f"{row['first_name']} (@{row['username']})"
+            name = f"{html_mod.escape(row['first_name'])} (@{html_mod.escape(row['username'])})"
         elif row['first_name']:
-            name = row['first_name']
+            name = html_mod.escape(row['first_name'])
         elif row['username']:
-            name = f"@{row['username']}"
+            name = f"@{html_mod.escape(row['username'])}"
         else:
             name = f"ID:{row['telegram_id']}"
         date = row['created_at'].strftime('%d.%m %H:%M')
-        msg += f"`{row['code']}` — **{row['series_slug'].upper()}** — {name} ({date})\n"
+        msg += f"<code>{html_mod.escape(row['code'])}</code> — <b>{html_mod.escape(row['series_slug'].upper())}</b> — {name} ({date})\n"
         
-    await message.answer(msg, parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+    await message.answer(msg, parse_mode="HTML", reply_markup=get_game_admin_kb(message.from_user.id))
 
 
 
