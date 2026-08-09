@@ -244,6 +244,7 @@ async function fetchProfile() {
             userCards = data.user_cards || {};
             userData.completed_tasks = data.completed_tasks || [];
             userData.ref_count = data.ref_count || 0;
+            userData.is_admin = data.is_admin || false;
             if (data.bot_username) {
                 botUsername = data.bot_username;
                 setupRefLink();
@@ -889,7 +890,51 @@ function openLightbox(card, series, isCollected) {
     rarity.className = `card-lightbox-rarity lightbox-rarity-${card.rarity}`;
     seriesEl.textContent = series.name;
 
+    const claimBtn = document.getElementById('claim-prize-btn');
+    if (claimBtn) {
+        if (userData.is_admin && isCollected && series.slug === 'bonus_card') {
+            claimBtn.style.display = 'block';
+            claimBtn.onclick = () => claimPrize(card.id);
+        } else {
+            claimBtn.style.display = 'none';
+        }
+    }
+
     lb.classList.remove('hidden');
+}
+
+async function claimPrize(cardId) {
+    if (!confirm("Уверены, что хотите сжечь эту карту и получить промокод?")) return;
+    
+    try {
+        const res = await fetch('/api/cards/claim_prize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tg_id: userData.telegram_id, card_index: cardId })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            Swal.fire({
+                title: 'Успех!',
+                text: 'Карта сожжена. Промокод отправлен вам в ЛС бота: ' + data.promo_code,
+                icon: 'success',
+                confirmButtonText: 'Ок'
+            });
+            // Уменьшить счетчик локально
+            const cardKey = `bonus_card_${cardId}`;
+            if (userCards[cardKey]) {
+                userCards[cardKey]--;
+                if (userCards[cardKey] <= 0) delete userCards[cardKey];
+                renderCollection();
+            }
+            closeLightbox();
+        } else {
+            Swal.fire('Ошибка', data.message || 'Не удалось получить приз', 'error');
+        }
+    } catch (e) {
+        Swal.fire('Ошибка', 'Ошибка соединения', 'error');
+    }
 }
 
 function closeLightbox() {
