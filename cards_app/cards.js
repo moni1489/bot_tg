@@ -1158,14 +1158,14 @@ function updateFaqView(direction = 'none') {
         if (direction === 'none') {
             img.style.opacity = '1';
             img.style.transform = 'translateX(0) scale(1)';
-            img.src = `/cards/images/faq_${currentFaqIndex}.png`;
+            img.src = `/cards/images/faq${currentFaqIndex}.png?v=${Date.now()}`;
         } else {
             // Animate out
             img.style.opacity = '0';
             img.style.transform = direction === 'next' ? 'translateX(-30px)' : 'translateX(30px)';
 
             setTimeout(() => {
-                img.src = `/cards/images/faq_${currentFaqIndex}.png`;
+                img.src = `/cards/images/faq${currentFaqIndex}.png?v=${Date.now()}`;
                 // Prep for animate in
                 img.style.transform = direction === 'next' ? 'translateX(30px)' : 'translateX(-30px)';
 
