@@ -67,7 +67,8 @@ async def get_card_profile(request):
                 "user_cards": {},
                 "completed_tasks": [],
                 "ref_count": 0,
-                "bot_username": "funkostop_bot"
+                "bot_username": "funkostop_bot",
+                "is_admin": False
             })
         
         async with pool.acquire() as db:
@@ -117,13 +118,16 @@ async def get_card_profile(request):
             except Exception:
                 pass
 
+            is_adm = await is_admin(tg_id)
+
             return web.json_response({
                 "packs_count": packs_count,
                 "last_daily_pack": last_daily,
                 "user_cards": user_cards,
                 "completed_tasks": completed_tasks,
                 "ref_count": ref_count,
-                "bot_username": bot_username
+                "bot_username": bot_username,
+                "is_admin": is_adm
             })
     except Exception as e:
         logging.error(f"get_card_profile error: {e}")
@@ -445,6 +449,7 @@ async def start_webserver():
     app.router.add_post('/api/cards/reset_daily_test', reset_daily_test_api)
     app.router.add_post('/api/cards/generate_code', generate_series_code)
     app.router.add_post('/api/cards/claim_bonus_packs', claim_bonus_packs_api)
+    app.router.add_post('/api/cards/claim_prize', claim_prize_api)
     app.router.add_post('/api/notify_order_status', notify_order_status_api)
     
     if os.path.exists(cards_dir):
@@ -722,7 +727,7 @@ def get_game_admin_kb(user_id=None):
             [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))],
             [KeyboardButton(text="📊 Статистика Игры"), KeyboardButton(text="🔍 Проверить Игрока")],
             [KeyboardButton(text="🎫 Проверить код"), KeyboardButton(text="🎁 Выдать паки")],
-            [KeyboardButton(text="🏷 Все промокоды")],
+            [KeyboardButton(text="🏷 Все промокоды"), KeyboardButton(text="🎁 Выдать приз")],
             [KeyboardButton(text="🔙 Назад в гл. меню")]
         ],
         resize_keyboard=True
@@ -1918,6 +1923,125 @@ async def calculate_and_send_result(message: Message, state: FSMContext, weight:
     await message.answer(response, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=kb)
 
 # --- MAIN ---
+# --- ADMIN: GIVE PRIZE ---
+class GivePrize(StatesGroup):
+    waiting_for_user_id = State()
+
+BONUS_CARD_NAMES = {
+    1: "Funko Pop",
+    2: "Скидка 20%",
+    3: "Скидка 25%",
+    4: "Скидка 500₽",
+    5: "Скидка 1000₽",
+    6: "10 Бонус Паков",
+    7: "Скидка 300₽",
+    8: "5 Бонус Паков"
+}
+
+@router.message(F.text == "🎁 Выдать приз")
+async def give_prize_start(message: Message, state: FSMContext):
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer(
+        "Введите ID пользователя (или перешлите его сообщение), которому нужно выдать приз:",
+        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="❌ Отмена")]], resize_keyboard=True)
+    )
+    await state.set_state(GivePrize.waiting_for_user_id)
+
+@router.message(GivePrize.waiting_for_user_id)
+async def give_prize_user_id(message: Message, state: FSMContext):
+    if not await is_admin(message.from_user.id):
+        return
+        
+    try:
+        user_id = int(message.text.strip())
+    except ValueError:
+        if message.forward_from:
+            user_id = message.forward_from.id
+        else:
+            await message.answer("❌ Введите корректный числовой ID.")
+            return
+
+    async with pool.acquire() as db:
+        cards = await db.fetch("SELECT card_index, count FROM user_cards WHERE telegram_id = $1 AND series_slug = 'bonus_card' AND count > 0", user_id)
+        
+        if not cards:
+            await message.answer("У этого пользователя нет бонусных карт.", reply_markup=get_game_admin_kb(message.from_user.id))
+            await state.clear()
+            return
+            
+        builder = InlineKeyboardBuilder()
+        for c in cards:
+            c_idx = c['card_index']
+            c_name = BONUS_CARD_NAMES.get(c_idx, f"Бонус {c_idx}")
+            builder.button(text=f"Сжечь: {c_name} ({c['count']} шт)", callback_data=f"give_prize:{user_id}:{c_idx}")
+        builder.adjust(1)
+        
+        await message.answer("Выберите карту для списания и выдачи промокода:", reply_markup=builder.as_markup())
+        await message.answer("Меню админа", reply_markup=get_game_admin_kb(message.from_user.id))
+        await state.clear()
+
+import string
+import random
+
+@router.callback_query(F.data.startswith("give_prize:"))
+async def process_give_prize(callback: CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("У вас нет прав.", show_alert=True)
+        return
+        
+    parts = callback.data.split(":")
+    target_id = int(parts[1])
+    card_idx = int(parts[2])
+    
+    async with pool.acquire() as db:
+        res = await db.execute("UPDATE user_cards SET count = count - 1 WHERE telegram_id = $1 AND series_slug = 'bonus_card' AND card_index = $2 AND count > 0", target_id, card_idx)
+        if res == "UPDATE 0":
+            await callback.answer("Ошибка: карта уже списана или её нет.", show_alert=True)
+            return
+        await db.execute("DELETE FROM user_cards WHERE telegram_id = $1 AND count <= 0", target_id)
+        
+    promo_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    c_name = BONUS_CARD_NAMES.get(card_idx, f"Бонус {card_idx}")
+    
+    try:
+        await bot.send_message(target_id, f"🎁 Поздравляем! Ваша бонусная карта обменена на приз!\nВы выиграли: **{c_name}**\n\nВаш промокод: `{promo_code}`\n\nСделайте скриншот и покажите его администратору или в магазине.", parse_mode="Markdown")
+        await callback.message.edit_text(f"✅ Карта '{c_name}' успешно сожжена.\nПромокод `{promo_code}` отправлен пользователю {target_id}.", parse_mode="Markdown")
+    except Exception as e:
+        await callback.message.edit_text(f"⚠️ Карта списана, но не удалось отправить сообщение пользователю. Промокод: `{promo_code}`. Ошибка: {e}", parse_mode="Markdown")
+
+# --- WEB APP CLAIM PRIZE API ---
+async def claim_prize_api(request):
+    try:
+        data = await request.json()
+        tg_id = safe_int(data.get("tg_id"))
+        card_idx = safe_int(data.get("card_index"))
+        
+        if not tg_id or not card_idx:
+            return web.json_response({"success": False, "message": "Invalid data"})
+            
+        if not await is_admin(tg_id):
+            return web.json_response({"success": False, "message": "Only admins can use this feature"})
+            
+        async with pool.acquire() as db:
+            res = await db.execute("UPDATE user_cards SET count = count - 1 WHERE telegram_id = $1 AND series_slug = 'bonus_card' AND card_index = $2 AND count > 0", tg_id, card_idx)
+            if res == "UPDATE 0":
+                return web.json_response({"success": False, "message": "Карта не найдена"})
+            await db.execute("DELETE FROM user_cards WHERE telegram_id = $1 AND count <= 0", tg_id)
+            
+        promo_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        c_name = BONUS_CARD_NAMES.get(card_idx, f"Бонус {card_idx}")
+        
+        try:
+            await bot.send_message(tg_id, f"🎁 Поздравляем! Ваша бонусная карта обменена на приз!\nВы выиграли: **{c_name}**\n\nВаш промокод: `{promo_code}`\n\nСделайте скриншот и покажите его администратору или в магазине.", parse_mode="Markdown")
+        except Exception:
+            pass
+            
+        return web.json_response({"success": True, "promo_code": promo_code})
+    except Exception as e:
+        logging.error(f"claim_prize_api error: {e}")
+        return web.json_response({"success": False, "message": "Server error"})
+
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
     await init_db()
