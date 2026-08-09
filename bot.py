@@ -727,7 +727,7 @@ def get_game_admin_kb(user_id=None):
             [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))],
             [KeyboardButton(text="📊 Статистика Игры"), KeyboardButton(text="🔍 Проверить Игрока")],
             [KeyboardButton(text="🎫 Проверить код"), KeyboardButton(text="🎁 Выдать паки")],
-            [KeyboardButton(text="🏷 Все промокоды"), KeyboardButton(text="🎁 Выдать приз")],
+            [KeyboardButton(text="🎫 Все промокоды"), KeyboardButton(text="🎁 Выдать приз")],
             [KeyboardButton(text="🔙 Назад в гл. меню")]
         ],
         resize_keyboard=True
@@ -1402,7 +1402,7 @@ async def give_packs_process(message: Message, state: FSMContext):
     await state.clear()
 
 # --- ADMIN: ALL CODES ---
-@router.message(F.text == "🏷 Все промокоды")
+@router.message(F.text.in_(["🏷 Все промокоды", "🎫 Все промокоды"]))
 async def all_codes(message: Message):
     if not await is_admin(message.from_user.id):
         return
