@@ -1239,14 +1239,14 @@ function updateFaqView(direction = 'none') {
         if (direction === 'none') {
             img.style.opacity = '1';
             img.style.transform = 'translateX(0) scale(1)';
-            img.src = `/cards/images/faq${currentFaqIndex}.png?v=${Date.now()}`;
+            img.src = `/cards/images/faq${currentFaqIndex}.png`;
         } else {
             // Animate out
             img.style.opacity = '0';
             img.style.transform = direction === 'next' ? 'translateX(-30px)' : 'translateX(30px)';
 
             setTimeout(() => {
-                img.src = `/cards/images/faq${currentFaqIndex}.png?v=${Date.now()}`;
+                img.src = `/cards/images/faq${currentFaqIndex}.png`;
                 // Prep for animate in
                 img.style.transform = direction === 'next' ? 'translateX(30px)' : 'translateX(-30px)';
 
@@ -1348,11 +1348,19 @@ function preloadImagesAndInit() {
     const playBtn = document.getElementById('loading-play-btn');
     if (playBtn) playBtn.addEventListener('click', hideLoadingScreen);
 
-    // 2. Safety timeout — FORCE READY after 2.5s maximum so it never hangs
-    const safetyTimeout = setTimeout(showReadyState, 2500);
+    // 2. Safety timeout — FORCE READY after 6s maximum so it never hangs
+    const safetyTimeout = setTimeout(showReadyState, 6000);
 
-    // 3. Image Preloader
-    const images = Array.from(document.querySelectorAll('img')).filter(img => img.src);
+    // 3. Image Preloader (FAQ first, then DOM)
+    const faqImages = [];
+    for(let i=1; i<=totalFaqImages; i++) {
+        const img = new Image();
+        img.src = `/cards/images/faq${i}.png`;
+        faqImages.push(img);
+    }
+    
+    const domImages = Array.from(document.querySelectorAll('img')).filter(img => img.src);
+    const images = [...faqImages, ...domImages];
     const totalImages = images.length;
     
     if (totalImages === 0) {
