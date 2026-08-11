@@ -140,12 +140,12 @@ const SERIES_CONFIG = [
         name: 'Мои Бонусы',
         theme: 'bonus',
         cards: [
-            { index: 1, id: 1, name: 'Funko Pop', rarity: 'legendary', img: '/cards/images/bonus_card (1).png' },
-            { index: 2, id: 2, name: 'Скидка 20%', rarity: 'epic', img: '/cards/images/bonus_card (2).png' },
-            { index: 3, id: 3, name: 'Скидка 25%', rarity: 'epic', img: '/cards/images/bonus_card (3).png' },
-            { index: 4, id: 4, name: 'Скидка 500₽', rarity: 'epic', img: '/cards/images/bonus_card (4).png' },
-            { index: 5, id: 5, name: 'Скидка 1000₽', rarity: 'legendary', img: '/cards/images/bonus_card (5).png' },
-            { index: 7, id: 7, name: 'Скидка 300₽', rarity: 'rare', img: '/cards/images/bonus_card (7).png' }
+            { index: 1, id: 1, name: 'Funko Pop', rarity: 'legendary', img: '/cards/images/bonus_card_1.png' },
+            { index: 2, id: 2, name: 'Скидка 20%', rarity: 'epic', img: '/cards/images/bonus_card_2.png' },
+            { index: 3, id: 3, name: 'Скидка 25%', rarity: 'epic', img: '/cards/images/bonus_card_3.png' },
+            { index: 4, id: 4, name: 'Скидка 500₽', rarity: 'epic', img: '/cards/images/bonus_card_4.png' },
+            { index: 5, id: 5, name: 'Скидка 1000₽', rarity: 'legendary', img: '/cards/images/bonus_card_5.png' },
+            { index: 7, id: 7, name: 'Скидка 300₽', rarity: 'rare', img: '/cards/images/bonus_card_7.png' }
         ]
     }
 ];
@@ -431,6 +431,7 @@ function rollRandomCard() {
 
     const matching = [];
     SERIES_CONFIG.forEach(s => {
+        if (s.slug === 'bonus_card') return; // Do not roll bonus cards as main cards!
         s.cards.forEach(c => {
             if (c.rarity === selectedRarity) {
                 matching.push({ series: s, card: c });
@@ -772,8 +773,10 @@ openPackBtn.addEventListener('click', async () => {
                                 setTimeout(async () => {
                                     if (window.confetti) confetti({ particleCount: 200, spread: 120, origin: { y: 0.5 }, colors: ['#ff0022', '#ffffff'] });
 
-                                    // ✅ SAVE BONUS CARD TO DATABASE
                                     if (currentBonus) {
+                                        const bKey = `bonus_card_${currentBonus.id}`;
+                                        userCards[bKey] = (userCards[bKey] || 0) + 1;
+                                        updateUI(); // update collection
                                         try {
                                             await fetch('/api/cards/open', {
                                                 method: 'POST',
@@ -789,7 +792,7 @@ openPackBtn.addEventListener('click', async () => {
                                         }
                                     }
 
-                                    if (currentBonus.packs) {
+                                    if (currentBonus && currentBonus.packs) {
                                         fetch('/api/cards/claim_bonus_packs', {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
