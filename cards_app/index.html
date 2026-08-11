@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>FunkoStop Cards</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/cards/cards.css?v=75">
+    <link rel="stylesheet" href="/cards/cards.css?v=82">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -18,24 +18,36 @@
     <!-- LOADING SCREEN -->
     <div id="loading-screen" class="loading-overlay">
         <div class="loading-content">
-            <div class="loading-logo">FUNKOSTOP</div>
-            <div class="loading-bar-container">
+            <div class="loading-logo" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+                <svg width="45" height="45" viewBox="0 0 24 24" fill="none" stroke="var(--neon-red)" stroke-width="1.5">
+                    <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5z" fill="transparent"></path>
+                </svg>
+                <div style="font-size: 3rem; font-weight: 900; letter-spacing: 2px; color: white; text-shadow: 0 0 20px var(--neon-red-glow), 0 0 40px var(--neon-red-glow), 0 0 60px var(--neon-red-glow);">
+                    FUNKO<span style="color: var(--neon-red);">STOP</span>
+                </div>
+            </div>
+            <div class="loading-bar-container" style="margin-top: 30px;">
                 <div class="loading-bar" id="loading-bar"></div>
             </div>
-            <div class="loading-text" id="loading-text">Загрузка... 0%</div>
-            <div id="loading-actions" style="margin-top: 20px; display: flex; flex-direction: column; gap: 15px; width: 80%; max-width: 300px; margin-left: auto; margin-right: auto;">
-                <button id="loading-faq-btn" onclick="openFAQ()" style="padding: 14px 24px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); border: 1px solid var(--neon-red); border-radius: 12px; color: white; font-weight: 800; letter-spacing: 1px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.9rem; z-index: 9100; position: relative;">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--neon-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
+            <div class="loading-text" id="loading-text" style="margin-bottom: 20px;">Загрузка... 0%</div>
+            <div id="loading-actions"
+                style="display: flex; flex-direction: column; gap: 15px; width: 85%; max-width: 320px; margin: 0 auto;">
+                <button id="loading-faq-btn" onclick="openFAQ()"
+                    style="padding: 16px 24px; background: rgba(0,0,0,0.8); border: 1px solid var(--neon-red); border-radius: 12px; color: white; font-weight: 800; letter-spacing: 1px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 0.95rem;">
+                    <span style="color: var(--neon-red); font-size: 1.2rem; margin-right: 10px;">?</span>
                     КАК ЭТО РАБОТАЕТ?
+                    <span style="font-size: 1.2rem;">›</span>
                 </button>
-                <button id="loading-play-btn" class="hidden" style="padding: 14px 24px; background: var(--neon-red); border: none; border-radius: 12px; color: white; font-weight: 900; letter-spacing: 2px; cursor: pointer; box-shadow: 0 0 15px var(--neon-red-glow); font-size: 1.1rem;">ИГРАТЬ</button>
+                <button id="loading-play-btn" class="hidden"
+                    style="padding: 16px 24px; background: var(--neon-red); border: none; border-radius: 12px; color: white; font-weight: 900; letter-spacing: 2px; cursor: pointer; box-shadow: 0 0 20px var(--neon-red-glow); font-size: 1.1rem; display: flex; align-items: center; justify-content: space-between;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M9 12h.01"></path></svg>
+                    ИГРАТЬ
+                    <span style="font-size: 1.2rem;">›</span>
+                </button>
             </div>
         </div>
     </div>
-    
+
     <div class="app-container">
         <!-- Floating Daily Gift Tab (Right Side) -->
         <div class="daily-gift-floating" id="daily-gift-btn">
@@ -311,7 +323,9 @@
                 <div class="card-lightbox-name" id="lightbox-name"></div>
                 <div class="card-lightbox-rarity" id="lightbox-rarity"></div>
                 <div class="card-lightbox-series" id="lightbox-series"></div>
-                <button class="btn-action-primary hidden" id="claim-prize-btn" style="margin-top: 15px; width: 100%; display: none; border-radius: 12px; font-weight: 800; animation: pulse 2s infinite;">🎁 ЗАБРАТЬ ПРИЗ</button>
+                <button class="btn-action-primary hidden" id="claim-prize-btn"
+                    style="margin-top: 15px; width: 100%; display: none; border-radius: 12px; font-weight: 800; animation: pulse 2s infinite;">🎁
+                    ЗАБРАТЬ ПРИЗ</button>
             </div>
             <button class="card-lightbox-close" id="lightbox-close-btn">✕ Закрыть</button>
         </div>
@@ -349,7 +363,7 @@
         </div>
     </div>
 
-    <script src="/cards/cards.js?v=76"></script>
+    <script src="/cards/cards.js?v=80"></script>
 </body>
 
 </html>
