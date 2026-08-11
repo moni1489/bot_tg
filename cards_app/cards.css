@@ -1639,6 +1639,10 @@ body {
     background: transparent;
 }
 
+#faq-lightbox-img {
+    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
 .card-lightbox-info {
     text-align: center;
 }
@@ -2101,12 +2105,27 @@ body {
     width: 100vw;
     height: 100vh;
     height: 100dvh;
-    background: #000;
+    background: #000 url('/cards/images/background.png') center/cover no-repeat;
     z-index: 9000;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+}
+
+.loading-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.88); /* Heavy dark overlay */
+    backdrop-filter: blur(10px);  /* Heavy blur */
+    z-index: 0;
+}
+
+.loading-content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
 }
 
 .loading-overlay.fade-out {
@@ -2151,3 +2170,71 @@ body {
     color: var(--text-muted);
     font-weight: 700;
 }
+
+/* ===== PRIZES GRID ===== */
+.prizes-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 16px;
+}
+
+.prize-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    border-radius: 12px;
+    padding: 10px 6px;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.prize-item:active {
+    transform: scale(0.94);
+}
+
+.prize-img-wrap {
+    width: 100%;
+    aspect-ratio: 3/4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.prize-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+    opacity: 1;
+    filter: brightness(0.55);
+    transition: opacity 0.2s ease, filter 0.2s ease, transform 0.2s ease;
+}
+
+.prize-item.selected .prize-img {
+    filter: brightness(0.25);
+    transform: scale(0.96);
+}
+
+.prize-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.prize-item.selected .prize-label {
+    opacity: 0.4;
+}
+
+.prize-label-common  { color: var(--rarity-common); }
+.prize-label-rare    { color: var(--rarity-rare); }
+.prize-label-epic    { color: var(--rarity-epic); }
+.prize-label-legendary { color: var(--rarity-legendary); }
+.prize-label-bonus   { color: #ff0022; }
