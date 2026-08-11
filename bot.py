@@ -1669,7 +1669,45 @@ async def action_delete_order(callback: CallbackQuery):
 # --- CLIENT INTERFACE ---
 @router.message(F.text == "📦 Отследить заказы")
 async def check_status_start(message: Message, state: FSMContext):
-    await message.answer("Введите ваш Номер клиента (ID):", reply_markup=ReplyKeyboardRemove())
+    # First check if this Telegram ID is already linked to a client
+    async with pool.acquire() as db:
+        linked = await db.fetchrow("SELECT id FROM clients WHERE user_tg_id = $1", message.from_user.id)
+    
+    if linked:
+        # Already linked — show orders directly without password
+        client_id = linked['id']
+        async with pool.acquire() as db:
+            orders = await db.fetch(
+                "SELECT id, items, total_price, paid_amount, status, photo_id FROM orders WHERE client_id = $1 AND archived = FALSE",
+                client_id
+            )
+        
+        if len(orders) == 0:
+            await message.answer(f"✅ Личный кабинет #{client_id}\n\nАктивных заказов нет.", reply_markup=get_start_kb())
+        else:
+            await message.answer(f"✅ **Личный кабинет #{client_id}**\n\nАктивных заказов: {len(orders)}", parse_mode="Markdown", reply_markup=get_start_kb())
+            for order in orders:
+                order_id, items, total_price, paid_amount, status, photo_id = order
+                debt = total_price - paid_amount
+                response = f"📦 **Заказ #{order_id}**\n\n"
+                response += f"🛒 **Позиции:**\n{items}\n\n"
+                response += f"💵 **Общая стоимость:** {total_price}\n"
+                response += f"✅ **Оплачено:** {paid_amount}\n"
+                response += f"❗️ **Осталось доплатить:** {debt if debt > 0 else 0}\n\n"
+                response += f"🚚 **Текущий статус:**\n_{status}_"
+                if photo_id:
+                    await message.answer_photo(photo=photo_id, caption=response, parse_mode="Markdown")
+                else:
+                    await message.answer(response, parse_mode="Markdown")
+        return
+    
+    # Not linked yet — ask for ID and password (one-time login)
+    await message.answer(
+        "Введите ваш Номер клиента (ID) и Пароль.\n"
+        "После первого входа вам не придётся вводить их снова.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    await message.answer("Введите ваш Номер клиента (ID):")
     await state.set_state(CheckStatus.waiting_for_id)
 
 @router.message(CheckStatus.waiting_for_id)
@@ -1693,10 +1731,20 @@ async def check_status_password(message: Message, state: FSMContext):
         await message.answer("❌ Ошибка: Неверный ID клиента или пароль.", reply_markup=get_start_kb())
     elif len(orders) == 0:
         await bind_client_tg_id(client_id, message.from_user.id)
-        await message.answer(f"Привет! Вы вошли в личный кабинет (ID: {client_id}).\n\nУ вас пока нет активных заказов.", reply_markup=get_start_kb())
+        await message.answer(
+            f"✅ Вы вошли в личный кабинет (ID: {client_id}).\n"
+            f"Теперь вам не нужно вводить пароль — вы будете узнаваться автоматически!\n\n"
+            f"Активных заказов пока нет.",
+            reply_markup=get_start_kb()
+        )
     else:
         await bind_client_tg_id(client_id, message.from_user.id)
-        await message.answer(f"✅ **Личный кабинет #{client_id}**\n\nАктивных заказов: {len(orders)}", parse_mode="Markdown")
+        await message.answer(
+            f"✅ **Личный кабинет #{client_id}**\n"
+            f"Теперь вам не нужно вводить пароль — вы будете узнаваться автоматически!\n\n"
+            f"Активных заказов: {len(orders)}",
+            parse_mode="Markdown"
+        )
         for order in orders:
             order_id, items, total_price, paid_amount, status, photo_id = order
             debt = total_price - paid_amount
@@ -1720,6 +1768,36 @@ async def check_status_password(message: Message, state: FSMContext):
 # CLIENT: ARCHIVE
 @router.message(F.text == "🗃 Архив заказов")
 async def check_archive_start(message: Message, state: FSMContext):
+    # First check if this Telegram ID is already linked
+    async with pool.acquire() as db:
+        linked = await db.fetchrow("SELECT id FROM clients WHERE user_tg_id = $1", message.from_user.id)
+    
+    if linked:
+        client_id = linked['id']
+        async with pool.acquire() as db:
+            orders = await db.fetch(
+                "SELECT id, items, total_price, paid_amount, status, photo_id FROM orders WHERE client_id = $1 AND archived = TRUE",
+                client_id
+            )
+        
+        if len(orders) == 0:
+            await message.answer(f"🗃 Архив заказов пуст.", reply_markup=get_start_kb())
+        else:
+            await message.answer(f"🗃 **Архив заказов #{client_id}**\n\nВыданных заказов: {len(orders)}", parse_mode="Markdown", reply_markup=get_start_kb())
+            for order in orders:
+                order_id, items, total_price, paid_amount, status, photo_id = order
+                response = f"📦 **Архивный заказ #{order_id}**\n\n"
+                response += f"🛒 **Позиции:**\n{items}\n\n"
+                response += f"💵 **Общая стоимость:** {total_price}\n"
+                response += f"✅ **Оплачено:** {paid_amount}\n\n"
+                response += f"🚚 **Финальный статус:**\n_{status}_"
+                if photo_id:
+                    await message.answer_photo(photo=photo_id, caption=response, parse_mode="Markdown")
+                else:
+                    await message.answer(response, parse_mode="Markdown")
+        return
+    
+    # Not linked — ask for credentials
     await message.answer("Введите ваш Номер клиента (ID) для доступа к Архиву:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(CheckArchive.waiting_for_id)
 
@@ -2020,28 +2098,75 @@ async def claim_prize_api(request):
         
         if not tg_id or not card_idx:
             return web.json_response({"success": False, "message": "Invalid data"})
-            
-        if not await is_admin(tg_id):
-            return web.json_response({"success": False, "message": "Only admins can use this feature"})
-            
+
+        # Pack cards are auto-issued on reveal — don't allow claiming them via this API
+        pack_card_ids = [6, 8]
+        if card_idx in pack_card_ids:
+            return web.json_response({"success": False, "message": "Паки выдаются автоматически при открытии карты"})
+
         async with pool.acquire() as db:
             res = await db.execute("UPDATE user_cards SET count = count - 1 WHERE telegram_id = $1 AND series_slug = 'bonus_card' AND card_index = $2 AND count > 0", tg_id, card_idx)
             if res == "UPDATE 0":
-                return web.json_response({"success": False, "message": "Карта не найдена"})
+                return web.json_response({"success": False, "message": "Карта не найдена или уже использована"})
             await db.execute("DELETE FROM user_cards WHERE telegram_id = $1 AND count <= 0", tg_id)
             
         promo_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         c_name = BONUS_CARD_NAMES.get(card_idx, f"Бонус {card_idx}")
         
+        # Send promo code to player via bot DM
         try:
-            await bot.send_message(tg_id, f"🎁 Поздравляем! Ваша бонусная карта обменена на приз!\nВы выиграли: **{c_name}**\n\nВаш промокод: `{promo_code}`\n\nСделайте скриншот и покажите его администратору или в магазине.", parse_mode="Markdown")
+            await bot.send_message(
+                tg_id,
+                f"🎁 Поздравляем! Вы активировали бонусную карту!\n"
+                f"Вы выиграли: **{c_name}**\n\n"
+                f"Ваш промокод: `{promo_code}`\n\n"
+                f"Сделайте скриншот и отправьте его менеджеру @Funko_Stop.",
+                parse_mode="Markdown"
+            )
         except Exception:
             pass
+
+        # Notify all admins about the prize claim
+        try:
+            async with pool.acquire() as db:
+                user_row = await db.fetchrow("SELECT username, first_name FROM card_users WHERE telegram_id = $1", tg_id)
+            user_name = ""
+            if user_row:
+                if user_row['first_name'] and user_row['username']:
+                    user_name = f"{user_row['first_name']} (@{user_row['username']})"
+                elif user_row['first_name']:
+                    user_name = user_row['first_name']
+                elif user_row['username']:
+                    user_name = f"@{user_row['username']}"
+            if not user_name:
+                user_name = f"ID:{tg_id}"
+
+            admin_targets = set(ADMIN_IDS)
+            async with pool.acquire() as db:
+                db_admins = await db.fetch("SELECT user_tg_id FROM users WHERE role = 'admin' AND user_tg_id IS NOT NULL")
+            for r in db_admins:
+                admin_targets.add(r['user_tg_id'])
+
+            for admin_id in admin_targets:
+                try:
+                    await bot.send_message(
+                        admin_id,
+                        f"🎟 Игрок [{user_name}](tg://user?id={tg_id}) активировал бонус-карту!\n"
+                        f"Приз: **{c_name}**\n"
+                        f"Промокод: `{promo_code}`\n\n"
+                        f"Используй /all_promos или кнопку «🎫 Все промокоды» для проверки.",
+                        parse_mode="Markdown"
+                    )
+                except Exception:
+                    pass
+        except Exception as e:
+            logging.error(f"Admin notify error in claim_prize_api: {e}")
             
         return web.json_response({"success": True, "promo_code": promo_code})
     except Exception as e:
         logging.error(f"claim_prize_api error: {e}")
         return web.json_response({"success": False, "message": "Server error"})
+
 
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
