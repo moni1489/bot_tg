@@ -917,9 +917,11 @@ function openLightbox(card, series, isCollected) {
     if (claimBtn) {
         // Show prize button for all players on their own bonus cards
         if (isCollected && series.slug === 'bonus_card') {
+            claimBtn.classList.remove('hidden');
             claimBtn.style.display = 'block';
             claimBtn.onclick = () => claimPrize(card.id, card.name);
         } else {
+            claimBtn.classList.add('hidden');
             claimBtn.style.display = 'none';
         }
     }
