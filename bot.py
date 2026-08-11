@@ -72,14 +72,18 @@ async def get_card_profile(request):
             })
         
         async with pool.acquire() as db:
-            if username or first_name:
+            if username and username != "player" or first_name and first_name != "Игрок":
+                # Only update if it's real data from WebApp, not fallback
+                db_username = username if username and username != "player" else None
+                db_first_name = first_name if first_name and first_name != "Игрок" else None
+                
                 await db.execute("""
                     INSERT INTO card_users (telegram_id, username, first_name, packs_count)
                     VALUES ($1, $2, $3, 3)
                     ON CONFLICT (telegram_id) DO UPDATE SET
-                        username = COALESCE(EXCLUDED.username, card_users.username),
-                        first_name = COALESCE(EXCLUDED.first_name, card_users.first_name)
-                """, tg_id, username, first_name)
+                        username = COALESCE($2, card_users.username),
+                        first_name = COALESCE($3, card_users.first_name)
+                """, tg_id, db_username, db_first_name)
             else:
                 await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 3) ON CONFLICT DO NOTHING", tg_id)
 
@@ -408,6 +412,17 @@ async def start_webserver():
             shutil.copy(logo_src, os.path.join(images_dir, "logo.png"))
         except Exception:
             pass
+            
+    # Rename bonus cards if needed
+    if os.path.exists(images_dir):
+        for i in range(1, 9):
+            old_path = os.path.join(images_dir, f"bonus_card ({i}).png")
+            new_path = os.path.join(images_dir, f"bonus_card_{i}.png")
+            if os.path.exists(old_path) and not os.path.exists(new_path):
+                try:
+                    os.rename(old_path, new_path)
+                except:
+                    pass
 
     # Slice 7 series frames if available
 
