@@ -134,6 +134,19 @@ const SERIES_CONFIG = [
             { index: 3, name: 'Paul Atreides', rarity: 'legendary', img: '/cards/images/card_universal_3.png' },
             { index: 4, name: 'Derpy', rarity: 'legendary', img: '/cards/images/card_universal_4.png' }
         ]
+    },
+    {
+        slug: 'bonus_card',
+        name: 'Мои Бонусы',
+        theme: 'bonus',
+        cards: [
+            { index: 1, id: 1, name: 'Funko Pop', rarity: 'legendary', img: '/cards/images/bonus_card (1).png' },
+            { index: 2, id: 2, name: 'Скидка 20%', rarity: 'epic', img: '/cards/images/bonus_card (2).png' },
+            { index: 3, id: 3, name: 'Скидка 25%', rarity: 'epic', img: '/cards/images/bonus_card (3).png' },
+            { index: 4, id: 4, name: 'Скидка 500₽', rarity: 'epic', img: '/cards/images/bonus_card (4).png' },
+            { index: 5, id: 5, name: 'Скидка 1000₽', rarity: 'legendary', img: '/cards/images/bonus_card (5).png' },
+            { index: 7, id: 7, name: 'Скидка 300₽', rarity: 'rare', img: '/cards/images/bonus_card (7).png' }
+        ]
     }
 ];
 
@@ -978,7 +991,8 @@ function renderCollection() {
     });
 
     // Update global header stats
-    const totalCards = SERIES_CONFIG.length * 4;
+    let totalCards = 0;
+    SERIES_CONFIG.forEach(s => totalCards += s.cards.length);
     const missing = totalCards - totalCollected;
     let totalDupes = 0;
     Object.values(userCards).forEach(count => {
@@ -996,10 +1010,11 @@ function renderCollection() {
     if (elDupes) elDupes.textContent = totalDupes;
 
     SERIES_CONFIG.forEach(series => {
+        const maxCards = series.cards.length;
         let seriesCollectedCount = 0;
         series.cards.forEach(c => { if ((userCards[`${series.slug}_${c.index}`] || 0) > 0) seriesCollectedCount++; });
-        const isFull = seriesCollectedCount === 4;
-        const progressPct = Math.round((seriesCollectedCount / 4) * 100);
+        const isFull = (seriesCollectedCount === maxCards) && (series.slug !== 'bonus_card');
+        const progressPct = Math.round((seriesCollectedCount / maxCards) * 100);
 
         const seriesBlock = document.createElement('div');
         seriesBlock.className = 'series-card-block';
@@ -1009,7 +1024,7 @@ function renderCollection() {
         titleRow.className = 'series-title-row';
         titleRow.innerHTML = `
             <div class="series-name">${series.name}</div>
-            <div class="series-progress">${seriesCollectedCount} / 4</div>
+            <div class="series-progress">${seriesCollectedCount} / ${maxCards}</div>
         `;
         seriesBlock.appendChild(titleRow);
 
