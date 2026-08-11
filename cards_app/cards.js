@@ -465,13 +465,6 @@ openPackBtn.addEventListener('click', async () => {
         hasSeenFaq = localStorage.getItem('funko_cards_has_seen_faq') === 'true';
     } catch (e) { }
 
-    if (Object.keys(userCards).length === 0 && !hasSeenFaq) {
-        if (typeof openFAQ === 'function') {
-            openFAQ();
-            return;
-        }
-    }
-
     if (userData.packs_count <= 0) {
         alert("У вас закончились паки! Заберите ежедневный пак или выполняйте задания.");
         return;
@@ -763,8 +756,25 @@ openPackBtn.addEventListener('click', async () => {
                                     card3d.style.transform = 'rotateY(0deg)';
                                 }, 500);
 
-                                setTimeout(() => {
+                                setTimeout(async () => {
                                     if (window.confetti) confetti({ particleCount: 200, spread: 120, origin: { y: 0.5 }, colors: ['#ff0022', '#ffffff'] });
+
+                                    // ✅ SAVE BONUS CARD TO DATABASE
+                                    if (currentBonus) {
+                                        try {
+                                            await fetch('/api/cards/open', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    telegram_id: userData.telegram_id,
+                                                    series_slug: 'bonus_card',
+                                                    card_index: currentBonus.id
+                                                })
+                                            });
+                                        } catch (e) {
+                                            console.log('Bonus card save error', e);
+                                        }
+                                    }
 
                                     if (currentBonus.packs) {
                                         fetch('/api/cards/claim_bonus_packs', {
@@ -892,9 +902,10 @@ function openLightbox(card, series, isCollected) {
 
     const claimBtn = document.getElementById('claim-prize-btn');
     if (claimBtn) {
-        if (userData.is_admin && isCollected && series.slug === 'bonus_card') {
+        // Show prize button for all players on their own bonus cards
+        if (isCollected && series.slug === 'bonus_card') {
             claimBtn.style.display = 'block';
-            claimBtn.onclick = () => claimPrize(card.id);
+            claimBtn.onclick = () => claimPrize(card.id, card.name);
         } else {
             claimBtn.style.display = 'none';
         }
@@ -903,9 +914,16 @@ function openLightbox(card, series, isCollected) {
     lb.classList.remove('hidden');
 }
 
-async function claimPrize(cardId) {
-    if (!confirm("Уверены, что хотите сжечь эту карту и получить промокод?")) return;
-    
+async function claimPrize(cardId, cardName) {
+    // Pack cards (id 6=10 packs, id 8=5 packs) are auto-issued on card reveal, not via this button
+    const packCardIds = [6, 8];
+    if (packCardIds.includes(cardId)) {
+        alert('Паки выдаются автоматически при открытии пака!\nЕсли паки не начислились, обратитесь к менеджеру.');
+        return;
+    }
+
+    if (!confirm(`Хотите активировать приз «${cardName}»?\nБот отправит вам промокод в личку.`)) return;
+
     try {
         const res = await fetch('/api/cards/claim_prize', {
             method: 'POST',
@@ -913,15 +931,16 @@ async function claimPrize(cardId) {
             body: JSON.stringify({ tg_id: userData.telegram_id, card_index: cardId })
         });
         const data = await res.json();
-        
+
         if (data.success) {
-            Swal.fire({
-                title: 'Успех!',
-                text: 'Карта сожжена. Промокод отправлен вам в ЛС бота: ' + data.promo_code,
-                icon: 'success',
-                confirmButtonText: 'Ок'
-            });
-            // Уменьшить счетчик локально
+            const promoCode = data.promo_code;
+            alert(`✅ Ура! Ваш промокод: ${promoCode}\n\nСделайте скриншот и отправьте его менеджеру.\nСейчас откроется чат с менеджером.`);
+
+            // Auto-open manager with a pre-filled message
+            const msg = encodeURIComponent(`Здравствуйте! Я выбил бонус-карту «${cardName}». Мой промокод: ${promoCode}`);
+            window.open(`https://t.me/Funko_Stop?text=${msg}`, '_blank');
+
+            // Update local state
             const cardKey = `bonus_card_${cardId}`;
             if (userCards[cardKey]) {
                 userCards[cardKey]--;
@@ -930,10 +949,10 @@ async function claimPrize(cardId) {
             }
             closeLightbox();
         } else {
-            Swal.fire('Ошибка', data.message || 'Не удалось получить приз', 'error');
+            alert('Ошибка: ' + (data.message || 'Не удалось активировать приз.'));
         }
     } catch (e) {
-        Swal.fire('Ошибка', 'Ошибка соединения', 'error');
+        alert('Ошибка соединения. Попробуйте ещё раз.');
     }
 }
 
@@ -1123,26 +1142,26 @@ function renderPrizes() {
         const item = document.createElement('div');
         item.className = 'prize-item';
 
-        const isFigure = prize.rarity === 'figure';
-
         item.innerHTML = `
             <div class="prize-img-wrap">
-                <img src="${prize.img}" class="prize-img ${isFigure ? 'figure' : ''}" alt="${prize.name}">
+                <img src="${prize.img}" class="prize-img" alt="${prize.name}">
             </div>
             <div class="prize-label prize-label-${prize.rarity}">
                 ${prize.name}
             </div>
         `;
 
+        // Click: toggle 'selected' (darkens card) — simple tap feedback
         item.onclick = function() {
-            this.classList.toggle('active');
+            this.classList.toggle('selected');
         };
-        
+
         prizesGrid.appendChild(item);
     });
 
     container.appendChild(prizesGrid);
 }
+
 
 function initApp() {
     setupNavigation();
@@ -1278,80 +1297,77 @@ function preloadImagesAndInit() {
     const loadingBar = document.getElementById('loading-bar');
     const loadingText = document.getElementById('loading-text');
     
-    // 1. Сначала запускаем приложение, чтобы оно создало DOM-элементы с картинками
+    // 1. Initialize app DOM
     initApp();
     
     if (!loadingScreen) return;
     
-    // 2. Собираем все картинки, которые появились на странице
-    const images = Array.from(document.querySelectorAll('img'));
-    
-    // 3. Отфильтруем те, у которых есть src
-    const validImages = images.filter(img => img.src);
-    const totalImages = validImages.length;
+    let isCompleted = false;
+
+    function hideLoadingScreen() {
+        if (isCompleted) return;
+        isCompleted = true;
+        
+        loadingScreen.classList.add('fade-out');
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+        }, 400);
+    }
+
+    function showReadyState() {
+        if (isCompleted) return; // already skipped
+        
+        if (loadingBar) loadingBar.style.width = '100%';
+        if (loadingText) {
+            loadingText.innerText = 'Загрузка завершена! Можете играть или прочитать FAQ.';
+            loadingText.style.color = '#00ff88';
+        }
+        
+        const playBtn = document.getElementById('loading-play-btn');
+        if (playBtn) playBtn.classList.remove('hidden');
+    }
+
+    // Allow clicking PLAY button to enter the app
+    const playBtn = document.getElementById('loading-play-btn');
+    if (playBtn) playBtn.addEventListener('click', hideLoadingScreen);
+
+    // 2. Safety timeout — FORCE READY after 2.5s maximum so it never hangs
+    const safetyTimeout = setTimeout(showReadyState, 2500);
+
+    // 3. Image Preloader
+    const images = Array.from(document.querySelectorAll('img')).filter(img => img.src);
+    const totalImages = images.length;
     
     if (totalImages === 0) {
-        completeLoading();
+        clearTimeout(safetyTimeout);
+        hideLoadingScreen();
         return;
     }
     
     let loadedImages = 0;
-    // Минимальное время показа загрузки, чтобы не было "моргания", если все закешировано
-    const startTime = Date.now();
-    const MIN_LOADING_TIME = 800; 
     
     function updateProgress() {
         loadedImages++;
-        const progress = Math.floor((loadedImages / totalImages) * 100);
+        const progress = Math.min(100, Math.floor((loadedImages / totalImages) * 100));
         
         if (loadingBar) loadingBar.style.width = progress + '%';
         if (loadingText) loadingText.innerText = 'Загрузка... ' + progress + '%';
         
         if (loadedImages >= totalImages) {
-            const elapsedTime = Date.now() - startTime;
-            const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
-            
-            setTimeout(completeLoading, remainingTime);
+            clearTimeout(safetyTimeout);
+            setTimeout(showReadyState, 200);
         }
     }
     
-    function completeLoading() {
-        if (loadingBar) loadingBar.style.width = '100%';
-        if (loadingText) {
-            loadingText.innerText = 'Загрузка завершена! Можете играть или прочитать FAQ.';
-            loadingText.style.fontSize = '0.9rem';
-            loadingText.style.color = '#00ff88';
-        }
-        
-        const playBtn = document.getElementById('loading-play-btn');
-        if (playBtn) {
-            playBtn.classList.remove('hidden');
-            playBtn.addEventListener('click', () => {
-                loadingScreen.classList.add('fade-out');
-                setTimeout(() => {
-                    loadingScreen.style.display = 'none';
-                }, 500);
-            });
-        } else {
-            setTimeout(() => {
-                loadingScreen.classList.add('fade-out');
-                setTimeout(() => {
-                    loadingScreen.style.display = 'none';
-                }, 500);
-            }, 500);
-        }
-    }
-    
-    // Вешаем обработчики на каждую картинку
-    validImages.forEach(img => {
+    images.forEach(img => {
         if (img.complete) {
             updateProgress();
         } else {
             img.addEventListener('load', updateProgress, { once: true });
-            img.addEventListener('error', updateProgress, { once: true }); // Игнорируем ошибки загрузки, чтобы не зависнуть
+            img.addEventListener('error', updateProgress, { once: true });
         }
     });
 }
 
-// Запускаем реальную загрузку
 preloadImagesAndInit();
+
