@@ -2083,6 +2083,12 @@ async def process_give_prize(callback: CallbackQuery):
     promo_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     c_name = BONUS_CARD_NAMES.get(card_idx, f"Бонус {card_idx}")
     
+    async with pool.acquire() as db:
+        await db.execute(
+            "INSERT INTO series_codes (code, series_slug, telegram_id) VALUES ($1, $2, $3)",
+            promo_code, f"Приз: {c_name}", target_id
+        )
+    
     try:
         await bot.send_message(target_id, f"🎁 Поздравляем! Ваша бонусная карта обменена на приз!\nВы выиграли: **{c_name}**\n\nВаш промокод: `{promo_code}`\n\nСделайте скриншот и покажите его администратору или в магазине.", parse_mode="Markdown")
         await callback.message.edit_text(f"✅ Карта '{c_name}' успешно сожжена.\nПромокод `{promo_code}` отправлен пользователю {target_id}.", parse_mode="Markdown")
@@ -2112,6 +2118,12 @@ async def claim_prize_api(request):
             
         promo_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         c_name = BONUS_CARD_NAMES.get(card_idx, f"Бонус {card_idx}")
+        
+        async with pool.acquire() as db:
+            await db.execute(
+                "INSERT INTO series_codes (code, series_slug, telegram_id) VALUES ($1, $2, $3)",
+                promo_code, f"Приз: {c_name}", tg_id
+            )
         
         # Send promo code to player via bot DM
         try:
