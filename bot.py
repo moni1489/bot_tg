@@ -81,8 +81,8 @@ async def get_card_profile(request):
                     INSERT INTO card_users (telegram_id, username, first_name, packs_count)
                     VALUES ($1, $2, $3, 3)
                     ON CONFLICT (telegram_id) DO UPDATE SET
-                        username = COALESCE($2, card_users.username),
-                        first_name = COALESCE($3, card_users.first_name)
+                        username = COALESCE($2, NULLIF(card_users.username, 'player'), card_users.username),
+                        first_name = COALESCE($3, NULLIF(card_users.first_name, 'Игрок'), card_users.first_name)
                 """, tg_id, db_username, db_first_name)
             else:
                 await db.execute("INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 3) ON CONFLICT DO NOTHING", tg_id)
