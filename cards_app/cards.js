@@ -524,10 +524,10 @@ openPackBtn.addEventListener('click', async () => {
 
         cardFront.innerHTML = `
             <div class="card-frame ${drop.series.theme}" style="padding: 0; border: none; background: transparent; box-shadow: none; position: relative;">
-                <div style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 900; text-align: center; color: #fff; text-shadow: 0 2px 10px #000; padding: 20px; z-index: 0;">
+                <div style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 900; text-align: center; color: #fff; text-shadow: 0 2px 10px #000; padding: 20px; z-index: 0;" id="card-fallback-text">
                     ${drop.card.name}
                 </div>
-                <img src="${drop.card.img}" class="full-card-image" alt="${drop.card.name}" style="position: relative; z-index: 1;" onerror="this.style.display='none'; this.previousElementSibling.style.display='flex';">
+                <img src="${drop.card.img}" class="full-card-image" alt="${drop.card.name}" style="position: relative; z-index: 1;" onerror="this.style.display='none'; document.getElementById('card-fallback-text').style.display='flex';">
             </div>
         `;
 
@@ -719,8 +719,12 @@ openPackBtn.addEventListener('click', async () => {
                         setTimeout(() => {
                             card3d.classList.remove('flipped', 'aura-common', 'aura-rare', 'aura-epic', 'aura-legendary');
                             cardFront.innerHTML = `
-                                <div class="card-frame universal" style="padding: 0; border: none; background: transparent; box-shadow: none; position: relative;">
-                                    <img src="${currentBonus.img}" class="full-card-image" alt="${currentBonus.name}" style="position: relative; z-index: 1;">
+                                <div class="card-frame universal" style="padding: 0; border: none; background: transparent; box-shadow: none; position: relative; display: flex; align-items: center; justify-content: center;">
+                                    <div id="bonus-fallback-text" style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 900; text-align: center; color: #fff; text-shadow: 0 2px 10px #000; padding: 20px; z-index: 0; flex-direction: column; gap: 10px;">
+                                        <div style="font-size: 2rem;">🎁</div>
+                                        <div>${currentBonus.name}</div>
+                                    </div>
+                                    <img src="${currentBonus.img}" class="full-card-image" alt="${currentBonus.name}" style="position: relative; z-index: 1;" onerror="this.style.display='none'; document.getElementById('bonus-fallback-text').style.display='flex';">
                                 </div>
                             `;
 
