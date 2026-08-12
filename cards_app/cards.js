@@ -456,14 +456,14 @@ function rollBonusCard() {
     // 0.5% - 25% discount avito (3)
     // 0.05% - jackpot (1)
 
-    if (rand <= 0.05) return { id: 1, name: "Funko Pop", img: "/cards/images/bonus_card (1).png" };
-    if (rand <= 0.55) return { id: 2, name: "Скидка 20%", img: "/cards/images/bonus_card (2).png" };
-    if (rand <= 1.05) return { id: 3, name: "Скидка 25% (Авито)", img: "/cards/images/bonus_card (3).png" };
-    if (rand <= 1.55) return { id: 5, name: "Скидка 1000₽", img: "/cards/images/bonus_card (5).png" };
-    if (rand <= 2.05) return { id: 6, name: "10 Бонус Паков", packs: 10, img: "/cards/images/bonus_card (6).png" };
-    if (rand <= 3.05) return { id: 4, name: "Скидка 500₽", img: "/cards/images/bonus_card (4).png" };
-    if (rand <= 5.05) return { id: 8, name: "5 Бонус Паков", packs: 5, img: "/cards/images/bonus_card (8).png" };
-    if (rand <= 8.05) return { id: 7, name: "Скидка 300₽", img: "/cards/images/bonus_card (7).png" };
+    if (rand <= 0.05) return { id: 1, name: "Funko Pop", img: "/cards/images/bonus_card_1.png" };
+    if (rand <= 0.55) return { id: 2, name: "Скидка 20%", img: "/cards/images/bonus_card_2.png" };
+    if (rand <= 1.05) return { id: 3, name: "Скидка 25% (Авито)", img: "/cards/images/bonus_card_3.png" };
+    if (rand <= 1.55) return { id: 5, name: "Скидка 1000₽", img: "/cards/images/bonus_card_5.png" };
+    if (rand <= 2.05) return { id: 6, name: "10 Бонус Паков", packs: 10, img: "/cards/images/bonus_card_6.png" };
+    if (rand <= 3.05) return { id: 4, name: "Скидка 500₽", img: "/cards/images/bonus_card_4.png" };
+    if (rand <= 5.05) return { id: 8, name: "5 Бонус Паков", packs: 5, img: "/cards/images/bonus_card_8.png" };
+    if (rand <= 8.05) return { id: 7, name: "Скидка 300₽", img: "/cards/images/bonus_card_7.png" };
 
     return null;
 }
@@ -1148,14 +1148,14 @@ function renderPrizes() {
         { name: "Rare", rarity: "rare", img: "/cards/images/card_death_note_2.png" },
         { name: "Epic", rarity: "epic", img: "/cards/images/card_invincible_3.png" },
         { name: "Legendary", rarity: "legendary", img: "/cards/images/card_residennt_evil_4.png" },
-        { name: "Funko Pop", rarity: "bonus", img: "/cards/images/bonus_card (1).png" },
-        { name: "Скидка 20%", rarity: "bonus", img: "/cards/images/bonus_card (2).png" },
-        { name: "Скидка 25%", rarity: "bonus", img: "/cards/images/bonus_card (3).png" },
-        { name: "Скидка 500₽", rarity: "bonus", img: "/cards/images/bonus_card (4).png" },
-        { name: "Скидка 1000₽", rarity: "bonus", img: "/cards/images/bonus_card (5).png" },
-        { name: "10 Паков", rarity: "bonus", img: "/cards/images/bonus_card (6).png" },
-        { name: "Скидка 300₽", rarity: "bonus", img: "/cards/images/bonus_card (7).png" },
-        { name: "5 Паков", rarity: "bonus", img: "/cards/images/bonus_card (8).png" }
+        { name: "Funko Pop", rarity: "bonus", img: "/cards/images/bonus_card_1.png" },
+        { name: "Скидка 20%", rarity: "bonus", img: "/cards/images/bonus_card_2.png" },
+        { name: "Скидка 25%", rarity: "bonus", img: "/cards/images/bonus_card_3.png" },
+        { name: "Скидка 500₽", rarity: "bonus", img: "/cards/images/bonus_card_4.png" },
+        { name: "Скидка 1000₽", rarity: "bonus", img: "/cards/images/bonus_card_5.png" },
+        { name: "10 Паков", rarity: "bonus", img: "/cards/images/bonus_card_6.png" },
+        { name: "Скидка 300₽", rarity: "bonus", img: "/cards/images/bonus_card_7.png" },
+        { name: "5 Паков", rarity: "bonus", img: "/cards/images/bonus_card_8.png" }
     ];
 
     prizesList.forEach(prize => {
