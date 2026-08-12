@@ -1437,14 +1437,19 @@ async def all_codes(message: Message):
     import html as html_mod
     msg = f"🏷 <b>Все промокоды</b> ({len(codes)} шт):\n\n"
     for row in codes:
-        if row['first_name'] and row['username']:
-            name = f"{html_mod.escape(row['first_name'])} (@{html_mod.escape(row['username'])})"
-        elif row['first_name']:
-            name = html_mod.escape(row['first_name'])
-        elif row['username']:
-            name = f"@{html_mod.escape(row['username'])}"
+        # Build name part
+        parts = []
+        if row['first_name']:
+            parts.append(html_mod.escape(row['first_name']))
+        if row['username']:
+            parts.append(f"@{html_mod.escape(row['username'])}")
+        # Always add ID as tg link
+        tg_id = row['telegram_id']
+        id_link = f"<a href=\"tg://user?id={tg_id}\">ID:{tg_id}</a>"
+        if parts:
+            name = " ".join(parts) + f" [{id_link}]"
         else:
-            name = f"ID:{row['telegram_id']}"
+            name = id_link
         date = row['created_at'].strftime('%d.%m %H:%M')
         msg += f"<code>{html_mod.escape(row['code'])}</code> — <b>{html_mod.escape(row['series_slug'].upper())}</b> — {name} ({date})\n"
         
@@ -2135,9 +2140,13 @@ async def claim_prize_api(request):
         c_name = BONUS_CARD_NAMES.get(card_idx, f"Бонус {card_idx}")
         
         async with pool.acquire() as db:
+            # Use timestamp suffix to avoid UNIQUE(telegram_id, series_slug) conflict
+            # when same user claims the same prize type multiple times
+            import time
+            unique_slug = f"Приз: {c_name} #{int(time.time())}"
             await db.execute(
-                "INSERT INTO series_codes (code, series_slug, telegram_id) VALUES ($1, $2, $3)",
-                promo_code, f"Приз: {c_name}", tg_id
+                "INSERT INTO series_codes (code, series_slug, telegram_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+                promo_code, unique_slug, tg_id
             )
         
         # Send promo code to player via bot DM
@@ -2191,7 +2200,8 @@ async def claim_prize_api(request):
             
         return web.json_response({"success": True, "promo_code": promo_code})
     except Exception as e:
-        logging.error(f"claim_prize_api error: {e}")
+        import traceback
+        logging.error(f"claim_prize_api error: {e}\n{traceback.format_exc()}")
         return web.json_response({"success": False, "message": "Server error"})
 
 
