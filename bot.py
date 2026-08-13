@@ -123,6 +123,14 @@ async def get_card_profile(request):
                 pass
 
             is_adm = await is_admin(tg_id)
+            
+            # Beta testers have access to the game without being admins
+            BETA_TESTERS = [8908317814]
+            if not is_adm and tg_id not in BETA_TESTERS:
+                return web.json_response({
+                    "error": "not_admin",
+                    "message": "Игра находится на стадии тестирования и пока доступна только администраторам."
+                }, status=403)
 
             return web.json_response({
                 "packs_count": packs_count,
@@ -714,14 +722,20 @@ async def unarchive_order_db(order_id: int):
         await db.execute("UPDATE orders SET archived = FALSE WHERE id = $1", order_id)
 
 # --- KEYBOARDS ---
+BETA_TESTERS = [8908317814]
+
 def get_start_kb(user_id=None):
-    return ReplyKeyboardMarkup(
+    kb = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🧮 Калькулятор стоимости")],
             [KeyboardButton(text="📦 Отследить заказы"), KeyboardButton(text="🗃 Архив заказов")]
         ],
         resize_keyboard=True
     )
+    if user_id in BETA_TESTERS:
+        url = f"{WEBAPP_URL}?tg_id={user_id}" if user_id else WEBAPP_URL
+        kb.keyboard.insert(0, [KeyboardButton(text="🎴 Играть в Funko Cards (Beta)", web_app=WebAppInfo(url=url))])
+    return kb
 
 def get_admin_kb(user_id=None):
     return ReplyKeyboardMarkup(
@@ -886,18 +900,18 @@ async def start_handler(message: Message, state: FSMContext):
                 async with pool.acquire() as db:
                     user = await db.fetchrow("SELECT telegram_id, referred_by FROM card_users WHERE telegram_id = $1", message.from_user.id)
                     if not user:
-                        # Give 5 base packs + 1 bonus pack = 6 to new user
-                        await db.execute("INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 6, $4)", 
+                        # Give 3 base packs + 1 bonus pack = 4 to new user
+                        await db.execute("INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 4, $4)", 
                                          message.from_user.id, message.from_user.username, message.from_user.first_name, inviter_id)
                         is_referral = True
-                        # Give +1 pack to inviter
+                        # Give +2 packs to inviter
                         await db.execute("""
-                            INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 6)
-                            ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 1
+                            INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 5)
+                            ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 2
                         """, inviter_id)
-                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный <b>+1 пак</b> (Всего 6 стартовых паков)!", parse_mode="HTML")
+                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный <b>+1 пак</b> (Всего 4 стартовых пака)!", parse_mode="HTML")
                         try:
-                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислен <b>+1 пак</b>!", parse_mode="HTML")
+                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислено <b>+2 пака</b>!", parse_mode="HTML")
                         except Exception as notify_err:
                             logging.error(f"Notify error: {notify_err}")
                     elif not user["referred_by"]:
@@ -905,12 +919,12 @@ async def start_handler(message: Message, state: FSMContext):
                                          inviter_id, message.from_user.id, message.from_user.username, message.from_user.first_name)
                         is_referral = True
                         await db.execute("""
-                            INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 6)
-                            ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 1
+                            INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 5)
+                            ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 2
                         """, inviter_id)
                         await message.answer("🎉 Вы активировали реферальную ссылку и получили бонусный <b>+1 пак</b>!", parse_mode="HTML")
                         try:
-                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислен <b>+1 пак</b>!", parse_mode="HTML")
+                            await bot.send_message(inviter_id, "🎉 По вашей ссылке перешел друг! Вам начислено <b>+2 пака</b>!", parse_mode="HTML")
                         except Exception as notify_err:
                             logging.error(f"Notify error: {notify_err}")
         except Exception as e:
@@ -2116,11 +2130,22 @@ async def process_give_prize(callback: CallbackQuery):
         await callback.message.edit_text(f"⚠️ Карта списана, но не удалось отправить сообщение пользователю. Промокод: `{promo_code}`. Ошибка: {e}", parse_mode="Markdown")
 
 # --- WEB APP CLAIM PRIZE API ---
+BONUS_CARD_NAMES = {
+    1: "Funko Pop",
+    2: "Скидка 20%",
+    3: "Скидка 25%",
+    4: "Скидка 500₽",
+    5: "Скидка 1000₽",
+    6: "10 Бонус Паков",
+    7: "Скидка 300₽",
+    8: "5 Бонус Паков"
+}
+
 async def claim_prize_api(request):
     try:
         data = await request.json()
-        tg_id = safe_int(data.get("tg_id"))
-        card_idx = safe_int(data.get("card_index"))
+        tg_id = int(data.get("tg_id") or 0)
+        card_idx = int(data.get("card_index") or 0)
         
         if not tg_id or not card_idx:
             return web.json_response({"success": False, "message": "Invalid data"})
