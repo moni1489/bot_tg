@@ -1891,6 +1891,14 @@ async def handle_link(message: Message, state: FSMContext):
     if not url.startswith("http"):
         return
 
+    # Force US region for eBay to ensure domestic shipping is visible
+    if "ebay.com" in url or "ebay.io" in url:
+        from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+        parsed = urlparse(url)
+        q = parse_qs(parsed.query)
+        q['_ul'] = ['US']
+        url = urlunparse(parsed._replace(query=urlencode(q, doseq=True)))
+
     await message.answer("🔍 Секунду, анализирую ссылку (загружаю страницу и запускаю ИИ)...")
     
     if not SCRAPER_API_KEY or not OPENAI_API_KEY:
