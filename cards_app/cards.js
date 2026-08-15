@@ -1188,9 +1188,9 @@ function renderPrizes() {
             </div>
         `;
 
-        // Click: toggle 'selected' (darkens card) — simple tap feedback
+        // Click: open card in fullscreen lightbox
         item.onclick = function() {
-            this.classList.toggle('selected');
+            openLightbox(prize, { name: "Призы" }, true);
         };
 
         prizesGrid.appendChild(item);
