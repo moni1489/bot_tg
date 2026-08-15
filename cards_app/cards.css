@@ -2066,7 +2066,7 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    filter: brightness(0.12) contrast(1.2);
+    filter: brightness(1);
     transition: filter 0.3s ease;
 }
 
@@ -2213,12 +2213,12 @@ body {
     object-fit: cover;
     border-radius: 8px;
     opacity: 1;
-    filter: brightness(0.55);
-    transition: opacity 0.2s ease, filter 0.2s ease, transform 0.2s ease;
+    filter: brightness(1);
+    transition: filter 0.3s ease;
 }
 
-.prize-item.selected .prize-img {
-    filter: brightness(0.25);
+.prize-item:active .prize-img {
+    filter: brightness(0.8);
     transform: scale(0.96);
 }
 
