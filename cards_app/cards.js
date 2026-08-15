@@ -436,11 +436,28 @@ function startDailyCountdown(secondsLeft) {
 // Roll Card
 function rollRandomCard() {
     const rand = Math.random() * 100;
+    let hasCompletedAnySeries = false;
+    if (typeof userCards !== 'undefined') {
+        SERIES_CONFIG.forEach(series => {
+            if (series.slug === 'bonus_card') return;
+            let collectedCount = 0;
+            series.cards.forEach(card => {
+                const cardKey = `${series.slug}_${card.index}`;
+                if (userCards[cardKey] > 0) collectedCount++;
+            });
+            if (collectedCount > 0 && collectedCount === series.cards.length) {
+                hasCompletedAnySeries = true;
+            }
+        });
+    }
+
+    const chanceMultiplier = hasCompletedAnySeries ? 0.1 : 1;
     let selectedRarity = 'common';
-    if (rand <= 1.5) selectedRarity = 'legendary'; // 1.5% chance
-    else if (rand <= 6.5) selectedRarity = 'epic'; // 5% chance
-    else if (rand <= 32.5) selectedRarity = 'rare'; // 26% chance
-    else selectedRarity = 'common'; // 67.5% chance
+
+    if (rand <= 1.5 * chanceMultiplier) selectedRarity = 'legendary'; 
+    else if (rand <= 6.5 * chanceMultiplier) selectedRarity = 'epic'; 
+    else if (rand <= 32.5 * chanceMultiplier) selectedRarity = 'rare'; 
+    else selectedRarity = 'common';
 
     const matching = [];
     SERIES_CONFIG.forEach(s => {
