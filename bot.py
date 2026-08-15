@@ -733,10 +733,6 @@ def get_start_kb(user_id=None):
         resize_keyboard=True
     )
     
-    # Кнопка игры доступна для всех пользователей
-    url = f"{WEBAPP_URL}?tg_id={user_id}" if user_id else WEBAPP_URL
-    kb.keyboard.insert(0, [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))])
-    
     return kb
 
 def get_admin_kb(user_id=None):
@@ -2289,27 +2285,14 @@ async def main():
     
     logging.info("Бот запущен. Ожидание сообщений...")
     try:
-        # Убираем кнопку по умолчанию у всех обычных игроков
-        await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
-        
-        # Собираем всех админов
-        admin_targets = set(ADMIN_IDS)
-        async with pool.acquire() as db:
-            db_admins = await db.fetch("SELECT user_tg_id FROM users WHERE role = 'admin' AND user_tg_id IS NOT NULL")
-            for r in db_admins:
-                admin_targets.add(r['user_tg_id'])
-                
-        # Ставим кнопку только админам
-        for admin_id in admin_targets:
-            try:
-                await bot.set_chat_menu_button(
-                    chat_id=admin_id,
-                    menu_button=MenuButtonWebApp(
-                        type="web_app",
-                        text="START THE GAME",
-                        web_app=WebAppInfo(url=f"{WEBAPP_URL}?tg_id={admin_id}")
-                    )
-                )
+        # Устанавливаем кнопку START THE GAME для всех пользователей
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                type="web_app",
+                text="START THE GAME",
+                web_app=WebAppInfo(url=WEBAPP_URL)
+            )
+        )
             except Exception as e:
                 pass
                 
