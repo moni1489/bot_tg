@@ -438,9 +438,9 @@ function rollRandomCard() {
     const rand = Math.random() * 100;
     let selectedRarity = 'common';
     if (rand <= 1.5) selectedRarity = 'legendary'; // 1.5% chance
-    else if (rand <= 11.5) selectedRarity = 'epic'; // 10% chance
-    else if (rand <= 37.5) selectedRarity = 'rare'; // 26% chance
-    else selectedRarity = 'common'; // 62.5% chance
+    else if (rand <= 6.5) selectedRarity = 'epic'; // 5% chance
+    else if (rand <= 32.5) selectedRarity = 'rare'; // 26% chance
+    else selectedRarity = 'common'; // 67.5% chance
 
     const matching = [];
     SERIES_CONFIG.forEach(s => {
