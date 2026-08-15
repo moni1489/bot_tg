@@ -919,6 +919,21 @@ async def start_handler(message: Message, state: FSMContext):
                 async with pool.acquire() as db:
                     user = await db.fetchrow("SELECT telegram_id, referred_by FROM card_users WHERE telegram_id = $1", message.from_user.id)
                     if not user:
+                        # Check subscription before giving referral bonus
+                        is_sub = False
+                        try:
+                            member = await bot.get_chat_member(chat_id="@FunkoStop", user_id=message.from_user.id)
+                            status = member.status.value if hasattr(member.status, 'value') else member.status
+                            if status not in ["left", "kicked", "banned"]:
+                                is_sub = True
+                        except Exception as e:
+                            logging.error(f"Error checking sub in start: {e}")
+                            
+                        is_adm = await is_admin(message.from_user.id)
+                        
+                        if not is_sub and not is_adm:
+                            await message.answer("⚠️ Чтобы получить бонус по реферальной ссылке (и начать играть), **сначала подпишитесь на наш канал** @FunkoStop!\n\nПосле подписки нажмите на ссылку друга еще раз.", parse_mode="Markdown")
+                            return
                         # Give 3 base packs + 1 bonus pack = 4 to new user
                         await db.execute("INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 4, $4)", 
                                          message.from_user.id, message.from_user.username, message.from_user.first_name, inviter_id)
