@@ -2293,9 +2293,6 @@ async def main():
                 web_app=WebAppInfo(url=WEBAPP_URL)
             )
         )
-            except Exception as e:
-                pass
-                
     except Exception as e:
         logging.error(f"Failed to set menu button: {e}")
         
