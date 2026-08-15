@@ -914,19 +914,8 @@ async def start_handler(message: Message, state: FSMContext):
                             await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислено <b>+2 пака</b>!", parse_mode="HTML")
                         except Exception as notify_err:
                             logging.error(f"Notify error: {notify_err}")
-                    elif not user["referred_by"]:
-                        await db.execute("UPDATE card_users SET referred_by = $1, packs_count = packs_count + 1, username = $3, first_name = $4 WHERE telegram_id = $2", 
-                                         inviter_id, message.from_user.id, message.from_user.username, message.from_user.first_name)
-                        is_referral = True
-                        await db.execute("""
-                            INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 5)
-                            ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 2
-                        """, inviter_id)
-                        await message.answer("🎉 Вы активировали реферальную ссылку и получили бонусный <b>+1 пак</b>!", parse_mode="HTML")
-                        try:
-                            await bot.send_message(inviter_id, "🎉 По вашей ссылке перешел друг! Вам начислено <b>+2 пака</b>!", parse_mode="HTML")
-                        except Exception as notify_err:
-                            logging.error(f"Notify error: {notify_err}")
+                    else:
+                        await message.answer("ℹ️ Вы уже зарегистрированы в игре. Бонус за приглашение выдается только новым игрокам!")
         except Exception as e:
             logging.error(f"Ref error: {e}")
 
@@ -1184,18 +1173,26 @@ async def game_stats(message: Message):
                 LEFT JOIN user_cards c ON u.telegram_id = c.telegram_id
                 GROUP BY u.telegram_id, u.username, u.first_name
                 ORDER BY unique_cards DESC, total_cards DESC
-                LIMIT 10
+            """)
+            
+            top_referrers = await db.fetch("""
+                SELECT u.telegram_id, u.username, u.first_name, COUNT(r.telegram_id) as refs_count
+                FROM card_users u
+                JOIN card_users r ON u.telegram_id = r.referred_by
+                GROUP BY u.telegram_id, u.username, u.first_name
+                ORDER BY refs_count DESC
             """)
             
         import html as html_mod
-        msg = f"📊 <b>Статистика Funko Cards</b>\n\n"
-        msg += f"👥 Всего игроков: <b>{total_players}</b>\n"
-        msg += f"🎴 Карт выбито (с повторками): <b>{total_cards_collected}</b>\n"
-        msg += f"🗂 Уникальных позиций: <b>{total_unique}</b>\n\n"
-        msg += f"🏆 <b>ТОП-10 КОЛЛЕКЦИОНЕРОВ:</b>\n"
+        msg_parts = []
+        current_msg = f"📊 <b>Статистика Funko Cards</b>\n\n"
+        current_msg += f"👥 Всего игроков: <b>{total_players}</b>\n"
+        current_msg += f"🎴 Карт выбито (с повторками): <b>{total_cards_collected}</b>\n"
+        current_msg += f"🗂 Уникальных позиций: <b>{total_unique}</b>\n\n"
+        current_msg += f"🏆 <b>ТОП КОЛЛЕКЦИОНЕРОВ:</b>\n"
         
         if not leaderboard:
-            msg += "Пока нет данных."
+            current_msg += "Пока нет данных."
         else:
             medals = ["🥇", "🥈", "🥉"]
             for i, row in enumerate(leaderboard, 1):
@@ -1213,12 +1210,56 @@ async def game_stats(message: Message):
                 elif username:
                     name_str = f"@{username_esc}"
                 else:
-                    name_str = f"ID:{tg_id}"
+                    name_str = f"Без имени"
                     
                 medal = medals[i-1] if i <= 3 else f"{i}."
-                msg += f"{medal} <a href='tg://user?id={tg_id}'>{name_str}</a> — {unique} уник. / {total} всего\n"
+                line = f"{medal} <a href='tg://user?id={tg_id}'>{name_str}</a> [<code>{tg_id}</code>] — {unique} уник. / {total} всего\n"
                 
-        await message.answer(msg, parse_mode="HTML", reply_markup=get_game_admin_kb(message.from_user.id))
+                if len(current_msg) + len(line) > 3900:
+                    msg_parts.append(current_msg)
+                    current_msg = ""
+                current_msg += line
+                
+        if top_referrers:
+            top_refs_title = f"\n🤝 <b>ТОП ПРИГЛАСИТЕЛЕЙ (РЕФЕРАЛОВ):</b>\n"
+            if len(current_msg) + len(top_refs_title) > 3900:
+                msg_parts.append(current_msg)
+                current_msg = top_refs_title
+            else:
+                current_msg += top_refs_title
+                
+            for i, row in enumerate(top_referrers, 1):
+                refs = row['refs_count']
+                tg_id = row['telegram_id']
+                username = row['username'] or ""
+                first_name = html_mod.escape(row['first_name'] or "")
+                username_esc = html_mod.escape(username)
+                
+                if first_name and username:
+                    name_str = f"{first_name} (@{username_esc})"
+                elif first_name:
+                    name_str = first_name
+                elif username:
+                    name_str = f"@{username_esc}"
+                else:
+                    name_str = f"Без имени"
+                    
+                medal = medals[i-1] if i <= 3 else f"{i}."
+                line = f"{medal} <a href='tg://user?id={tg_id}'>{name_str}</a> [<code>{tg_id}</code>] — {refs} реф.\n"
+                
+                if len(current_msg) + len(line) > 3900:
+                    msg_parts.append(current_msg)
+                    current_msg = ""
+                current_msg += line
+                
+        if current_msg:
+            msg_parts.append(current_msg)
+            
+        for i, part in enumerate(msg_parts):
+            if i == len(msg_parts) - 1:
+                await message.answer(part, parse_mode="HTML", reply_markup=get_game_admin_kb(message.from_user.id))
+            else:
+                await message.answer(part, parse_mode="HTML")
     except Exception as e:
         await message.answer(f"❌ Ошибка при получении статистики: {e}", reply_markup=get_game_admin_kb(message.from_user.id))
 
