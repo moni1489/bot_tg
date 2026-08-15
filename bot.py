@@ -15,7 +15,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.types import (
     Message, CallbackQuery, ReplyKeyboardMarkup, 
     KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton,
-    ReplyKeyboardRemove, WebAppInfo
+    ReplyKeyboardRemove, WebAppInfo, MenuButtonWebApp, MenuButtonDefault
 )
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -2286,6 +2286,34 @@ async def main():
     await start_webserver()
     
     logging.info("Бот запущен. Ожидание сообщений...")
+    try:
+        # Убираем кнопку по умолчанию у всех обычных игроков
+        await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
+        
+        # Собираем всех админов
+        admin_targets = set(ADMIN_IDS)
+        async with pool.acquire() as db:
+            db_admins = await db.fetch("SELECT user_tg_id FROM users WHERE role = 'admin' AND user_tg_id IS NOT NULL")
+            for r in db_admins:
+                admin_targets.add(r['user_tg_id'])
+                
+        # Ставим кнопку только админам
+        for admin_id in admin_targets:
+            try:
+                await bot.set_chat_menu_button(
+                    chat_id=admin_id,
+                    menu_button=MenuButtonWebApp(
+                        type="web_app",
+                        text="START THE GAME",
+                        web_app=WebAppInfo(url=f"{WEBAPP_URL}?tg_id={admin_id}")
+                    )
+                )
+            except Exception as e:
+                pass
+                
+    except Exception as e:
+        logging.error(f"Failed to set menu button: {e}")
+        
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
