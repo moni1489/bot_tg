@@ -132,6 +132,21 @@ async def get_card_profile(request):
             #         "message": "Игра находится на стадии тестирования и пока доступна только администраторам."
             #     }, status=403)
 
+            # Check channel subscription
+            is_sub = False
+            try:
+                member = await bot.get_chat_member(chat_id="@FunkoStop", user_id=tg_id)
+                if member.status not in ["left", "kicked", "banned"]:
+                    is_sub = True
+            except Exception as e:
+                logging.error(f"Error checking sub: {e}")
+                
+            if not is_sub and not is_adm:
+                return web.json_response({
+                    "error": "not_subscribed",
+                    "message": "Для участия в игре необходимо быть подписанным на наш Telegram канал @FunkoStop!"
+                }, status=403)
+
             return web.json_response({
                 "packs_count": packs_count,
                 "last_daily_pack": last_daily,
@@ -602,6 +617,11 @@ async def init_db():
                 UNIQUE (telegram_id, series_slug)
             )
         """)
+        
+        try:
+            await db.execute("ALTER TABLE series_codes ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        except asyncpg.exceptions.DuplicateColumnError:
+            pass
         
         # Admin check
         admin = await db.fetchrow("SELECT id FROM users WHERE role = 'admin'")
@@ -1132,25 +1152,31 @@ async def check_code_btn(message: Message, state: FSMContext):
 
 @router.message(CheckCode.waiting_for_code)
 async def process_check_code(message: Message, state: FSMContext):
+    if not message.text:
+        return
     code = message.text.strip().upper()
-    async with pool.acquire() as db:
-        record = await db.fetchrow("SELECT telegram_id, series_slug, created_at FROM series_codes WHERE code = $1", code)
-        
-    if record:
-        tg_id = record['telegram_id']
-        series = record['series_slug'].upper()
-        date = record['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-        
-        await message.answer(
-            f"✅ **Код действителен!**\n\n"
-            f"👤 Игрок: [ID: {tg_id}](tg://user?id={tg_id})\n"
-            f"🎁 Серия: **{series}**\n"
-            f"📅 Сгенерирован: {date}",
-            parse_mode="Markdown",
-            reply_markup=get_game_admin_kb(message.from_user.id)
-        )
-    else:
-        await message.answer(f"❌ **Код `{code}` не найден!** Возможно, он недействителен или написан с ошибкой.", parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+    try:
+        async with pool.acquire() as db:
+            record = await db.fetchrow("SELECT telegram_id, series_slug, created_at FROM series_codes WHERE code = $1", code)
+            
+        if record:
+            tg_id = record['telegram_id']
+            series = record['series_slug'].upper()
+            date_obj = record['created_at']
+            date = date_obj.strftime('%Y-%m-%d %H:%M:%S') if date_obj else "Неизвестно"
+            
+            await message.answer(
+                f"✅ **Код действителен!**\n\n"
+                f"👤 Игрок: [ID: {tg_id}](tg://user?id={tg_id})\n"
+                f"🎁 Серия: **{series}**\n"
+                f"📅 Сгенерирован: {date}",
+                parse_mode="Markdown",
+                reply_markup=get_game_admin_kb(message.from_user.id)
+            )
+        else:
+            await message.answer(f"❌ **Код `{code}` не найден!** Возможно, он недействителен или написан с ошибкой.", parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+    except Exception as e:
+        await message.answer(f"❌ Ошибка базы данных при проверке кода: {e}", reply_markup=get_game_admin_kb(message.from_user.id))
     await state.clear()
 
 # --- ADMIN: GAME STATS ---
