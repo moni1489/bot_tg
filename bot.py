@@ -136,7 +136,8 @@ async def get_card_profile(request):
             is_sub = False
             try:
                 member = await bot.get_chat_member(chat_id="@FunkoStop", user_id=tg_id)
-                if member.status not in ["left", "kicked", "banned"]:
+                status = member.status.value if hasattr(member.status, 'value') else member.status
+                if status not in ["left", "kicked", "banned"]:
                     is_sub = True
             except Exception as e:
                 logging.error(f"Error checking sub: {e}")
@@ -1161,7 +1162,8 @@ async def process_check_code(message: Message, state: FSMContext):
             
         if record:
             tg_id = record['telegram_id']
-            series = record['series_slug'].upper()
+            # Экранируем символы Markdown (особенно _) чтобы избежать ошибки "can't parse entities"
+            series = record['series_slug'].upper().replace("_", "\\_").replace("*", "\\*")
             date_obj = record['created_at']
             date = date_obj.strftime('%Y-%m-%d %H:%M:%S') if date_obj else "Неизвестно"
             
