@@ -918,7 +918,8 @@ async def start_handler(message: Message, state: FSMContext):
             if inviter_id != message.from_user.id:
                 async with pool.acquire() as db:
                     user = await db.fetchrow("SELECT telegram_id, referred_by FROM card_users WHERE telegram_id = $1", message.from_user.id)
-                    if not user:
+                    
+                    if not user or not user['referred_by']:
                         # Check subscription before giving referral bonus
                         is_sub = False
                         try:
@@ -934,16 +935,23 @@ async def start_handler(message: Message, state: FSMContext):
                         if not is_sub and not is_adm:
                             await message.answer("⚠️ Чтобы получить бонус по реферальной ссылке (и начать играть), **сначала подпишитесь на наш канал** @FunkoStop!\n\nПосле подписки нажмите на ссылку друга еще раз.", parse_mode="Markdown")
                             return
-                        # Give 3 base packs + 1 bonus pack = 4 to new user
-                        await db.execute("INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 4, $4)", 
-                                         message.from_user.id, message.from_user.username, message.from_user.first_name, inviter_id)
+                            
+                        if not user:
+                            # Give 3 base packs + 1 bonus pack = 4 to new user
+                            await db.execute("INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 4, $4)", 
+                                             message.from_user.id, message.from_user.username, message.from_user.first_name, inviter_id)
+                        else:
+                            # User exists but hasn't used a referral link yet. Give +1 pack and set referred_by
+                            await db.execute("UPDATE card_users SET packs_count = packs_count + 1, referred_by = $2 WHERE telegram_id = $1",
+                                             message.from_user.id, inviter_id)
+                                             
                         is_referral = True
                         # Give +2 packs to inviter
                         await db.execute("""
                             INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 5)
                             ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 2
                         """, inviter_id)
-                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный <b>+1 пак</b> (Всего 4 стартовых пака)!", parse_mode="HTML")
+                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный <b>+1 пак</b>!", parse_mode="HTML")
                         try:
                             await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислено <b>+2 пака</b>!", parse_mode="HTML")
                         except Exception as notify_err:
