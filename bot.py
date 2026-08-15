@@ -281,7 +281,11 @@ async def open_card_pack(request):
             return web.json_response({"error": "Invalid params"}, status=400)
             
         async with pool.acquire() as db:
-            await db.execute("UPDATE card_users SET packs_count = GREATEST(0, packs_count - 1) WHERE telegram_id = $1", tg_id)
+            user = await db.fetchrow("SELECT packs_count FROM card_users WHERE telegram_id = $1", tg_id)
+            if not user or user["packs_count"] < 1:
+                return web.json_response({"error": "Недостаточно паков"}, status=403)
+
+            await db.execute("UPDATE card_users SET packs_count = packs_count - 1 WHERE telegram_id = $1", tg_id)
             await db.execute("""
                 INSERT INTO user_cards (telegram_id, series_slug, card_index, count)
                 VALUES ($1, $2, $3, 1)
