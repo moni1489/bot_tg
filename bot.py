@@ -125,12 +125,12 @@ async def get_card_profile(request):
             is_adm = await is_admin(tg_id)
             
             # Beta testers have access to the game without being admins
-            BETA_TESTERS = [8908317814]
-            if not is_adm and tg_id not in BETA_TESTERS:
-                return web.json_response({
-                    "error": "not_admin",
-                    "message": "Игра находится на стадии тестирования и пока доступна только администраторам."
-                }, status=403)
+            # BETA_TESTERS = [8908317814]
+            # if not is_adm and tg_id not in BETA_TESTERS:
+            #     return web.json_response({
+            #         "error": "not_admin",
+            #         "message": "Игра находится на стадии тестирования и пока доступна только администраторам."
+            #     }, status=403)
 
             return web.json_response({
                 "packs_count": packs_count,
@@ -732,9 +732,11 @@ def get_start_kb(user_id=None):
         ],
         resize_keyboard=True
     )
-    if user_id in BETA_TESTERS:
-        url = f"{WEBAPP_URL}?tg_id={user_id}" if user_id else WEBAPP_URL
-        kb.keyboard.insert(0, [KeyboardButton(text="🎴 Играть в Funko Cards (Beta)", web_app=WebAppInfo(url=url))])
+    
+    # Кнопка игры доступна для всех пользователей
+    url = f"{WEBAPP_URL}?tg_id={user_id}" if user_id else WEBAPP_URL
+    kb.keyboard.insert(0, [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))])
+    
     return kb
 
 def get_admin_kb(user_id=None):
