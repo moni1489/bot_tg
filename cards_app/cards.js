@@ -262,6 +262,19 @@ async function fetchProfile() {
                 botUsername = data.bot_username;
                 setupRefLink();
             }
+        } else if (res.status === 403) {
+            const data = await res.json();
+            document.body.innerHTML = `
+                <div style="color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; padding:20px; font-family:Montserrat,sans-serif; background: radial-gradient(circle at center, #1a0000 0%, #000000 100%);">
+                    <h1 style="color:var(--neon-red); margin-bottom:15px; font-size: 2.5rem; text-shadow: 0 0 20px var(--neon-red-glow);">ДОСТУП ЗАКРЫТ</h1>
+                    <p style="font-size:1.2rem; opacity:0.8; max-width: 400px; line-height: 1.5;">${data.message || 'Игра находится на стадии тестирования и пока доступна только администраторам.'}</p>
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--neon-red)" stroke-width="1.5" style="margin-top: 30px; opacity: 0.7;">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </div>
+            `;
+            throw new Error("Access denied (Not admin)");
         }
     } catch (e) {
         console.log("Using default profile / fetch error", e);
@@ -424,10 +437,10 @@ function startDailyCountdown(secondsLeft) {
 function rollRandomCard() {
     const rand = Math.random() * 100;
     let selectedRarity = 'common';
-    if (rand <= 2.5) selectedRarity = 'legendary';
-    else if (rand <= 12.5) selectedRarity = 'epic'; // 10% chance
-    else if (rand <= 37.5) selectedRarity = 'rare'; // 25% chance
-    else selectedRarity = 'common';
+    if (rand <= 1.5) selectedRarity = 'legendary'; // 1.5% chance
+    else if (rand <= 11.5) selectedRarity = 'epic'; // 10% chance
+    else if (rand <= 37.5) selectedRarity = 'rare'; // 26% chance
+    else selectedRarity = 'common'; // 62.5% chance
 
     const matching = [];
     SERIES_CONFIG.forEach(s => {
