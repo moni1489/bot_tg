@@ -42,9 +42,9 @@ const effectiveTgId = getEffectiveUserId();
 // User state
 let userData = {
     telegram_id: effectiveTgId,
-    first_name: tg?.initDataUnsafe?.user?.first_name || 'Игрок',
+    first_name: tg?.initDataUnsafe?.user?.first_name || '👤',
     username: tg?.initDataUnsafe?.user?.username || 'player',
-    packs_count: 3,
+    packs_count: 0, // Starts at 0 until fetchProfile completes
     last_daily_pack: null,
     completed_tasks: [],
     ref_code: 'ref_' + effectiveTgId
@@ -347,7 +347,7 @@ function setupDailyPackButton() {
     dailyGiftBtn.addEventListener('click', async () => {
         const isReady = dailyTimer.textContent === "ГОТОВО";
         if (!isReady) {
-            alert(`⏳ Ежедневный подарок уже получен! Следующий забор будет доступен через ${dailyTimer.textContent}.`);
+            alert(`⏳ Ежедневный подарок уже получен! Следующий набор будет доступен через ${dailyTimer.textContent}.`);
             return;
         }
 
