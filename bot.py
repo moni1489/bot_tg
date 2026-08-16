@@ -1063,6 +1063,59 @@ async def reset_daily_cmd(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer(f"❌ Ошибка: {e}")
 
+@router.message(Command("send_daily_now"), StateFilter("*"))
+async def send_daily_now_cmd(message: Message, state: FSMContext):
+    await state.clear()
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer("⏳ Начинаю рассылку уведомлений о ежедневном подарке...")
+    try:
+        async with pool.acquire() as db:
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            users = await db.fetch("""
+                SELECT telegram_id FROM card_users
+                WHERE last_daily_pack IS NULL
+                   OR EXTRACT(EPOCH FROM ($1 - last_daily_pack)) >= 86400
+            """, now)
+
+        sent = 0
+        failed = 0
+        for row in users:
+            tg_id = row['telegram_id']
+            try:
+                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                kb = InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(
+                        text="🎁 Открыть игру",
+                        url="https://t.me/funkostop_bot/cards"
+                    )
+                ]])
+                await bot.send_message(
+                    tg_id,
+                    "🎁 <b>Ваш ежедневный бонус готов!</b>\n\nЗаходите в игру и забирайте бесплатный пак — успейте, пока он вас ждёт! 🔥",
+                    parse_mode="HTML",
+                    reply_markup=kb
+                )
+                async with pool.acquire() as db:
+                    await db.execute(
+                        "UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1 AND last_daily_pack IS NOT NULL",
+                        tg_id
+                    )
+                sent += 1
+                await asyncio.sleep(0.05)  # Avoid flood limits
+            except Exception as e:
+                logging.error(f"send_daily_now error for {tg_id}: {e}")
+                failed += 1
+
+        await message.answer(
+            f"✅ Рассылка завершена!\n"
+            f"📨 Отправлено: {sent}\n"
+            f"❌ Ошибок: {failed}"
+        )
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+
+
 @router.message(Command("give_packs", "give", "packs"), StateFilter("*"))
 async def give_packs_cmd(message: Message, state: FSMContext):
     await state.clear()
