@@ -1067,6 +1067,30 @@ async def reset_daily_cmd(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer(f"❌ Ошибка: {e}")
 
+
+@router.message(Command("test_daily_notify"), StateFilter("*"))
+async def test_daily_notify_cmd(message: Message, state: FSMContext):
+    """Отправляет тестовое уведомление только администратору."""
+    await state.clear()
+    if not await is_admin(message.from_user.id):
+        return
+    try:
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(
+                text="🎁 Открыть игру",
+                web_app=WebAppInfo(url=WEBAPP_URL)
+            )
+        ]])
+        await bot.send_message(
+            message.from_user.id,
+            "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
+            reply_markup=kb
+        )
+        await message.answer("✅ Тестовое уведомление отправлено — проверь!")
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+
 @router.message(Command("send_daily_now"), StateFilter("*"))
 async def send_daily_now_cmd(message: Message, state: FSMContext):
     await state.clear()
