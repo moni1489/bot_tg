@@ -264,7 +264,7 @@ async def claim_daily_pack(request):
                     })
                 
             new_count = user["packs_count"] + 1
-            await db.execute("UPDATE card_users SET packs_count = $1, last_daily_pack = CURRENT_TIMESTAMP WHERE telegram_id = $2", new_count, tg_id)
+            await db.execute("UPDATE card_users SET packs_count = $1, last_daily_pack = CURRENT_TIMESTAMP, daily_notified = FALSE WHERE telegram_id = $2", new_count, tg_id)
             return web.json_response({"success": True, "packs_count": new_count})
     except Exception as e:
         logging.error(f"Daily pack error: {e}")
@@ -281,7 +281,7 @@ async def open_card_pack(request):
             return web.json_response({"error": "Invalid params"}, status=400)
             
         async with pool.acquire() as db:
-            user = await db.fetchrow("SELECT packs_count FROM card_users WHERE telegram_id = $1", tg_id)
+            user = await db.fetchrow("SELECT packs_count, referred_by FROM card_users WHERE telegram_id = $1", tg_id)
             if not user or user["packs_count"] < 1:
                 return web.json_response({"error": "Недостаточно паков"}, status=403)
 
@@ -292,6 +292,23 @@ async def open_card_pack(request):
                 ON CONFLICT (telegram_id, series_slug, card_index)
                 DO UPDATE SET count = user_cards.count + 1
             """, tg_id, series_slug, card_index)
+            
+            # If this user was invited, check if this is their first non-bonus pack open
+            # If so, reward the inviter with +2 packs
+            inviter_id = user.get("referred_by")
+            if inviter_id and series_slug != 'bonus_card':
+                total_cards = await db.fetchval(
+                    "SELECT SUM(count) FROM user_cards WHERE telegram_id = $1 AND series_slug != 'bonus_card'", tg_id
+                )
+                if total_cards == 1:  # This is the very first card (just inserted = 1)
+                    await db.execute("""
+                        INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 1)
+                        ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 1
+                    """, inviter_id)
+                    try:
+                        await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг и открыл первый пак! Вам начислен <b>+1 пак</b>!", parse_mode="HTML")
+                    except Exception:
+                        pass
             
         return web.json_response({"success": True})
     except Exception as e:
@@ -505,6 +522,44 @@ async def start_webserver():
     await site.start()
     logging.info(f"🌐 Веб-сервер и Cards Mini App запущены на порту {port}")
 
+async def daily_notification_task():
+    """Background task: notifies users when their 24h daily pack timer is ready."""
+    while True:
+        try:
+            await asyncio.sleep(300)  # Check every 5 minutes
+            async with pool.acquire() as db:
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
+                # Find users whose 24h has passed and haven't been notified yet
+                users = await db.fetch("""
+                    SELECT telegram_id FROM card_users
+                    WHERE last_daily_pack IS NOT NULL
+                      AND daily_notified = FALSE
+                      AND EXTRACT(EPOCH FROM ($1 - last_daily_pack)) >= 86400
+                """, now)
+                for row in users:
+                    tg_id = row['telegram_id']
+                    try:
+                        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                        kb = InlineKeyboardMarkup(inline_keyboard=[
+                            [InlineKeyboardButton(
+                                text="🎁 Открыть игру",
+                                url="https://t.me/funkostop_bot/cards"
+                            )]
+                        ])
+                        await bot.send_message(
+                            tg_id,
+                            "🎁 <b>Ваш ежедневный бонус готов!</b>\n\nЗаходите в игру и забирайте бесплатный пак — успейте, пока он вас ждёт! 🔥",
+                            parse_mode="HTML",
+                            reply_markup=kb
+                        )
+                        await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
+                    except Exception as e:
+                        logging.error(f"Daily notify error for {tg_id}: {e}")
+                        await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
+        except Exception as e:
+            logging.error(f"Daily notification task error: {e}")
+            await asyncio.sleep(60)
+
 # --- CURRENCY ---
 async def get_usd_rate():
     try:
@@ -599,6 +654,10 @@ async def init_db():
         """)
         try:
             await db.execute("ALTER TABLE card_users ADD COLUMN completed_tasks TEXT DEFAULT '[]'")
+        except asyncpg.exceptions.DuplicateColumnError:
+            pass
+        try:
+            await db.execute("ALTER TABLE card_users ADD COLUMN daily_notified BOOLEAN DEFAULT FALSE")
         except asyncpg.exceptions.DuplicateColumnError:
             pass
         
@@ -921,9 +980,10 @@ async def start_handler(message: Message, state: FSMContext):
             inviter_id = int(args[1].replace("ref_", ""))
             if inviter_id != message.from_user.id:
                 async with pool.acquire() as db:
-                    user = await db.fetchrow("SELECT telegram_id, referred_by FROM card_users WHERE telegram_id = $1", message.from_user.id)
+                    # Only truly new users (not in DB at all) can use referral links
+                    user = await db.fetchrow("SELECT telegram_id FROM card_users WHERE telegram_id = $1", message.from_user.id)
                     
-                    if not user or not user['referred_by']:
+                    if not user:
                         # Check subscription before giving referral bonus
                         is_sub = False
                         try:
@@ -939,29 +999,16 @@ async def start_handler(message: Message, state: FSMContext):
                         if not is_sub and not is_adm:
                             await message.answer("⚠️ Чтобы получить бонус по реферальной ссылке (и начать играть), **сначала подпишитесь на наш канал** @FunkoStop!\n\nПосле подписки нажмите на ссылку друга еще раз.", parse_mode="Markdown")
                             return
-                            
-                        if not user:
-                            # Give 3 base packs + 1 bonus pack = 4 to new user
-                            await db.execute("INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 4, $4)", 
-                                             message.from_user.id, message.from_user.username, message.from_user.first_name, inviter_id)
-                        else:
-                            # User exists but hasn't used a referral link yet. Give +1 pack and set referred_by
-                            await db.execute("UPDATE card_users SET packs_count = packs_count + 1, referred_by = $2 WHERE telegram_id = $1",
-                                             message.from_user.id, inviter_id)
-                                             
+                        
+                        # Brand new user: give 3 base + 1 referral bonus = 4 packs, store pending inviter
+                        await db.execute(
+                            "INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 4, $4)",
+                            message.from_user.id, message.from_user.username, message.from_user.first_name, inviter_id
+                        )
                         is_referral = True
-                        # Give +2 packs to inviter
-                        await db.execute("""
-                            INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 5)
-                            ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 2
-                        """, inviter_id)
-                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный <b>+1 пак</b>!", parse_mode="HTML")
-                        try:
-                            await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг! Вам начислено <b>+2 пака</b>!", parse_mode="HTML")
-                        except Exception as notify_err:
-                            logging.error(f"Notify error: {notify_err}")
+                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный <b>+1 пак</b>!\n\nОткройте хотя бы 1 пак, чтобы активировать бонус вашему другу!", parse_mode="HTML")
                     else:
-                        await message.answer("ℹ️ Вы уже зарегистрированы в игре. Бонус за приглашение выдается только новым игрокам!")
+                        await message.answer("ℹ️ Бонус за приглашение получают только новые игроки. Вы уже зарегистрированы!")
         except Exception as e:
             logging.error(f"Ref error: {e}")
 
@@ -1372,7 +1419,7 @@ async def check_player_collection(message: Message, state: FSMContext):
             return
         
         async with pool.acquire() as db:
-            user = await db.fetchrow("SELECT telegram_id, packs_count, username, first_name FROM card_users WHERE telegram_id = $1", target_id)
+            user = await db.fetchrow("SELECT telegram_id, packs_count, username, first_name, referred_by FROM card_users WHERE telegram_id = $1", target_id)
             user_exists_in_cards = await db.fetchval("SELECT 1 FROM user_cards WHERE telegram_id = $1 LIMIT 1", target_id)
             
             if not user and not user_exists_in_cards:
@@ -1388,6 +1435,7 @@ async def check_player_collection(message: Message, state: FSMContext):
             username = user['username'] if user else None
             first_name = user['first_name'] if user else None
             ref_count = await db.fetchval("SELECT COUNT(*) FROM card_users WHERE referred_by = $1", target_id) or 0
+            referred_by_id = user['referred_by'] if user and 'referred_by' in user.keys() else None
             cards = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", target_id)
         
         import html as html_mod
@@ -1409,8 +1457,18 @@ async def check_player_collection(message: Message, state: FSMContext):
         msg = f"👤 <b>Игрок: {display_name}</b>\n"
         msg += f"🆔 Telegram ID: <code>{target_id}</code>\n"
         msg += f"📦 Доступно паков: <b>{packs_count}</b>\n"
-        msg += f"🤝 Приглашено друзей: {ref_count}\n\n"
-        msg += f"🎴 <b>Коллекция:</b>\n"
+        msg += f"🤝 Приглашено друзей: {ref_count}\n"
+        
+        # Who invited this user?
+        if referred_by_id:
+            async with pool.acquire() as db:
+                inviter = await db.fetchrow("SELECT username, first_name FROM card_users WHERE telegram_id = $1", referred_by_id)
+            if inviter:
+                inv_name = html_mod.escape(inviter['first_name'] or inviter['username'] or str(referred_by_id))
+                inv_un = f" (@{html_mod.escape(inviter['username'])})".replace('@None', '') if inviter['username'] else ''
+                msg += f"📩 Приглашен пользователем: <b>{inv_name}{inv_un}</b> (<code>{referred_by_id}</code>)\n"
+        
+        msg += f"\n🎴 <b>Коллекция:</b>\n"
         
         if not cards:
             msg += "Игрок пока не выбил ни одной карты."
@@ -1435,7 +1493,18 @@ async def check_player_collection(message: Message, state: FSMContext):
                     extra = f" (x{cnt})" if cnt > 1 else ""
                     msg += f"  — Карточка №{idx}{extra}\n"
         
-        await message.answer(msg, parse_mode="HTML", reply_markup=get_game_admin_kb(message.from_user.id))
+        # Build inline keyboard with 'show referrals' button if there are any
+        reply_markup = get_game_admin_kb(message.from_user.id)
+        inline_kb = None
+        if ref_count > 0:
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            inline_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=f"👥 Показать рефералов ({ref_count})", callback_data=f"show_refs_{target_id}")]
+            ])
+        
+        await message.answer(msg, parse_mode="HTML", reply_markup=reply_markup)
+        if inline_kb:
+            await message.answer("👇 Нажмите, чтобы увидеть список приглашённых:", reply_markup=inline_kb)
         await state.clear()
     except Exception as e:
         import traceback
@@ -1793,6 +1862,39 @@ async def action_delete_order(callback: CallbackQuery):
     await delete_order_db(order_id)
     await callback.message.edit_text(f"🗑 Заказ #{order_id} был окончательно удален из базы.")
     await callback.answer("Удалено")
+
+@router.callback_query(F.data.startswith("show_refs_"))
+async def show_player_refs(callback: CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа.", show_alert=True)
+        return
+    
+    try:
+        target_id = int(callback.data.replace("show_refs_", ""))
+        async with pool.acquire() as db:
+            refs = await db.fetch(
+                "SELECT telegram_id, username, first_name, packs_count FROM card_users WHERE referred_by = $1 ORDER BY telegram_id",
+                target_id
+            )
+        
+        import html as html_mod
+        if not refs:
+            await callback.answer("У этого игрока нет рефералов.", show_alert=True)
+            return
+        
+        msg = f"👥 <b>Рефералы игрока <code>{target_id}</code>:</b>\n\n"
+        for i, r in enumerate(refs, 1):
+            fn = html_mod.escape(r['first_name'] or '')
+            un = html_mod.escape(r['username'] or '')
+            name = f"{fn}" if fn else f"@{un}" if un else f"ID:{r['telegram_id']}"
+            un_part = f" (@{un})" if un and fn else ""
+            msg += f"{i}. <b>{name}{un_part}</b> — <code>{r['telegram_id']}</code> | 📦 паков: {r['packs_count']}\n"
+        
+        await callback.message.answer(msg, parse_mode="HTML")
+        await callback.answer()
+    except Exception as e:
+        await callback.answer(f"Ошибка: {e}", show_alert=True)
+
 
 # --- CLIENT INTERFACE ---
 @router.message(F.text == "📦 Отследить заказы")
@@ -2337,6 +2439,9 @@ async def main():
     await init_db()
     
     await start_webserver()
+    
+    # Start daily notification background task
+    asyncio.create_task(daily_notification_task())
     
     logging.info("Бот запущен. Ожидание сообщений...")
     try:
