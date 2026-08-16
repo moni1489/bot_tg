@@ -539,20 +539,22 @@ async def daily_notification_task():
                 for row in users:
                     tg_id = row['telegram_id']
                     try:
-                        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                        kb = InlineKeyboardMarkup(inline_keyboard=[
-                            [InlineKeyboardButton(
+                        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+                        kb = InlineKeyboardMarkup(inline_keyboard=[[
+                            InlineKeyboardButton(
                                 text="🎁 Открыть игру",
-                                url="https://t.me/funkostop_bot/cards"
-                            )]
-                        ])
-                        await bot.send_message(
+                                web_app=WebAppInfo(url=WEBAPP_URL)
+                            )
+                        ]])
+                        sent_msg = await bot.send_message(
                             tg_id,
-                            "🎁 <b>Ваш ежедневный бонус готов!</b>\n\nЗаходите в игру и забирайте бесплатный пак — успейте, пока он вас ждёт! 🔥",
-                            parse_mode="HTML",
+                            "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
                             reply_markup=kb
                         )
-                        await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
+                        await db.execute(
+                            "UPDATE card_users SET daily_notified = TRUE, daily_notif_msg_id = $2 WHERE telegram_id = $1",
+                            tg_id, sent_msg.message_id
+                        )
                     except Exception as e:
                         logging.error(f"Daily notify error for {tg_id}: {e}")
                         await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
@@ -1159,9 +1161,8 @@ async def resend_daily_now_cmd(message: Message, state: FSMContext):
             now = datetime.now(timezone.utc).replace(tzinfo=None)
             users = await db.fetch("""
                 SELECT telegram_id, daily_notif_msg_id FROM card_users
-                WHERE daily_notif_msg_id IS NOT NULL
-                  AND (last_daily_pack IS NULL
-                       OR EXTRACT(EPOCH FROM ($1 - last_daily_pack)) >= 86400)
+                WHERE last_daily_pack IS NULL
+                   OR EXTRACT(EPOCH FROM ($1 - last_daily_pack)) >= 86400
             """, now)
 
         deleted = 0
@@ -1179,12 +1180,13 @@ async def resend_daily_now_cmd(message: Message, state: FSMContext):
             tg_id = row['telegram_id']
             old_msg_id = row['daily_notif_msg_id']
             try:
-                # Удаляем старое сообщение
-                try:
-                    await bot.delete_message(chat_id=tg_id, message_id=old_msg_id)
-                    deleted += 1
-                except Exception:
-                    pass  # Уже удалено или недоступно
+                # Удаляем старое сообщение если ID известен
+                if old_msg_id:
+                    try:
+                        await bot.delete_message(chat_id=tg_id, message_id=old_msg_id)
+                        deleted += 1
+                    except Exception:
+                        pass  # Уже удалено или недоступно
 
                 # Отправляем новое
                 sent_msg = await bot.send_message(
