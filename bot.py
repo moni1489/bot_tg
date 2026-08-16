@@ -660,6 +660,10 @@ async def init_db():
             await db.execute("ALTER TABLE card_users ADD COLUMN daily_notified BOOLEAN DEFAULT FALSE")
         except asyncpg.exceptions.DuplicateColumnError:
             pass
+        try:
+            await db.execute("ALTER TABLE card_users ADD COLUMN daily_notif_msg_id BIGINT")
+        except asyncpg.exceptions.DuplicateColumnError:
+            pass
         
         await db.execute("""
             CREATE TABLE IF NOT EXISTS user_cards (
@@ -1083,23 +1087,25 @@ async def send_daily_now_cmd(message: Message, state: FSMContext):
         for row in users:
             tg_id = row['telegram_id']
             try:
-                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
                 kb = InlineKeyboardMarkup(inline_keyboard=[[
                     InlineKeyboardButton(
                         text="🎁 Открыть игру",
-                        url="https://t.me/funkostop_bot/cards"
+                        web_app=WebAppInfo(url=WEBAPP_URL)
                     )
                 ]])
-                await bot.send_message(
+                sent_msg = await bot.send_message(
                     tg_id,
-                    "🎁 <b>Ваш ежедневный бонус готов!</b>\n\nЗаходите в игру и забирайте бесплатный пак — успейте, пока он вас ждёт! 🔥",
-                    parse_mode="HTML",
+                    "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
                     reply_markup=kb
                 )
                 async with pool.acquire() as db:
                     await db.execute(
-                        "UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1 AND last_daily_pack IS NOT NULL",
-                        tg_id
+                        """UPDATE card_users
+                           SET daily_notified = TRUE,
+                               daily_notif_msg_id = $2
+                           WHERE telegram_id = $1""",
+                        tg_id, sent_msg.message_id
                     )
                 sent += 1
                 await asyncio.sleep(0.05)  # Avoid flood limits
@@ -1110,6 +1116,76 @@ async def send_daily_now_cmd(message: Message, state: FSMContext):
         await message.answer(
             f"✅ Рассылка завершена!\n"
             f"📨 Отправлено: {sent}\n"
+            f"❌ Ошибок: {failed}\n\n"
+            f"Чтобы удалить старые и переслать заново — /resend_daily_now"
+        )
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+
+
+@router.message(Command("resend_daily_now"), StateFilter("*"))
+async def resend_daily_now_cmd(message: Message, state: FSMContext):
+    """Удаляет старые уведомления о ежедневном паке и присылает новые."""
+    await state.clear()
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer("⏳ Удаляю старые уведомления и отправляю новые...")
+    try:
+        async with pool.acquire() as db:
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            users = await db.fetch("""
+                SELECT telegram_id, daily_notif_msg_id FROM card_users
+                WHERE daily_notif_msg_id IS NOT NULL
+                  AND (last_daily_pack IS NULL
+                       OR EXTRACT(EPOCH FROM ($1 - last_daily_pack)) >= 86400)
+            """, now)
+
+        deleted = 0
+        sent = 0
+        failed = 0
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(
+                text="🎁 Открыть игру",
+                web_app=WebAppInfo(url=WEBAPP_URL)
+            )
+        ]])
+
+        for row in users:
+            tg_id = row['telegram_id']
+            old_msg_id = row['daily_notif_msg_id']
+            try:
+                # Удаляем старое сообщение
+                try:
+                    await bot.delete_message(chat_id=tg_id, message_id=old_msg_id)
+                    deleted += 1
+                except Exception:
+                    pass  # Уже удалено или недоступно
+
+                # Отправляем новое
+                sent_msg = await bot.send_message(
+                    tg_id,
+                    "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
+                    reply_markup=kb
+                )
+                async with pool.acquire() as db:
+                    await db.execute(
+                        """UPDATE card_users
+                           SET daily_notified = TRUE,
+                               daily_notif_msg_id = $2
+                           WHERE telegram_id = $1""",
+                        tg_id, sent_msg.message_id
+                    )
+                sent += 1
+                await asyncio.sleep(0.05)
+            except Exception as e:
+                logging.error(f"resend_daily_now error for {tg_id}: {e}")
+                failed += 1
+
+        await message.answer(
+            f"✅ Готово!\n"
+            f"🗑 Удалено старых: {deleted}\n"
+            f"📨 Отправлено новых: {sent}\n"
             f"❌ Ошибок: {failed}"
         )
     except Exception as e:
