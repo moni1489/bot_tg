@@ -911,7 +911,7 @@ function svetnFlash() {
 
 async function syncOpenedCard(seriesSlug, cardIndex) {
     try {
-        await fetch('/api/cards/open', {
+        const res = await fetch('/api/cards/open', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -920,8 +920,20 @@ async function syncOpenedCard(seriesSlug, cardIndex) {
                 card_index: cardIndex
             })
         });
+        const data = await res.json();
+        if (data.error) {
+            console.error("Open error:", data.error);
+            // Revert local state to fix desync visual bug
+            const cardKey = `${seriesSlug}_${cardIndex}`;
+            if (userCards[cardKey]) {
+                userCards[cardKey]--;
+                if (userCards[cardKey] <= 0) delete userCards[cardKey];
+            }
+            alert("Ошибка синхронизации (фантомный пак). Перезапустите приложение.");
+            renderCollection();
+        }
     } catch (e) {
-        console.log("Card opened offline/simulated");
+        console.log("Card opened offline/simulated", e);
     }
 }
 
