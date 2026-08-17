@@ -539,22 +539,20 @@ async def daily_notification_task():
                 for row in users:
                     tg_id = row['telegram_id']
                     try:
-                        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-                        kb = InlineKeyboardMarkup(inline_keyboard=[[
-                            InlineKeyboardButton(
+                        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                        kb = InlineKeyboardMarkup(inline_keyboard=[
+                            [InlineKeyboardButton(
                                 text="🎁 Открыть игру",
-                                web_app=WebAppInfo(url=WEBAPP_URL)
-                            )
-                        ]])
-                        sent_msg = await bot.send_message(
+                                url="https://t.me/funkostop_bot/cards"
+                            )]
+                        ])
+                        await bot.send_message(
                             tg_id,
-                            "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
+                            "🎁 <b>Ваш ежедневный бонус готов!</b>\n\nЗаходите в игру и забирайте бесплатный пак — успейте, пока он вас ждёт! 🔥",
+                            parse_mode="HTML",
                             reply_markup=kb
                         )
-                        await db.execute(
-                            "UPDATE card_users SET daily_notified = TRUE, daily_notif_msg_id = $2 WHERE telegram_id = $1",
-                            tg_id, sent_msg.message_id
-                        )
+                        await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
                     except Exception as e:
                         logging.error(f"Daily notify error for {tg_id}: {e}")
                         await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
@@ -606,6 +604,12 @@ class CheckCode(StatesGroup):
     waiting_for_code = State()
 
 class GivePacks(StatesGroup):
+    waiting_for_input = State()
+
+class TakePacksFromPlayer(StatesGroup):
+    waiting_for_input = State()
+
+class ResetPlayerAccount(StatesGroup):
     waiting_for_input = State()
 
 # --- DATABASE ---
@@ -660,10 +664,6 @@ async def init_db():
             pass
         try:
             await db.execute("ALTER TABLE card_users ADD COLUMN daily_notified BOOLEAN DEFAULT FALSE")
-        except asyncpg.exceptions.DuplicateColumnError:
-            pass
-        try:
-            await db.execute("ALTER TABLE card_users ADD COLUMN daily_notif_msg_id BIGINT")
         except asyncpg.exceptions.DuplicateColumnError:
             pass
         
@@ -844,6 +844,7 @@ def get_game_admin_kb(user_id=None):
             [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))],
             [KeyboardButton(text="📊 Статистика Игры"), KeyboardButton(text="🔍 Проверить Игрока")],
             [KeyboardButton(text="🎫 Проверить код"), KeyboardButton(text="🎁 Выдать паки")],
+            [KeyboardButton(text="📤 Забрать паки"), KeyboardButton(text="🔄 Сброс аккаунта")],
             [KeyboardButton(text="🎫 Все промокоды"), KeyboardButton(text="🎁 Выдать приз")],
             [KeyboardButton(text="🔙 Назад в гл. меню")]
         ],
@@ -1068,155 +1069,6 @@ async def reset_daily_cmd(message: Message, state: FSMContext):
         await message.answer("✅ Ваш ежедневный подарок сброшен! Зайдите в игру — кнопка снова будет в состоянии **ГОТОВО**.")
     except Exception as e:
         await message.answer(f"❌ Ошибка: {e}")
-
-
-@router.message(Command("test_daily_notify"), StateFilter("*"))
-async def test_daily_notify_cmd(message: Message, state: FSMContext):
-    """Отправляет тестовое уведомление только администратору."""
-    await state.clear()
-    if not await is_admin(message.from_user.id):
-        return
-    try:
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-        kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(
-                text="🎁 Открыть игру",
-                web_app=WebAppInfo(url=WEBAPP_URL)
-            )
-        ]])
-        await bot.send_message(
-            message.from_user.id,
-            "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
-            reply_markup=kb
-        )
-        await message.answer("✅ Тестовое уведомление отправлено — проверь!")
-    except Exception as e:
-        await message.answer(f"❌ Ошибка: {e}")
-
-@router.message(Command("send_daily_now"), StateFilter("*"))
-async def send_daily_now_cmd(message: Message, state: FSMContext):
-    await state.clear()
-    if not await is_admin(message.from_user.id):
-        return
-    await message.answer("⏳ Начинаю рассылку уведомлений о ежедневном подарке...")
-    try:
-        async with pool.acquire() as db:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
-            users = await db.fetch("""
-                SELECT telegram_id FROM card_users
-                WHERE last_daily_pack IS NULL
-                   OR EXTRACT(EPOCH FROM ($1 - last_daily_pack)) >= 86400
-            """, now)
-
-        sent = 0
-        failed = 0
-        for row in users:
-            tg_id = row['telegram_id']
-            try:
-                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-                kb = InlineKeyboardMarkup(inline_keyboard=[[
-                    InlineKeyboardButton(
-                        text="🎁 Открыть игру",
-                        web_app=WebAppInfo(url=WEBAPP_URL)
-                    )
-                ]])
-                sent_msg = await bot.send_message(
-                    tg_id,
-                    "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
-                    reply_markup=kb
-                )
-                async with pool.acquire() as db:
-                    await db.execute(
-                        """UPDATE card_users
-                           SET daily_notified = TRUE,
-                               daily_notif_msg_id = $2
-                           WHERE telegram_id = $1""",
-                        tg_id, sent_msg.message_id
-                    )
-                sent += 1
-                await asyncio.sleep(0.05)  # Avoid flood limits
-            except Exception as e:
-                logging.error(f"send_daily_now error for {tg_id}: {e}")
-                failed += 1
-
-        await message.answer(
-            f"✅ Рассылка завершена!\n"
-            f"📨 Отправлено: {sent}\n"
-            f"❌ Ошибок: {failed}\n\n"
-            f"Чтобы удалить старые и переслать заново — /resend_daily_now"
-        )
-    except Exception as e:
-        await message.answer(f"❌ Ошибка: {e}")
-
-
-@router.message(Command("resend_daily_now"), StateFilter("*"))
-async def resend_daily_now_cmd(message: Message, state: FSMContext):
-    """Удаляет старые уведомления о ежедневном паке и присылает новые."""
-    await state.clear()
-    if not await is_admin(message.from_user.id):
-        return
-    await message.answer("⏳ Удаляю старые уведомления и отправляю новые...")
-    try:
-        async with pool.acquire() as db:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
-            users = await db.fetch("""
-                SELECT telegram_id, daily_notif_msg_id FROM card_users
-                WHERE last_daily_pack IS NULL
-                   OR EXTRACT(EPOCH FROM ($1 - last_daily_pack)) >= 86400
-            """, now)
-
-        deleted = 0
-        sent = 0
-        failed = 0
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-        kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(
-                text="🎁 Открыть игру",
-                web_app=WebAppInfo(url=WEBAPP_URL)
-            )
-        ]])
-
-        for row in users:
-            tg_id = row['telegram_id']
-            old_msg_id = row['daily_notif_msg_id']
-            try:
-                # Удаляем старое сообщение если ID известен
-                if old_msg_id:
-                    try:
-                        await bot.delete_message(chat_id=tg_id, message_id=old_msg_id)
-                        deleted += 1
-                    except Exception:
-                        pass  # Уже удалено или недоступно
-
-                # Отправляем новое
-                sent_msg = await bot.send_message(
-                    tg_id,
-                    "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
-                    reply_markup=kb
-                )
-                async with pool.acquire() as db:
-                    await db.execute(
-                        """UPDATE card_users
-                           SET daily_notified = TRUE,
-                               daily_notif_msg_id = $2
-                           WHERE telegram_id = $1""",
-                        tg_id, sent_msg.message_id
-                    )
-                sent += 1
-                await asyncio.sleep(0.05)
-            except Exception as e:
-                logging.error(f"resend_daily_now error for {tg_id}: {e}")
-                failed += 1
-
-        await message.answer(
-            f"✅ Готово!\n"
-            f"🗑 Удалено старых: {deleted}\n"
-            f"📨 Отправлено новых: {sent}\n"
-            f"❌ Ошибок: {failed}"
-        )
-    except Exception as e:
-        await message.answer(f"❌ Ошибка: {e}")
-
 
 @router.message(Command("give_packs", "give", "packs"), StateFilter("*"))
 async def give_packs_cmd(message: Message, state: FSMContext):
@@ -1746,6 +1598,109 @@ async def give_packs_process(message: Message, state: FSMContext):
             parse_mode="Markdown",
             reply_markup=get_game_admin_kb(message.from_user.id)
         )
+    await state.clear()
+
+# --- ADMIN: TAKE PACKS ---
+@router.message(F.text == "📤 Забрать паки")
+async def take_packs_start(message: Message, state: FSMContext):
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer(
+        "Введите Telegram ID или @username игрока и количество паков через пробел:\n\n"
+        "Пример: `123456789 5` или `@username 5`",
+        parse_mode="Markdown",
+        reply_markup=get_cancel_kb()
+    )
+    await state.set_state(TakePacksFromPlayer.waiting_for_input)
+
+@router.message(TakePacksFromPlayer.waiting_for_input)
+async def take_packs_process(message: Message, state: FSMContext):
+    parts = message.text.strip().split()
+    try:
+        if len(parts) < 2:
+            raise ValueError("Need 2 args")
+        input_text = parts[0]
+        count = int(parts[1])
+        
+        if input_text.isdigit():
+            target_id = int(input_text)
+        else:
+            username_clean = input_text.lstrip("@")
+            async with pool.acquire() as db:
+                row = await db.fetchrow("SELECT telegram_id FROM card_users WHERE username ILIKE $1", username_clean)
+            target_id = row['telegram_id'] if row else None
+            if not target_id:
+                try:
+                    chat = await bot.get_chat(f"@{username_clean}")
+                    target_id = chat.id
+                except Exception:
+                    pass
+            if not target_id:
+                await message.answer(f"❌ Игрок `{input_text}` не найден.", parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+                await state.clear()
+                return
+        
+        async with pool.acquire() as db:
+            current = await db.fetchval("SELECT packs_count FROM card_users WHERE telegram_id = $1", target_id) or 0
+            new_count = max(0, current - count)
+            await db.execute("UPDATE card_users SET packs_count = $1 WHERE telegram_id = $2", new_count, target_id)
+        
+        await message.answer(
+            f"✅ У игрока `{target_id}` забрано паков: было {current}, стало **{new_count}**",
+            parse_mode="Markdown",
+            reply_markup=get_game_admin_kb(message.from_user.id)
+        )
+    except (ValueError, IndexError):
+        await message.answer("❌ Неверный формат. Пример: `@username 5`", parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+    await state.clear()
+
+# --- ADMIN: RESET ACCOUNT ---
+@router.message(F.text == "🔄 Сброс аккаунта")
+async def reset_account_start(message: Message, state: FSMContext):
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer(
+        "⚠️ СБРОС АККАУНТА — удалит все карты, очищает задания и устанавливает 3 пака.\n\n"
+        "Введите Telegram ID или @username игрока:",
+        reply_markup=get_cancel_kb()
+    )
+    await state.set_state(ResetPlayerAccount.waiting_for_input)
+
+@router.message(ResetPlayerAccount.waiting_for_input)
+async def reset_account_process(message: Message, state: FSMContext):
+    input_text = message.text.strip()
+    try:
+        if input_text.isdigit():
+            target_id = int(input_text)
+        else:
+            username_clean = input_text.lstrip("@")
+            async with pool.acquire() as db:
+                row = await db.fetchrow("SELECT telegram_id FROM card_users WHERE username ILIKE $1", username_clean)
+            target_id = row['telegram_id'] if row else None
+            if not target_id:
+                await message.answer(f"❌ Игрок `{input_text}` не найден.", parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+                await state.clear()
+                return
+        
+        async with pool.acquire() as db:
+            await db.execute("DELETE FROM user_cards WHERE telegram_id = $1", target_id)
+            await db.execute("""
+                UPDATE card_users SET 
+                    packs_count = 3,
+                    completed_tasks = '[]',
+                    referred_by = NULL,
+                    last_daily_pack = NULL,
+                    daily_notified = FALSE
+                WHERE telegram_id = $1
+            """, target_id)
+        
+        await message.answer(
+            f"✅ Аккаунт `{target_id}` сброшен: 3 пака, все карты удалены, задания сброшены.",
+            parse_mode="Markdown",
+            reply_markup=get_game_admin_kb(message.from_user.id)
+        )
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}", reply_markup=get_game_admin_kb(message.from_user.id))
     await state.clear()
 
 # --- ADMIN: ALL CODES ---
