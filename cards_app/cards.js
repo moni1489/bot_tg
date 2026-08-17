@@ -923,13 +923,10 @@ async function syncOpenedCard(seriesSlug, cardIndex) {
         const data = await res.json();
         if (data.error) {
             console.error("Open error:", data.error);
-            // Revert local state to fix desync visual bug
-            const cardKey = `${seriesSlug}_${cardIndex}`;
-            if (userCards[cardKey]) {
-                userCards[cardKey]--;
-                if (userCards[cardKey] <= 0) delete userCards[cardKey];
-            }
-            alert("Ошибка синхронизации (фантомный пак). Перезапустите приложение.");
+            // Revert local state: re-sync from server to get exact DB state
+            // (do NOT manually decrement - could delete legitimate cards)
+            try { await fetchProfile(); } catch(e2) {}
+            alert("Ошибка: у вас закончились паки. Отображение коллекции обновлено.");
             renderCollection();
         }
     } catch (e) {
