@@ -281,6 +281,16 @@ async def open_card_pack(request):
             return web.json_response({"error": "Invalid params"}, status=400)
             
         async with pool.acquire() as db:
+            # Bonus cards are awarded for free alongside regular cards — skip pack check
+            if series_slug == 'bonus_card':
+                await db.execute("""
+                    INSERT INTO user_cards (telegram_id, series_slug, card_index, count)
+                    VALUES ($1, $2, $3, 1)
+                    ON CONFLICT (telegram_id, series_slug, card_index)
+                    DO UPDATE SET count = user_cards.count + 1
+                """, tg_id, series_slug, card_index)
+                return web.json_response({"success": True})
+
             user = await db.fetchrow("SELECT packs_count, referred_by, inviter_rewarded FROM card_users WHERE telegram_id = $1", tg_id)
             if not user or user["packs_count"] < 1:
                 return web.json_response({"error": "Недостаточно паков"}, status=403)
