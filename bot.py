@@ -542,11 +542,11 @@ async def daily_notification_task():
                 for row in users:
                     tg_id = row['telegram_id']
                     try:
-                        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                        from aiogram.types import WebAppInfo
                         kb = InlineKeyboardMarkup(inline_keyboard=[
                             [InlineKeyboardButton(
                                 text="🎁 Открыть игру",
-                                url="https://t.me/funkostop_bot?start=open"
+                                web_app=WebAppInfo(url=WEBAPP_URL)
                             )]
                         ])
                         await bot.send_message(
