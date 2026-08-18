@@ -281,7 +281,7 @@ async def open_card_pack(request):
             return web.json_response({"error": "Invalid params"}, status=400)
             
         async with pool.acquire() as db:
-            user = await db.fetchrow("SELECT packs_count, referred_by FROM card_users WHERE telegram_id = $1", tg_id)
+            user = await db.fetchrow("SELECT packs_count, referred_by, inviter_rewarded FROM card_users WHERE telegram_id = $1", tg_id)
             if not user or user["packs_count"] < 1:
                 return web.json_response({"error": "Недостаточно паков"}, status=403)
 
@@ -294,17 +294,20 @@ async def open_card_pack(request):
             """, tg_id, series_slug, card_index)
             
             # If this user was invited, check if this is their first non-bonus pack open
-            # If so, reward the inviter with +2 packs
+            # Only reward inviter ONCE (inviter_rewarded guards against double-payout)
             inviter_id = user.get("referred_by")
-            if inviter_id and series_slug != 'bonus_card':
+            inviter_rewarded = user.get("inviter_rewarded", False)
+            if inviter_id and not inviter_rewarded and series_slug != 'bonus_card':
                 total_cards = await db.fetchval(
                     "SELECT SUM(count) FROM user_cards WHERE telegram_id = $1 AND series_slug != 'bonus_card'", tg_id
                 )
-                if total_cards == 1:  # This is the very first card (just inserted = 1)
+                if total_cards == 1:  # This is the very first card
                     await db.execute("""
                         INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 1)
                         ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + 1
                     """, inviter_id)
+                    # Mark so we never pay this inviter again for this user
+                    await db.execute("UPDATE card_users SET inviter_rewarded = TRUE WHERE telegram_id = $1", tg_id)
                     try:
                         await bot.send_message(inviter_id, "🎉 По вашей ссылке зарегистрировался друг и открыл первый пак! Вам начислен <b>+1 пак</b>!", parse_mode="HTML")
                     except Exception:
@@ -543,12 +546,12 @@ async def daily_notification_task():
                         kb = InlineKeyboardMarkup(inline_keyboard=[
                             [InlineKeyboardButton(
                                 text="🎁 Открыть игру",
-                                url="https://t.me/funkostop_bot/cards"
+                                url=WEBAPP_URL
                             )]
                         ])
                         await bot.send_message(
                             tg_id,
-                            "🎁 <b>Ваш ежедневный бонус готов!</b>\n\nЗаходите в игру и забирайте бесплатный пак — успейте, пока он вас ждёт! 🔥",
+                            "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
                             parse_mode="HTML",
                             reply_markup=kb
                         )
@@ -664,6 +667,10 @@ async def init_db():
             pass
         try:
             await db.execute("ALTER TABLE card_users ADD COLUMN daily_notified BOOLEAN DEFAULT FALSE")
+        except asyncpg.exceptions.DuplicateColumnError:
+            pass
+        try:
+            await db.execute("ALTER TABLE card_users ADD COLUMN inviter_rewarded BOOLEAN DEFAULT FALSE")
         except asyncpg.exceptions.DuplicateColumnError:
             pass
         
