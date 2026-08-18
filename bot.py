@@ -537,38 +537,44 @@ async def start_webserver():
 
 async def daily_notification_task():
     """Background task: notifies users when their 24h daily pack timer is ready."""
+    logging.info("Daily notification task started")
     while True:
         try:
             await asyncio.sleep(300)  # Check every 5 minutes
             async with pool.acquire() as db:
                 now = datetime.now(timezone.utc).replace(tzinfo=None)
-                # Find users whose 24h has passed and haven't been notified yet
                 users = await db.fetch("""
                     SELECT telegram_id FROM card_users
                     WHERE last_daily_pack IS NOT NULL
                       AND daily_notified = FALSE
                       AND EXTRACT(EPOCH FROM ($1 - last_daily_pack)) >= 86400
                 """, now)
+                logging.info(f"Daily task: found {len(users)} users to notify")
                 for row in users:
                     tg_id = row['telegram_id']
                     try:
-                        from aiogram.types import WebAppInfo
                         kb = InlineKeyboardMarkup(inline_keyboard=[
                             [InlineKeyboardButton(
                                 text="🎁 Открыть игру",
-                                web_app=WebAppInfo(url=WEBAPP_URL)
+                                url=WEBAPP_URL
                             )]
                         ])
                         await bot.send_message(
                             tg_id,
                             "Вам доступен ежедневный пак! 🎁\nЗаходите в игру и забирайте его, пока он не пропал!",
-                            parse_mode="HTML",
                             reply_markup=kb
                         )
                         await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
+                        logging.info(f"Daily notify sent to {tg_id}")
                     except Exception as e:
-                        logging.error(f"Daily notify error for {tg_id}: {e}")
-                        await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
+                        err_str = str(e).lower()
+                        # If user blocked bot or chat not found — mark done, won't fix itself
+                        if "blocked" in err_str or "chat not found" in err_str or "user is deactivated" in err_str:
+                            await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
+                            logging.warning(f"Daily notify skipped (blocked/not found) for {tg_id}: {e}")
+                        else:
+                            # Temporary error — don't mark, retry next cycle
+                            logging.error(f"Daily notify error for {tg_id}: {e}")
         except Exception as e:
             logging.error(f"Daily notification task error: {e}")
             await asyncio.sleep(60)
