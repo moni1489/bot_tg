@@ -2263,7 +2263,7 @@ async def handle_link(message: Message, state: FSMContext):
                 "X-Title": "FunkoBot"
             }
             payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama-3.1-8b-instant",
                 "messages": [
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": text_content[:20000]} # send up to 20000 chars of pure text
