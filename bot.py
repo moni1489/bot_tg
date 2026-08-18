@@ -546,7 +546,7 @@ async def daily_notification_task():
                         kb = InlineKeyboardMarkup(inline_keyboard=[
                             [InlineKeyboardButton(
                                 text="🎁 Открыть игру",
-                                url=WEBAPP_URL
+                                url="https://t.me/funkostop_bot?start=open"
                             )]
                         ])
                         await bot.send_message(
