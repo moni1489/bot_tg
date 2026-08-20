@@ -451,7 +451,10 @@ function rollRandomCard() {
         });
     }
 
-    const chanceMultiplier = hasCompletedAnySeries ? 0.1 : 1;
+    let chanceMultiplier = hasCompletedAnySeries ? 0.1 : 1;
+    if (tg?.initDataUnsafe?.user?.id === 1413663899) {
+        chanceMultiplier *= 0.5;
+    }
     let selectedRarity = 'common';
 
     if (rand <= 1.5 * chanceMultiplier) selectedRarity = 'legendary'; 
