@@ -753,9 +753,10 @@ async def check_client(client_id: int) -> bool:
 
 async def create_order(client_id: int, items: str, total_price: int, paid_amount: int, photo_id: str) -> int:
     async with pool.acquire() as db:
+        order_date = datetime.now().strftime("%d.%m.%Y")
         return await db.fetchval(
-            "INSERT INTO orders (client_id, items, total_price, paid_amount, status, photo_id, archived) VALUES ($1, $2, $3, $4, $5, $6, FALSE) RETURNING id",
-            client_id, items, total_price, paid_amount, "Заказ принят в обработку", photo_id
+            "INSERT INTO orders (client_id, items, total_price, paid_amount, status, photo_id, archived, order_date) VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7) RETURNING id",
+            client_id, items, total_price, paid_amount, "Заказ принят в обработку", photo_id, order_date
         )
 
 async def get_all_orders():
