@@ -797,6 +797,10 @@ async def init_db():
                 PRIMARY KEY (user_id, chat_id)
             )
         """)
+        try:
+            await db.execute("ALTER TABLE group_captcha ADD COLUMN prompt_msg_id BIGINT")
+        except asyncpg.exceptions.DuplicateColumnError:
+            pass
         
         # Admin check
         admin = await db.fetchrow("SELECT id FROM users WHERE role = 'admin'")
