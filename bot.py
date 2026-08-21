@@ -54,33 +54,39 @@ class CaptchaMiddleware(BaseMiddleware):
                     event.from_user.id, event.chat.id
                 )
                 if captcha_entry:
-                    if event.text and "🛑" in event.text:
+                    msg_text = event.text or event.caption or ""
+                    emoji_match = ("🛑" in msg_text)
+                    if not emoji_match and event.sticker and event.sticker.emoji:
+                        emoji_match = ("🛑" in event.sticker.emoji)
+                        
+                    if emoji_match:
                         # Passed
                         try:
                             await bot.delete_message(event.chat.id, captcha_entry['welcome_msg_id'])
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logging.error(f"Failed to delete welcome msg: {e}")
                         if captcha_entry['prompt_msg_id']:
                             try:
                                 await bot.delete_message(event.chat.id, captcha_entry['prompt_msg_id'])
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logging.error(f"Failed to delete prompt msg: {e}")
                         try:
                             await event.delete()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logging.error(f"Failed to delete user emoji msg (maybe user is admin?): {e}")
+                        
                         await db.execute("DELETE FROM group_captcha WHERE user_id = $1 AND chat_id = $2", event.from_user.id, event.chat.id)
                         return # Solved
                     else:
                         # Failed/Spam
                         try:
                             await event.delete()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logging.error(f"Failed to delete spam msg (maybe user is admin?): {e}")
                         return # Stop propagation
         return await handler(event, data)
 
-router.message.middleware(CaptchaMiddleware())
+router.message.outer_middleware(CaptchaMiddleware())
 
 pool = None
 
