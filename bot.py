@@ -50,7 +50,7 @@ class CaptchaMiddleware(BaseMiddleware):
                 
             async with pool.acquire() as db:
                 captcha_entry = await db.fetchrow(
-                    "SELECT welcome_msg_id FROM group_captcha WHERE user_id = $1 AND chat_id = $2",
+                    "SELECT welcome_msg_id, prompt_msg_id FROM group_captcha WHERE user_id = $1 AND chat_id = $2",
                     event.from_user.id, event.chat.id
                 )
                 if captcha_entry:
@@ -60,6 +60,11 @@ class CaptchaMiddleware(BaseMiddleware):
                             await bot.delete_message(event.chat.id, captcha_entry['welcome_msg_id'])
                         except Exception:
                             pass
+                        if captcha_entry['prompt_msg_id']:
+                            try:
+                                await bot.delete_message(event.chat.id, captcha_entry['prompt_msg_id'])
+                            except Exception:
+                                pass
                         try:
                             await event.delete()
                         except Exception:
@@ -614,7 +619,7 @@ async def daily_notification_task():
                             
                 # --- GROUP CAPTCHA KICK LOGIC ---
                 expired_users = await db.fetch("""
-                    SELECT user_id, chat_id, welcome_msg_id 
+                    SELECT user_id, chat_id, welcome_msg_id, prompt_msg_id 
                     FROM group_captcha 
                     WHERE EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - join_time)) >= 3600
                 """)
@@ -628,6 +633,11 @@ async def daily_notification_task():
                         if row['welcome_msg_id']:
                             try:
                                 await bot.delete_message(chat_id=row['chat_id'], message_id=row['welcome_msg_id'])
+                            except Exception:
+                                pass
+                        if row['prompt_msg_id']:
+                            try:
+                                await bot.delete_message(chat_id=row['chat_id'], message_id=row['prompt_msg_id'])
                             except Exception:
                                 pass
                                 
@@ -1078,10 +1088,9 @@ async def welcome_new_member(message: Message):
 - Продажа / обмен - только там, где это разрешено администрацией
 - Уважаем участников и не устраиваем конфликты
 - Изучайте содержание чата
-- Администраторы всевластны. Их решения окончательны, обжалованию не подлежат 
-///
-Если согласен, отправь эмодзи «🛑»
-///"""
+- Администраторы всевластны. Их решения окончательны, обжалованию не подлежат"""
+            
+            prompt_text = "<b>Если согласен, отправь эмодзи «🛑»</b>"
             try:
                 # Try to delete the system "joined group" message
                 try:
@@ -1090,11 +1099,12 @@ async def welcome_new_member(message: Message):
                     pass
                 
                 welcome_msg = await message.answer(welcome_text, parse_mode="HTML")
+                prompt_msg = await message.answer(prompt_text, parse_mode="HTML")
                 
                 await db.execute(
-                    "INSERT INTO group_captcha (user_id, chat_id, welcome_msg_id) VALUES ($1, $2, $3) "
-                    "ON CONFLICT (user_id, chat_id) DO UPDATE SET join_time = CURRENT_TIMESTAMP, welcome_msg_id = EXCLUDED.welcome_msg_id",
-                    new_member.id, message.chat.id, welcome_msg.message_id
+                    "INSERT INTO group_captcha (user_id, chat_id, welcome_msg_id, prompt_msg_id) VALUES ($1, $2, $3, $4) "
+                    "ON CONFLICT (user_id, chat_id) DO UPDATE SET join_time = CURRENT_TIMESTAMP, welcome_msg_id = EXCLUDED.welcome_msg_id, prompt_msg_id = EXCLUDED.prompt_msg_id",
+                    new_member.id, message.chat.id, welcome_msg.message_id, prompt_msg.message_id
                 )
             except Exception as e:
                 logging.error(f"Error in welcome_new_member: {e}")
