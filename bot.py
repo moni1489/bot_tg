@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
-from aiogram import Bot, Dispatcher, F, Router
+from aiogram import Bot, Dispatcher, F, Router, BaseMiddleware
 from aiogram.types import (
     Message, CallbackQuery, ReplyKeyboardMarkup, 
     KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton,
@@ -40,6 +40,42 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 router = Router()
 dp.include_router(router)
+
+class CaptchaMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        if hasattr(event, "chat") and event.chat and event.chat.type in ["group", "supergroup"]:
+            # If it's a new member message, we don't intercept it here, we let the handler do it
+            if event.new_chat_members:
+                return await handler(event, data)
+                
+            async with pool.acquire() as db:
+                captcha_entry = await db.fetchrow(
+                    "SELECT welcome_msg_id FROM group_captcha WHERE user_id = $1 AND chat_id = $2",
+                    event.from_user.id, event.chat.id
+                )
+                if captcha_entry:
+                    if event.text and "🛑" in event.text:
+                        # Passed
+                        try:
+                            await bot.delete_message(event.chat.id, captcha_entry['welcome_msg_id'])
+                        except Exception:
+                            pass
+                        try:
+                            await event.delete()
+                        except Exception:
+                            pass
+                        await db.execute("DELETE FROM group_captcha WHERE user_id = $1 AND chat_id = $2", event.from_user.id, event.chat.id)
+                        return # Solved
+                    else:
+                        # Failed/Spam
+                        try:
+                            await event.delete()
+                        except Exception:
+                            pass
+                        return # Stop propagation
+        return await handler(event, data)
+
+router.message.middleware(CaptchaMiddleware())
 
 pool = None
 
@@ -575,6 +611,31 @@ async def daily_notification_task():
                         else:
                             # Temporary error — don't mark, retry next cycle
                             logging.error(f"Daily notify error for {tg_id}: {e}")
+                            
+                # --- GROUP CAPTCHA KICK LOGIC ---
+                expired_users = await db.fetch("""
+                    SELECT user_id, chat_id, welcome_msg_id 
+                    FROM group_captcha 
+                    WHERE EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - join_time)) >= 3600
+                """)
+                for row in expired_users:
+                    try:
+                        # Kick user (ban and unban)
+                        await bot.ban_chat_member(chat_id=row['chat_id'], user_id=row['user_id'])
+                        await bot.unban_chat_member(chat_id=row['chat_id'], user_id=row['user_id'])
+                        
+                        # Delete welcome message
+                        if row['welcome_msg_id']:
+                            try:
+                                await bot.delete_message(chat_id=row['chat_id'], message_id=row['welcome_msg_id'])
+                            except Exception:
+                                pass
+                                
+                        # Delete from db
+                        await db.execute("DELETE FROM group_captcha WHERE user_id = $1 AND chat_id = $2", row['user_id'], row['chat_id'])
+                        logging.info(f"Kicked {row['user_id']} from {row['chat_id']} due to captcha timeout")
+                    except Exception as e:
+                        logging.error(f"Error kicking user {row['user_id']}: {e}")
         except Exception as e:
             logging.error(f"Daily notification task error: {e}")
             await asyncio.sleep(60)
@@ -715,6 +776,17 @@ async def init_db():
             await db.execute("ALTER TABLE series_codes ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         except asyncpg.exceptions.DuplicateColumnError:
             pass
+            
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS group_captcha (
+                user_id BIGINT,
+                chat_id BIGINT,
+                join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                welcome_msg_id BIGINT,
+                prompt_msg_id BIGINT,
+                PRIMARY KEY (user_id, chat_id)
+            )
+        """)
         
         # Admin check
         admin = await db.fetchrow("SELECT id FROM users WHERE role = 'admin'")
@@ -990,6 +1062,43 @@ def generate_random_password(length=6):
     return ''.join(random.choice(characters) for _ in range(length))
 
 # --- HANDLERS ---
+@router.message(F.new_chat_members)
+async def welcome_new_member(message: Message):
+    async with pool.acquire() as db:
+        for new_member in message.new_chat_members:
+            if new_member.is_bot:
+                continue
+                
+            welcome_text = f"""{new_member.mention_html()}, добро пожаловать! 
+
+Основные правила:
+
+- Аккуратно делимся ссылками 
+- Без рекламы и навязчивого спама
+- Продажа / обмен - только там, где это разрешено администрацией
+- Уважаем участников и не устраиваем конфликты
+- Изучайте содержание чата
+- Администраторы всевластны. Их решения окончательны, обжалованию не подлежат 
+///
+Если согласен, отправь эмодзи «🛑»
+///"""
+            try:
+                # Try to delete the system "joined group" message
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
+                
+                welcome_msg = await message.answer(welcome_text, parse_mode="HTML")
+                
+                await db.execute(
+                    "INSERT INTO group_captcha (user_id, chat_id, welcome_msg_id) VALUES ($1, $2, $3) "
+                    "ON CONFLICT (user_id, chat_id) DO UPDATE SET join_time = CURRENT_TIMESTAMP, welcome_msg_id = EXCLUDED.welcome_msg_id",
+                    new_member.id, message.chat.id, welcome_msg.message_id
+                )
+            except Exception as e:
+                logging.error(f"Error in welcome_new_member: {e}")
+
 @router.message(F.text == "❌ Отмена", StateFilter("*"))
 async def cancel_handler(message: Message, state: FSMContext):
     await state.clear()
