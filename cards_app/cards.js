@@ -63,10 +63,10 @@ const SERIES_CONFIG = [
         name: 'Breaking Bad',
         theme: 'breaking_bad',
         cards: [
-            { index: 1, name: 'Walter White', rarity: 'legendary', img: '/cards/images/card_breaking_bad_1.png' },
-            { index: 2, name: 'Jesse Pinkman', rarity: 'common', img: '/cards/images/card_breaking_bad_2.png' },
-            { index: 3, name: 'Saul Goodman', rarity: 'rare', img: '/cards/images/card_breaking_bad_3.png' },
-            { index: 4, name: 'Gustavo Fring', rarity: 'epic', img: '/cards/images/card_breaking_bad_4.png' }
+            { index: 1, name: 'Walter White', rarity: 'legendary', img: '/cards/images/card_breaking_bad_1.webp' },
+            { index: 2, name: 'Jesse Pinkman', rarity: 'common', img: '/cards/images/card_breaking_bad_2.webp' },
+            { index: 3, name: 'Saul Goodman', rarity: 'rare', img: '/cards/images/card_breaking_bad_3.webp' },
+            { index: 4, name: 'Gustavo Fring', rarity: 'epic', img: '/cards/images/card_breaking_bad_4.webp' }
         ]
     },
     {
@@ -74,10 +74,10 @@ const SERIES_CONFIG = [
         name: 'Stranger Things',
         theme: 'stranger_things',
         cards: [
-            { index: 1, name: 'Steve', rarity: 'common', img: '/cards/images/card_stranger_things_1.png' },
-            { index: 2, name: 'Mike', rarity: 'rare', img: '/cards/images/card_stranger_things_2.png' },
-            { index: 3, name: 'Will Byers', rarity: 'epic', img: '/cards/images/card_stranger_things_3.png' },
-            { index: 4, name: 'Demogorgon', rarity: 'legendary', img: '/cards/images/card_stranger_things_4.png' }
+            { index: 1, name: 'Steve', rarity: 'common', img: '/cards/images/card_stranger_things_1.webp' },
+            { index: 2, name: 'Mike', rarity: 'rare', img: '/cards/images/card_stranger_things_2.webp' },
+            { index: 3, name: 'Will Byers', rarity: 'epic', img: '/cards/images/card_stranger_things_3.webp' },
+            { index: 4, name: 'Demogorgon', rarity: 'legendary', img: '/cards/images/card_stranger_things_4.webp' }
         ]
     },
     {
@@ -85,10 +85,10 @@ const SERIES_CONFIG = [
         name: 'Resident Evil',
         theme: 'resident_evil',
         cards: [
-            { index: 1, name: 'Chainsaw Villager', rarity: 'common', img: '/cards/images/card_residennt_evil_1.png' },
-            { index: 2, name: 'Jill Valentine', rarity: 'rare', img: '/cards/images/card_residennt_evil_2.png' },
-            { index: 3, name: 'Albert Wesker', rarity: 'epic', img: '/cards/images/card_residennt_evil_3.png' },
-            { index: 4, name: 'Leon Kennedy', rarity: 'legendary', img: '/cards/images/card_residennt_evil_4.png' }
+            { index: 1, name: 'Chainsaw Villager', rarity: 'common', img: '/cards/images/card_residennt_evil_1.webp' },
+            { index: 2, name: 'Jill Valentine', rarity: 'rare', img: '/cards/images/card_residennt_evil_2.webp' },
+            { index: 3, name: 'Albert Wesker', rarity: 'epic', img: '/cards/images/card_residennt_evil_3.webp' },
+            { index: 4, name: 'Leon Kennedy', rarity: 'legendary', img: '/cards/images/card_residennt_evil_4.webp' }
         ]
     },
     {
@@ -96,10 +96,10 @@ const SERIES_CONFIG = [
         name: 'Death Note',
         theme: 'death_note',
         cards: [
-            { index: 1, name: 'Misa Amane', rarity: 'common', img: '/cards/images/card_death_note_1.png' },
-            { index: 2, name: 'Ryuk', rarity: 'rare', img: '/cards/images/card_death_note_2.png' },
-            { index: 3, name: 'L', rarity: 'epic', img: '/cards/images/card_death_note_3.png' },
-            { index: 4, name: 'Light Yagami', rarity: 'legendary', img: '/cards/images/card_death_note_4.png' }
+            { index: 1, name: 'Misa Amane', rarity: 'common', img: '/cards/images/card_death_note_1.webp' },
+            { index: 2, name: 'Ryuk', rarity: 'rare', img: '/cards/images/card_death_note_2.webp' },
+            { index: 3, name: 'L', rarity: 'epic', img: '/cards/images/card_death_note_3.webp' },
+            { index: 4, name: 'Light Yagami', rarity: 'legendary', img: '/cards/images/card_death_note_4.webp' }
         ]
     },
     {
@@ -107,10 +107,10 @@ const SERIES_CONFIG = [
         name: 'Invincible',
         theme: 'invincible',
         cards: [
-            { index: 1, name: 'Atom Eve', rarity: 'common', img: '/cards/images/card_invincible_1.png' },
-            { index: 2, name: 'Allen the Alien', rarity: 'rare', img: '/cards/images/card_invincible_2.png' },
-            { index: 3, name: 'Omni-Man', rarity: 'epic', img: '/cards/images/card_invincible_3.png' },
-            { index: 4, name: 'Invincible', rarity: 'legendary', img: '/cards/images/card_invincible_4.png' }
+            { index: 1, name: 'Atom Eve', rarity: 'common', img: '/cards/images/card_invincible_1.webp' },
+            { index: 2, name: 'Allen the Alien', rarity: 'rare', img: '/cards/images/card_invincible_2.webp' },
+            { index: 3, name: 'Omni-Man', rarity: 'epic', img: '/cards/images/card_invincible_3.webp' },
+            { index: 4, name: 'Invincible', rarity: 'legendary', img: '/cards/images/card_invincible_4.webp' }
         ]
     },
     {
@@ -118,10 +118,10 @@ const SERIES_CONFIG = [
         name: 'One Piece',
         theme: 'one_piece',
         cards: [
-            { index: 1, name: 'Nami', rarity: 'common', img: '/cards/images/card_one_piece_1.png' },
-            { index: 2, name: 'Sanji', rarity: 'rare', img: '/cards/images/card_one_piece_2.png' },
-            { index: 3, name: 'Roronoa Zorro', rarity: 'epic', img: '/cards/images/card_one_piece_3.png' },
-            { index: 4, name: 'Monkey D Luffy', rarity: 'legendary', img: '/cards/images/card_one_piece_4.png' }
+            { index: 1, name: 'Nami', rarity: 'common', img: '/cards/images/card_one_piece_1.webp' },
+            { index: 2, name: 'Sanji', rarity: 'rare', img: '/cards/images/card_one_piece_2.webp' },
+            { index: 3, name: 'Roronoa Zorro', rarity: 'epic', img: '/cards/images/card_one_piece_3.webp' },
+            { index: 4, name: 'Monkey D Luffy', rarity: 'legendary', img: '/cards/images/card_one_piece_4.webp' }
         ]
     },
     {
@@ -129,10 +129,10 @@ const SERIES_CONFIG = [
         name: 'Universal',
         theme: 'universal',
         cards: [
-            { index: 1, name: 'Tony Soprano', rarity: 'legendary', img: '/cards/images/card_universal_1.png' },
-            { index: 2, name: 'BMO', rarity: 'legendary', img: '/cards/images/card_universal_2.png' },
-            { index: 3, name: 'Paul Atreides', rarity: 'legendary', img: '/cards/images/card_universal_3.png' },
-            { index: 4, name: 'Derpy', rarity: 'legendary', img: '/cards/images/card_universal_4.png' }
+            { index: 1, name: 'Tony Soprano', rarity: 'legendary', img: '/cards/images/card_universal_1.webp' },
+            { index: 2, name: 'BMO', rarity: 'legendary', img: '/cards/images/card_universal_2.webp' },
+            { index: 3, name: 'Paul Atreides', rarity: 'legendary', img: '/cards/images/card_universal_3.webp' },
+            { index: 4, name: 'Derpy', rarity: 'legendary', img: '/cards/images/card_universal_4.webp' }
         ]
     },
     {
@@ -140,12 +140,12 @@ const SERIES_CONFIG = [
         name: 'Мои Бонусы',
         theme: 'bonus',
         cards: [
-            { index: 1, id: 1, name: 'Funko Pop', rarity: 'legendary', img: '/cards/images/bonus_card_1.png' },
-            { index: 2, id: 2, name: 'Скидка 20%', rarity: 'epic', img: '/cards/images/bonus_card_2.png' },
-            { index: 3, id: 3, name: 'Скидка 25%', rarity: 'epic', img: '/cards/images/bonus_card_3.png' },
-            { index: 4, id: 4, name: 'Скидка 500₽', rarity: 'epic', img: '/cards/images/bonus_card_4.png' },
-            { index: 5, id: 5, name: 'Скидка 1000₽', rarity: 'legendary', img: '/cards/images/bonus_card_5.png' },
-            { index: 7, id: 7, name: 'Скидка 300₽', rarity: 'rare', img: '/cards/images/bonus_card_7.png' }
+            { index: 1, id: 1, name: 'Funko Pop', rarity: 'legendary', img: '/cards/images/bonus_card_1.webp' },
+            { index: 2, id: 2, name: 'Скидка 20%', rarity: 'epic', img: '/cards/images/bonus_card_2.webp' },
+            { index: 3, id: 3, name: 'Скидка 25%', rarity: 'epic', img: '/cards/images/bonus_card_3.webp' },
+            { index: 4, id: 4, name: 'Скидка 500₽', rarity: 'epic', img: '/cards/images/bonus_card_4.webp' },
+            { index: 5, id: 5, name: 'Скидка 1000₽', rarity: 'legendary', img: '/cards/images/bonus_card_5.webp' },
+            { index: 7, id: 7, name: 'Скидка 300₽', rarity: 'rare', img: '/cards/images/bonus_card_7.webp' }
         ]
     }
 ];
@@ -489,14 +489,14 @@ function rollBonusCard() {
     // 0.5% - 25% discount avito (3)
     // 0.05% - jackpot (1)
 
-    if (rand <= 0.05) return { id: 1, name: "Funko Pop", img: "/cards/images/bonus_card_1.png" };
-    if (rand <= 0.55) return { id: 2, name: "Скидка 20%", img: "/cards/images/bonus_card_2.png" };
-    if (rand <= 1.05) return { id: 3, name: "Скидка 25% (Авито)", img: "/cards/images/bonus_card_3.png" };
-    if (rand <= 1.55) return { id: 5, name: "Скидка 1000₽", img: "/cards/images/bonus_card_5.png" };
-    if (rand <= 2.05) return { id: 6, name: "10 Бонус Паков", packs: 10, img: "/cards/images/bonus_card_6.png" };
-    if (rand <= 3.05) return { id: 4, name: "Скидка 500₽", img: "/cards/images/bonus_card_4.png" };
-    if (rand <= 5.05) return { id: 8, name: "5 Бонус Паков", packs: 5, img: "/cards/images/bonus_card_8.png" };
-    if (rand <= 8.05) return { id: 7, name: "Скидка 300₽", img: "/cards/images/bonus_card_7.png" };
+    if (rand <= 0.05) return { id: 1, name: "Funko Pop", img: "/cards/images/bonus_card_1.webp" };
+    if (rand <= 0.55) return { id: 2, name: "Скидка 20%", img: "/cards/images/bonus_card_2.webp" };
+    if (rand <= 1.05) return { id: 3, name: "Скидка 25% (Авито)", img: "/cards/images/bonus_card_3.webp" };
+    if (rand <= 1.55) return { id: 5, name: "Скидка 1000₽", img: "/cards/images/bonus_card_5.webp" };
+    if (rand <= 2.05) return { id: 6, name: "10 Бонус Паков", packs: 10, img: "/cards/images/bonus_card_6.webp" };
+    if (rand <= 3.05) return { id: 4, name: "Скидка 500₽", img: "/cards/images/bonus_card_4.webp" };
+    if (rand <= 5.05) return { id: 8, name: "5 Бонус Паков", packs: 5, img: "/cards/images/bonus_card_8.webp" };
+    if (rand <= 8.05) return { id: 7, name: "Скидка 300₽", img: "/cards/images/bonus_card_7.webp" };
 
     return null;
 }
@@ -1190,18 +1190,18 @@ function renderPrizes() {
     prizesGrid.className = 'prizes-grid';
 
     const prizesList = [
-        { name: "Common", rarity: "common", img: "/cards/images/card_breaking_bad_2.png" },
-        { name: "Rare", rarity: "rare", img: "/cards/images/card_death_note_2.png" },
-        { name: "Epic", rarity: "epic", img: "/cards/images/card_invincible_3.png" },
-        { name: "Legendary", rarity: "legendary", img: "/cards/images/card_residennt_evil_4.png" },
-        { name: "Funko Pop", rarity: "bonus", img: "/cards/images/bonus_card_1.png" },
-        { name: "Скидка 20%", rarity: "bonus", img: "/cards/images/bonus_card_2.png" },
-        { name: "Скидка 25%", rarity: "bonus", img: "/cards/images/bonus_card_3.png" },
-        { name: "Скидка 500₽", rarity: "bonus", img: "/cards/images/bonus_card_4.png" },
-        { name: "Скидка 1000₽", rarity: "bonus", img: "/cards/images/bonus_card_5.png" },
-        { name: "10 Паков", rarity: "bonus", img: "/cards/images/bonus_card_6.png" },
-        { name: "Скидка 300₽", rarity: "bonus", img: "/cards/images/bonus_card_7.png" },
-        { name: "5 Паков", rarity: "bonus", img: "/cards/images/bonus_card_8.png" }
+        { name: "Common", rarity: "common", img: "/cards/images/card_breaking_bad_2.webp" },
+        { name: "Rare", rarity: "rare", img: "/cards/images/card_death_note_2.webp" },
+        { name: "Epic", rarity: "epic", img: "/cards/images/card_invincible_3.webp" },
+        { name: "Legendary", rarity: "legendary", img: "/cards/images/card_residennt_evil_4.webp" },
+        { name: "Funko Pop", rarity: "bonus", img: "/cards/images/bonus_card_1.webp" },
+        { name: "Скидка 20%", rarity: "bonus", img: "/cards/images/bonus_card_2.webp" },
+        { name: "Скидка 25%", rarity: "bonus", img: "/cards/images/bonus_card_3.webp" },
+        { name: "Скидка 500₽", rarity: "bonus", img: "/cards/images/bonus_card_4.webp" },
+        { name: "Скидка 1000₽", rarity: "bonus", img: "/cards/images/bonus_card_5.webp" },
+        { name: "10 Паков", rarity: "bonus", img: "/cards/images/bonus_card_6.webp" },
+        { name: "Скидка 300₽", rarity: "bonus", img: "/cards/images/bonus_card_7.webp" },
+        { name: "5 Паков", rarity: "bonus", img: "/cards/images/bonus_card_8.webp" }
     ];
 
     prizesList.forEach(prize => {
@@ -1288,14 +1288,14 @@ function updateFaqView(direction = 'none') {
         if (direction === 'none') {
             img.style.opacity = '1';
             img.style.transform = 'translateX(0) scale(1)';
-            img.src = `/cards/images/faq${currentFaqIndex}.png`;
+            img.src = `/cards/images/faq${currentFaqIndex}.webp`;
         } else {
             // Animate out
             img.style.opacity = '0';
             img.style.transform = direction === 'next' ? 'translateX(-30px)' : 'translateX(30px)';
 
             setTimeout(() => {
-                img.src = `/cards/images/faq${currentFaqIndex}.png`;
+                img.src = `/cards/images/faq${currentFaqIndex}.webp`;
                 // Prep for animate in
                 img.style.transform = direction === 'next' ? 'translateX(30px)' : 'translateX(-30px)';
 
@@ -1404,7 +1404,7 @@ function preloadImagesAndInit() {
     const faqImages = [];
     for(let i=1; i<=totalFaqImages; i++) {
         const img = new Image();
-        img.src = `/cards/images/faq${i}.png`;
+        img.src = `/cards/images/faq${i}.webp`;
         faqImages.push(img);
     }
     
