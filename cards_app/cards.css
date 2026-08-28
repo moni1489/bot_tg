@@ -72,7 +72,7 @@ body {
     height: 100vh;
     /* fallback */
     background-color: #080808;
-    background-image: url('/cards/images/background.png');
+    background-image: url('/cards/images/background.webp');
     background-size: cover;
     background-position: center top;
     background-repeat: no-repeat;
@@ -633,7 +633,7 @@ body {
     z-index: 1;
     transition: opacity 0.8s ease;
     opacity: 0;
-    background: radial-gradient(circle at center, rgba(255, 0, 34, 0.4) 0%, transparent 65%), url('images/svet.png') center / cover no-repeat, url('/cards/images/svet.png') center / cover no-repeat;
+    background: radial-gradient(circle at center, rgba(255, 0, 34, 0.4) 0%, transparent 65%), url('images/svet.webp') center / cover no-repeat, url('/cards/images/svet.webp') center / cover no-repeat;
     mix-blend-mode: screen;
     -webkit-mix-blend-mode: screen;
     -webkit-transform: translateZ(0);
@@ -919,35 +919,35 @@ body {
 }
 
 .card-frame.breaking_bad {
-    background: url('/cards/images/frame_breaking_bad.png') center/cover no-repeat, radial-gradient(circle, #1b381e, #051007);
+    background: url('/cards/images/frame_breaking_bad.webp') center/cover no-repeat, radial-gradient(circle, #1b381e, #051007);
 }
 
 .card-frame.stranger_things {
-    background: url('/cards/images/frame_stranger_things.png') center/cover no-repeat, radial-gradient(circle, #4d1218, #140305);
+    background: url('/cards/images/frame_stranger_things.webp') center/cover no-repeat, radial-gradient(circle, #4d1218, #140305);
 }
 
 .card-frame.dc {
-    background: url('/cards/images/frame_dc.png') center/cover no-repeat, radial-gradient(circle, #142847, #040914);
+    background: url('/cards/images/frame_dc.webp') center/cover no-repeat, radial-gradient(circle, #142847, #040914);
 }
 
 .card-frame.death_note {
-    background: url('/cards/images/frame_death_note.png') center/cover no-repeat, radial-gradient(circle, #2c2c30, #0a0a0c);
+    background: url('/cards/images/frame_death_note.webp') center/cover no-repeat, radial-gradient(circle, #2c2c30, #0a0a0c);
 }
 
 .card-frame.invincible {
-    background: url('/cards/images/frame_invincible.png') center/cover no-repeat, radial-gradient(circle, #473a14, #141004);
+    background: url('/cards/images/frame_invincible.webp') center/cover no-repeat, radial-gradient(circle, #473a14, #141004);
 }
 
 .card-frame.one_piece {
-    background: url('/cards/images/frame_one_piece.png') center/cover no-repeat, radial-gradient(circle, #3d2613, #120a04);
+    background: url('/cards/images/frame_one_piece.webp') center/cover no-repeat, radial-gradient(circle, #3d2613, #120a04);
 }
 
 .card-frame.resident_evil {
-    background: url('/cards/images/frame_resident_evil.png') center/cover no-repeat, radial-gradient(circle, #3d0a0a, #100202);
+    background: url('/cards/images/frame_resident_evil.webp') center/cover no-repeat, radial-gradient(circle, #3d0a0a, #100202);
 }
 
 .card-frame.universal {
-    background: url('/cards/images/frame_universal.png') center/cover no-repeat, radial-gradient(circle, #3d0c18, #0e0205);
+    background: url('/cards/images/frame_universal.webp') center/cover no-repeat, radial-gradient(circle, #3d0c18, #0e0205);
 }
 
 /* Removed conflicting box-shadows for Epic and Legendary to rely entirely on drop-shadow filter */
@@ -2105,7 +2105,7 @@ body {
     width: 100vw;
     height: 100vh;
     height: 100dvh;
-    background: #000 url('/cards/images/background2.png') center/cover no-repeat;
+    background: #000 url('/cards/images/background2.webp') center/cover no-repeat;
     z-index: 9000;
     display: flex;
     align-items: center;
