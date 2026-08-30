@@ -436,7 +436,7 @@ async def craft_cards_api(request):
                     elif rand <= 20.0: new_rarity = "epic"
                     else: new_rarity = "rare"
                 elif counts["epic"] == 4:
-                    if rand <= 25.0: new_rarity = "legendary"
+                    if rand <= 20.0: new_rarity = "legendary"
                     else: new_rarity = "epic"
                 else:
                     # Mixed / Standard
