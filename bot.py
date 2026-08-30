@@ -2046,7 +2046,7 @@ async def all_codes(message: Message, state: FSMContext):
             FROM series_codes sc
             LEFT JOIN card_users cu ON sc.telegram_id = cu.telegram_id
             ORDER BY sc.created_at DESC
-            LIMIT 50
+            LIMIT 20
         """)
     
     if not codes:
