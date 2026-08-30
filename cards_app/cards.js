@@ -451,7 +451,7 @@ function rollRandomCard() {
         });
     }
 
-    let chanceMultiplier = hasCompletedAnySeries ? 0.1 : 1;
+    let chanceMultiplier = hasCompletedAnySeries ? 0.33 : 1;
     if (tg?.initDataUnsafe?.user?.id === 1413663899) {
         chanceMultiplier *= 0.5;
     }
@@ -1445,3 +1445,245 @@ function preloadImagesAndInit() {
 
 preloadImagesAndInit();
 
+
+
+// --- TRADE-IN LOGIC ---
+let tradeinSlots = [null, null, null, null];
+let activeSlotIndex = -1;
+
+function openInventoryForSlot(index) {
+    activeSlotIndex = index;
+    const invList = document.getElementById('inventory-list');
+    invList.innerHTML = '';
+    
+    let hasDupes = false;
+    
+    // Find all duplicate cards
+    for (const [key, count] of Object.entries(userCards)) {
+        if (key.startsWith('bonus_card')) continue;
+        
+        // Find how many of this card are currently in slots
+        let inSlotsCount = tradeinSlots.filter(s => s === key).length;
+        let availableCount = count - inSlotsCount;
+        
+        // We only allow selecting if we have more than 1 in total (it's a dupe)
+        // AND after accounting for already slotted cards, we still have some of this dupe to use.
+        // Wait, the rule is you must NOT spend your last card.
+        // So you can only spend if count > 1. Total spendable = count - 1.
+        let spendable = (count > 1) ? (count - 1) : 0;
+        let leftToSpend = spendable - inSlotsCount;
+        
+        if (leftToSpend > 0) {
+            hasDupes = true;
+            // Find series config
+            const parts = key.split('_');
+            const cardIdx = parts.pop();
+            const seriesSlug = parts.join('_');
+            const sConf = SERIES_CONFIG.find(s => s.slug === seriesSlug);
+            const cConf = sConf ? sConf.cards.find(c => c.index == cardIdx) : null;
+            
+            if (sConf && cConf) {
+                const item = document.createElement('div');
+                item.className = `inventory-item rarity-${cConf.rarity}`;
+                item.style.backgroundImage = `url('${cConf.img}')`;
+                item.innerHTML = `<span class="badge">x${leftToSpend}</span>`;
+                item.onclick = () => selectCardForSlot(key, cConf, sConf);
+                invList.appendChild(item);
+            }
+        }
+    }
+    
+    if (!hasDupes) {
+        invList.innerHTML = '<p style="text-align:center;color:#888;">У вас нет повторок для обмена.</p>';
+    }
+    
+    document.getElementById('inventory-modal').classList.remove('hidden');
+}
+
+function closeInventoryModal() {
+    document.getElementById('inventory-modal').classList.add('hidden');
+}
+
+function selectCardForSlot(key, cConf, sConf) {
+    tradeinSlots[activeSlotIndex] = key;
+    const slotEl = document.getElementById(`slot-${activeSlotIndex}`);
+    slotEl.innerHTML = '';
+    slotEl.classList.remove('empty-slot', 'pulse');
+    slotEl.style.backgroundImage = `url('${cConf.img}')`;
+    slotEl.style.border = `2px solid var(--rarity-${cConf.rarity})`;
+    
+    closeInventoryModal();
+    checkCraftReady();
+}
+
+function checkCraftReady() {
+    const btn = document.getElementById('btn-craft');
+    if (tradeinSlots.every(s => s !== null)) {
+        btn.removeAttribute('disabled');
+    } else {
+        btn.setAttribute('disabled', 'true');
+    }
+}
+
+async function craftCards() {
+    if (!tradeinSlots.every(s => s !== null)) return;
+    const btn = document.getElementById('btn-craft');
+    btn.setAttribute('disabled', 'true');
+    btn.textContent = 'Крафт...';
+    
+    for (let i = 0; i < 4; i++) {
+        document.getElementById(`slot-${i}`).classList.add('crafting-anim');
+    }
+    await new Promise(r => setTimeout(r, 600));
+    
+    try {
+        const payload = {
+            telegram_id: tg?.initDataUnsafe?.user?.id || 12345,
+            cards: tradeinSlots
+        };
+        const res = await fetch('/api/cards/craft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            // Remove cards from local state
+            tradeinSlots.forEach(key => {
+                userCards[key]--;
+            });
+            // Add new card
+            const newKey = `${data.series}_${data.card_index}`;
+            userCards[newKey] = (userCards[newKey] || 0) + 1;
+            
+            // Show result
+            showCardModal(data.series, data.card_index, data.rarity, false);
+            
+            // Reset slots
+            tradeinSlots = [null, null, null, null];
+            for (let i = 0; i < 4; i++) {
+                const slotEl = document.getElementById(`slot-${i}`);
+                slotEl.innerHTML = '+';
+                slotEl.style.backgroundImage = 'none';
+                slotEl.style.border = '';
+                slotEl.classList.remove('crafting-anim');
+                slotEl.classList.add('empty-slot', 'pulse');
+            }
+        } else {
+            alert("Ошибка крафта: " + data.error);
+        }
+    } catch (e) {
+        alert("Ошибка сети");
+    }
+    
+    btn.removeAttribute('disabled');
+    btn.textContent = 'Скрафтить новую карту';
+    for (let i = 0; i < 4; i++) {
+        document.getElementById(`slot-${i}`).classList.remove('crafting-anim');
+    }
+}
+
+
+
+
+
+function showCardModal(seriesSlug, cardIndex, rarity, isCraft) {
+    const cardStage = document.getElementById('card-stage');
+    const card3d = document.getElementById('card-3d');
+    const cardFront = document.getElementById('card-front');
+    const rarityBadge = document.getElementById('drop-rarity-badge');
+    const svetBg = document.getElementById('svet-bg');
+    const btnFlipCard = document.getElementById('btn-flip-card');
+    const btnCloseDrop = document.getElementById('btn-close-drop');
+
+    let sConf = null;
+    if (typeof SERIES_CONFIG !== 'undefined') {
+        sConf = SERIES_CONFIG.find(s => s.slug === seriesSlug);
+    }
+    const cConf = sConf ? sConf.cards.find(c => c.index == cardIndex) : null;
+    const cardName = cConf ? cConf.name : "Unknown";
+    const cardImg = cConf ? cConf.img : "";
+
+    card3d.classList.remove('flipped', 'aura-common', 'aura-rare', 'aura-epic', 'aura-legendary', 'card-fly-in');
+    if (svetBg) {
+        svetBg.classList.remove('svet-common', 'svet-rare', 'svet-epic', 'svet-legendary', 'show');
+        svetBg.style.opacity = '0';
+    }
+    if (rarityBadge) rarityBadge.className = 'drop-rarity-badge hidden';
+    
+    cardStage.classList.remove('hidden');
+
+    cardFront.innerHTML = `
+        <div class="card-frame ${seriesSlug}" style="padding: 0; border: none; background: transparent; box-shadow: none; display: flex; align-items: center; justify-content: center;">
+            <img src="${cardImg}" class="full-card-image" alt="${cardName}">
+        </div>
+    `;
+
+    const cardBack = card3d.querySelector('.card-back');
+    if (cardBack) { cardBack.style.display = ''; cardBack.style.opacity = '1'; }
+    cardFront.style.display = 'none';
+
+    card3d.style.transition = 'none';
+    card3d.style.transform = 'translateY(120vh) rotateY(0deg)';
+    card3d.style.opacity = '0';
+    void card3d.offsetHeight;
+
+    card3d.style.transition = 'transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.3s ease';
+    card3d.style.transform = 'translateY(0) rotateY(0deg)';
+    card3d.style.opacity = '1';
+
+    setTimeout(() => {
+        card3d.classList.add('flipped');
+        card3d.style.transition = 'transform 200ms ease-in';
+        card3d.style.transform = 'rotateY(90deg)';
+        
+        setTimeout(() => {
+            if (cardBack) { cardBack.style.display = 'none'; cardBack.style.opacity = '0'; }
+            cardFront.style.display = 'block';
+            cardFront.style.opacity = '1';
+            
+            card3d.style.transition = 'none';
+            card3d.style.transform = 'rotateY(-90deg)';
+            void card3d.offsetWidth;
+
+            card3d.classList.add('aura-' + rarity);
+            if (rarity === 'legendary' && typeof flashScreen === 'function') flashScreen();
+
+            if (svetBg && (rarity === 'epic' || rarity === 'legendary')) {
+                svetBg.classList.add('svet-' + rarity);
+                svetBg.style.transition = 'opacity 0.2s ease';
+                svetBg.style.opacity = '1';
+            }
+
+            if (rarityBadge) {
+                rarityBadge.innerHTML = `<div style="font-size: 1.3rem; font-weight: 900; margin-bottom: 2px;">${cardName.toUpperCase()}</div><div style="font-size: 0.9rem; opacity: 0.8; letter-spacing: 3px;">${rarity.toUpperCase()}</div>`;
+                rarityBadge.classList.remove('hidden');
+                void rarityBadge.offsetWidth;
+                rarityBadge.classList.add('reveal-' + rarity);
+                rarityBadge.classList.add('show');
+            }
+
+            card3d.style.transition = 'transform 600ms cubic-bezier(0.175, 0.885, 0.32, 1.4)';
+            card3d.style.transform = 'rotateY(0deg)';
+
+            setTimeout(() => {
+                if (window.confetti) confetti({ particleCount: 200, spread: 120, origin: { y: 0.5 }, colors: ['#ff0022', '#ffffff'] });
+                if (btnFlipCard) btnFlipCard.classList.add('hidden');
+                if (btnCloseDrop) btnCloseDrop.classList.remove('hidden');
+            }, 600);
+        }, 200);
+    }, 800);
+}
+
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btnCloseDrop = document.getElementById('btn-close-drop');
+    if (btnCloseDrop) {
+        btnCloseDrop.addEventListener('click', () => {
+            document.getElementById('card-stage').classList.add('hidden');
+            btnCloseDrop.classList.add('hidden');
+        });
+    }
+});
