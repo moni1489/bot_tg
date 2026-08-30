@@ -2046,7 +2046,6 @@ async def all_codes(message: Message, state: FSMContext):
             FROM series_codes sc
             LEFT JOIN card_users cu ON sc.telegram_id = cu.telegram_id
             ORDER BY sc.created_at DESC
-            LIMIT 20
         """)
     
     if not codes:
@@ -2054,25 +2053,35 @@ async def all_codes(message: Message, state: FSMContext):
         return
         
     import html as html_mod
-    msg = f"🏷 <b>Все промокоды</b> ({len(codes)} шт):\n\n"
+    
+    chunks = []
+    current_chunk = f"🏷 <b>Все промокоды</b> ({len(codes)} шт):\n\n"
+    
     for row in codes:
-        # Build name part
         parts = []
         if row['first_name']:
             parts.append(html_mod.escape(row['first_name']))
         if row['username']:
             parts.append(f"@{html_mod.escape(row['username'])}")
-        # Always add ID as tg link
         tg_id = row['telegram_id']
         id_link = f"<a href=\"tg://user?id={tg_id}\">ID:{tg_id}</a>"
-        if parts:
-            name = " ".join(parts) + f" [{id_link}]"
-        else:
-            name = id_link
-        date = row['created_at'].strftime('%d.%m %H:%M')
-        msg += f"<code>{html_mod.escape(row['code'])}</code> — <b>{html_mod.escape(row['series_slug'].upper())}</b> — {name} ({date})\n"
+        name = " ".join(parts) + f" [{id_link}]" if parts else id_link
         
-    await message.answer(msg, parse_mode="HTML", reply_markup=get_game_admin_kb(message.from_user.id))
+        date = row['created_at'].strftime('%d.%m %H:%M')
+        line = f"<code>{html_mod.escape(row['code'])}</code> — <b>{html_mod.escape(row['series_slug'].upper())}</b> — {name} ({date})\n"
+        
+        if len(current_chunk) + len(line) > 3800:
+            chunks.append(current_chunk)
+            current_chunk = line
+        else:
+            current_chunk += line
+            
+    if current_chunk:
+        chunks.append(current_chunk)
+        
+    for i, chunk in enumerate(chunks):
+        markup = get_game_admin_kb(message.from_user.id) if i == len(chunks) - 1 else None
+        await message.answer(chunk, parse_mode="HTML", reply_markup=markup)
 
 
 
@@ -2938,7 +2947,7 @@ async def tbank_link_amount(message: Message, state: FSMContext):
         payload["Token"] = token
         
         async with aiohttp.ClientSession() as session:
-            async with session.post("https://securepay.tinkoff.ru/v2/Init", json=payload) as resp:
+            async with session.post("https://securepay.tinkoff.ru/v2/Init", json=payload, ssl=False) as resp:
                 resp_data = await resp.json()
                 
         if resp_data.get("Success"):
