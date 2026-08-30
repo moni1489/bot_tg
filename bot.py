@@ -317,6 +317,167 @@ async def claim_daily_pack(request):
         logging.error(f"Daily pack error: {e}")
         return web.json_response({"error": str(e)}, status=500)
 
+
+
+SERIES_CONFIG = [
+    {
+        "slug": 'breaking_bad',
+        "cards": [
+            { "index": 1, "rarity": 'legendary' },
+            { "index": 2, "rarity": 'common' },
+            { "index": 3, "rarity": 'rare' },
+            { "index": 4, "rarity": 'epic' }
+        ]
+    },
+    {
+        "slug": 'stranger_things',
+        "cards": [
+            { "index": 1, "rarity": 'common' },
+            { "index": 2, "rarity": 'rare' },
+            { "index": 3, "rarity": 'epic' },
+            { "index": 4, "rarity": 'legendary' }
+        ]
+    },
+    {
+        "slug": 'resident_evil',
+        "cards": [
+            { "index": 1, "rarity": 'common' },
+            { "index": 2, "rarity": 'rare' },
+            { "index": 3, "rarity": 'epic' },
+            { "index": 4, "rarity": 'legendary' }
+        ]
+    },
+    {
+        "slug": 'death_note',
+        "cards": [
+            { "index": 1, "rarity": 'common' },
+            { "index": 2, "rarity": 'rare' },
+            { "index": 3, "rarity": 'epic' },
+            { "index": 4, "rarity": 'legendary' }
+        ]
+    },
+    {
+        "slug": 'invincible',
+        "cards": [
+            { "index": 1, "rarity": 'common' },
+            { "index": 2, "rarity": 'rare' },
+            { "index": 3, "rarity": 'epic' },
+            { "index": 4, "rarity": 'legendary' }
+        ]
+    },
+    {
+        "slug": 'one_piece',
+        "cards": [
+            { "index": 1, "rarity": 'common' },
+            { "index": 2, "rarity": 'rare' },
+            { "index": 3, "rarity": 'epic' },
+            { "index": 4, "rarity": 'legendary' }
+        ]
+    },
+    {
+        "slug": 'universal',
+        "cards": [
+            { "index": 1, "rarity": 'legendary' },
+            { "index": 2, "rarity": 'legendary' },
+            { "index": 3, "rarity": 'legendary' },
+            { "index": 4, "rarity": 'legendary' }
+        ]
+    }
+]
+
+async def craft_cards_api(request):
+    try:
+        body = await request.json()
+        tg_id = int(body.get("telegram_id", 0))
+        cards = body.get("cards", [])
+        
+        if not tg_id or len(cards) != 4:
+            return web.json_response({"error": "Invalid params"}, status=400)
+            
+        async with pool.acquire() as db:
+            # 1. Check if user has all cards
+            # and deduct them
+            async with db.transaction():
+                rarities = []
+                for c_key in cards:
+                    parts = c_key.split('_')
+                    c_idx = int(parts.pop())
+                    s_slug = "_".join(parts)
+                    
+                    row = await db.fetchrow("SELECT count FROM user_cards WHERE telegram_id = $1 AND series_slug = $2 AND card_index = $3", tg_id, s_slug, c_idx)
+                    if not row or row["count"] < 1:
+                        return web.json_response({"error": f"Missing card {c_key}"}, status=400)
+                    
+                    # Deduct
+                    await db.execute("UPDATE user_cards SET count = count - 1 WHERE telegram_id = $1 AND series_slug = $2 AND card_index = $3", tg_id, s_slug, c_idx)
+                    
+                    # Find rarity
+                    for sc in SERIES_CONFIG:
+                        if sc["slug"] == s_slug:
+                            for cc in sc["cards"]:
+                                if cc["index"] == c_idx:
+                                    rarities.append(cc["rarity"])
+                                    break
+                                    
+                # 2. Determine new rarity based on rules
+                import random
+                counts = {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
+                for r in rarities: counts[r] += 1
+                
+                new_rarity = "common"
+                rand = random.uniform(0, 100)
+                
+                if counts["common"] == 4:
+                    if rand <= 1.0: new_rarity = "epic"
+                    elif rand <= 15.0: new_rarity = "rare"
+                    else: new_rarity = "common"
+                elif counts["rare"] == 4:
+                    if rand <= 2.0: new_rarity = "legendary"
+                    elif rand <= 20.0: new_rarity = "epic"
+                    else: new_rarity = "rare"
+                elif counts["epic"] == 4:
+                    if rand <= 25.0: new_rarity = "legendary"
+                    else: new_rarity = "epic"
+                else:
+                    # Mixed / Standard
+                    if rand <= 1.5: new_rarity = "legendary"
+                    elif rand <= 6.5: new_rarity = "epic"
+                    elif rand <= 32.5: new_rarity = "rare"
+                    else: new_rarity = "common"
+                    
+                # 3. Pick random card of that rarity
+                matching = []
+                for sc in SERIES_CONFIG:
+                    if sc["slug"] == "bonus_card": continue
+                    for cc in sc["cards"]:
+                        if cc["rarity"] == new_rarity:
+                            matching.append((sc["slug"], cc["index"]))
+                            
+                if not matching:
+                    matching.append(("breaking_bad", 1)) # Fallback
+                
+                s_slug, c_idx = random.choice(matching)
+                
+                # 4. Give new card
+                await db.execute("""
+                    INSERT INTO user_cards (telegram_id, series_slug, card_index, count)
+                    VALUES ($1, $2, $3, 1)
+                    ON CONFLICT (telegram_id, series_slug, card_index)
+                    DO UPDATE SET count = user_cards.count + 1
+                """, tg_id, s_slug, c_idx)
+                
+                return web.json_response({
+                    "success": True, 
+                    "series": s_slug, 
+                    "card_index": c_idx, 
+                    "rarity": new_rarity
+                })
+                
+    except Exception as e:
+        import logging
+        logging.error(f"Craft error: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
 async def open_card_pack(request):
     try:
         body = await request.json()
@@ -564,6 +725,7 @@ async def start_webserver():
     app.router.add_get('/api/cards/profile', get_card_profile)
     app.router.add_post('/api/cards/claim_daily', claim_daily_pack)
     app.router.add_post('/api/cards/open', open_card_pack)
+    app.router.add_post('/api/cards/craft', craft_cards_api)
     app.router.add_post('/api/cards/tasks/claim', claim_task_reward)
     app.router.add_post('/api/cards/give_test_packs', give_test_packs_api)
     app.router.add_post('/api/cards/reset_daily_test', reset_daily_test_api)
@@ -707,6 +869,11 @@ class TakePacksFromPlayer(StatesGroup):
 
 class ResetPlayerAccount(StatesGroup):
     waiting_for_input = State()
+
+class CreatePaymentLink(StatesGroup):
+    waiting_for_desc = State()
+    waiting_for_amount = State()
+
 
 # --- DATABASE ---
 async def init_db():
@@ -948,6 +1115,7 @@ def get_admin_kb(user_id=None):
             [KeyboardButton(text="👤 Создать клиента"), KeyboardButton(text="➕ Добавить заказ")],
             [KeyboardButton(text="🔄 Изменить статус заказа"), KeyboardButton(text="💰 Изменить оплату")],
             [KeyboardButton(text="🗃 Архив заказов (Админ)")],
+            [KeyboardButton(text="💳 Создать ссылку на оплату")],
             [KeyboardButton(text="🎮 Админка Игры")]
         ],
         resize_keyboard=True
@@ -1332,8 +1500,9 @@ async def admin_logout(message: Message, state: FSMContext):
         await message.answer("✅ Вы успешно вышли из панели администратора.", reply_markup=get_start_kb())
 
 # --- ADMIN: CREATE CLIENT ---
-@router.message(F.text == "👤 Создать клиента")
+@router.message(F.text == "👤 Создать клиента", StateFilter("*"))
 async def add_client_start(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
         
@@ -1350,8 +1519,9 @@ async def add_client_start(message: Message, state: FSMContext):
     await state.clear()
 
 # --- ADMIN: LIST CLIENTS ---
-@router.message(F.text == "👥 Список клиентов")
-async def list_clients(message: Message):
+@router.message(F.text == "👥 Список клиентов", StateFilter("*"))
+async def list_clients(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     clients = await get_all_clients()
@@ -1366,20 +1536,23 @@ async def list_clients(message: Message):
     await message.answer(response, parse_mode="Markdown")
 
 # --- ADMIN: GAME ADMIN MENU ---
-@router.message(F.text == "🎮 Админка Игры")
-async def game_admin_menu(message: Message):
+@router.message(F.text == "🎮 Админка Игры", StateFilter("*"))
+async def game_admin_menu(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     await message.answer("Добро пожаловать в админку игры Funko Cards!", reply_markup=get_game_admin_kb(message.from_user.id))
 
-@router.message(F.text == "🔙 Назад в гл. меню")
-async def back_to_main_admin(message: Message):
+@router.message(F.text == "🔙 Назад в гл. меню", StateFilter("*"))
+async def back_to_main_admin(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     await message.answer("Возврат в главное меню администратора.", reply_markup=get_admin_kb(message.from_user.id))
 
-@router.message(F.text == "🎫 Проверить код")
+@router.message(F.text == "🎫 Проверить код", StateFilter("*"))
 async def check_code_btn(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     await message.answer("Введите одноразовый промокод игрока (например, A1B2C3D4):", reply_markup=get_cancel_kb())
@@ -1416,8 +1589,9 @@ async def process_check_code(message: Message, state: FSMContext):
     await state.clear()
 
 # --- ADMIN: GAME STATS ---
-@router.message(F.text == "📊 Статистика Игры")
-async def game_stats(message: Message):
+@router.message(F.text == "📊 Статистика Игры", StateFilter("*"))
+async def game_stats(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     
@@ -1525,8 +1699,9 @@ async def game_stats(message: Message):
 
 
 # --- ADMIN: CHECK PLAYER ---
-@router.message(F.text == "🔍 Проверить Игрока")
+@router.message(F.text == "🔍 Проверить Игрока", StateFilter("*"))
 async def check_player_start(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     await message.answer("Введите Telegram ID или @username игрока (можно без @):", reply_markup=get_cancel_kb())
@@ -1673,8 +1848,9 @@ async def check_player_collection(message: Message, state: FSMContext):
         await state.clear()
 
 # --- ADMIN: GIVE PACKS ---
-@router.message(F.text == "🎁 Выдать паки")
+@router.message(F.text == "🎁 Выдать паки", StateFilter("*"))
 async def give_packs_start(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     await message.answer(
@@ -1754,8 +1930,9 @@ async def give_packs_process(message: Message, state: FSMContext):
     await state.clear()
 
 # --- ADMIN: TAKE PACKS ---
-@router.message(F.text == "📤 Забрать паки")
+@router.message(F.text == "📤 Забрать паки", StateFilter("*"))
 async def take_packs_start(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     await message.answer(
@@ -1808,8 +1985,9 @@ async def take_packs_process(message: Message, state: FSMContext):
     await state.clear()
 
 # --- ADMIN: RESET ACCOUNT ---
-@router.message(F.text == "🔄 Сброс аккаунта")
+@router.message(F.text == "🔄 Сброс аккаунта", StateFilter("*"))
 async def reset_account_start(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     await message.answer(
@@ -1857,8 +2035,9 @@ async def reset_account_process(message: Message, state: FSMContext):
     await state.clear()
 
 # --- ADMIN: ALL CODES ---
-@router.message(F.text.in_(["🏷 Все промокоды", "🎫 Все промокоды"]))
-async def all_codes(message: Message):
+@router.message(F.text.in_(["🏷 Все промокоды", "🎫 Все промокоды"]), StateFilter("*"))
+async def all_codes(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     async with pool.acquire() as db:
@@ -1898,8 +2077,9 @@ async def all_codes(message: Message):
 
 
 # --- ADMIN: CREATE ORDER ---
-@router.message(F.text == "➕ Добавить заказ")
+@router.message(F.text == "➕ Добавить заказ", StateFilter("*"))
 async def add_order_start(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     await message.answer("Введите Номер клиента (ID), к которому нужно привязать заказ:", reply_markup=ReplyKeyboardRemove())
@@ -1984,8 +2164,9 @@ async def add_order_photo(message: Message, state: FSMContext):
             logging.error(f"Не удалось уведомить пользователя о новом заказе: {e}")
 
 # --- ADMIN: UPDATE STATUS ---
-@router.message(F.text == "🔄 Изменить статус заказа")
+@router.message(F.text == "🔄 Изменить статус заказа", StateFilter("*"))
 async def change_status_start(message: Message, state: FSMContext):
+    await state.clear()
     await state.clear()
     if not await is_admin(message.from_user.id):
         return
@@ -2038,8 +2219,9 @@ async def set_order_status(callback: CallbackQuery):
         logging.warning(f"[NOTIFY] No user_tg_id for order #{order_id} — user not linked")
 
 # --- ADMIN: UPDATE PAYMENT ---
-@router.message(F.text == "💰 Изменить оплату по заказу")
+@router.message(F.text == "💰 Изменить оплату по заказу", StateFilter("*"))
 async def change_payment_start(message: Message, state: FSMContext):
+    await state.clear()
     await state.clear()
     if not await is_admin(message.from_user.id):
         return
@@ -2085,8 +2267,9 @@ async def update_payment_value(message: Message, state: FSMContext):
             logging.error(f"Не удалось отправить уведомление об оплате клиенту {client_tg_id}: {e}")
 
 # --- ADMIN: ARCHIVE LIST ---
-@router.message(F.text == "🗃 Архив заказов (Админ)")
-async def admin_archive_list(message: Message):
+@router.message(F.text == "🗃 Архив заказов (Админ)", StateFilter("*"))
+async def admin_archive_list(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     
@@ -2160,8 +2343,9 @@ async def show_player_refs(callback: CallbackQuery):
 
 
 # --- CLIENT INTERFACE ---
-@router.message(F.text == "📦 Отследить заказы")
+@router.message(F.text == "📦 Отследить заказы", StateFilter("*"))
 async def check_status_start(message: Message, state: FSMContext):
+    await state.clear()
     # First check if this Telegram ID is already linked to a client
     async with pool.acquire() as db:
         linked = await db.fetchrow("SELECT id FROM clients WHERE user_tg_id = $1", message.from_user.id)
@@ -2259,8 +2443,9 @@ async def check_status_password(message: Message, state: FSMContext):
     await state.clear()
 
 # CLIENT: ARCHIVE
-@router.message(F.text == "🗃 Архив заказов")
+@router.message(F.text == "🗃 Архив заказов", StateFilter("*"))
 async def check_archive_start(message: Message, state: FSMContext):
+    await state.clear()
     # First check if this Telegram ID is already linked
     async with pool.acquire() as db:
         linked = await db.fetchrow("SELECT id FROM clients WHERE user_tg_id = $1", message.from_user.id)
@@ -2335,8 +2520,9 @@ async def check_archive_password(message: Message, state: FSMContext):
             
     await state.clear()
 
-@router.message(F.text == "🧮 Калькулятор стоимости")
-async def calculator_prompt(message: Message):
+@router.message(F.text == "🧮 Калькулятор стоимости", StateFilter("*"))
+async def calculator_prompt(message: Message, state: FSMContext):
+    await state.clear()
     await message.answer("🔗 Просто пришлите мне ссылку на товар с сайта **eBay**, и я автоматически рассчитаю его итоговую стоимость с учетом доставки в РФ!", parse_mode="Markdown")
 
 # --- LINK PARSER ---
@@ -2518,8 +2704,9 @@ BONUS_CARD_NAMES = {
     8: "5 Бонус Паков"
 }
 
-@router.message(F.text == "🎁 Выдать приз")
+@router.message(F.text == "🎁 Выдать приз", StateFilter("*"))
 async def give_prize_start(message: Message, state: FSMContext):
+    await state.clear()
     if not await is_admin(message.from_user.id):
         return
     await message.answer(
@@ -2696,6 +2883,73 @@ async def claim_prize_api(request):
         logging.error(f"claim_prize_api error: {e}\n{traceback.format_exc()}")
         return web.json_response({"success": False, "message": "Server error"})
 
+
+# --- ADMIN: TINKOFF PAYMENT LINK ---
+import hashlib
+import uuid
+import aiohttp
+
+@router.message(F.text == "💳 Создать ссылку на оплату", StateFilter("*"))
+async def tbank_link_start(message: Message, state: FSMContext):
+    await state.clear()
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer("Введите название позиции (товара/услуги):", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(CreatePaymentLink.waiting_for_desc)
+
+@router.message(CreatePaymentLink.waiting_for_desc)
+async def tbank_link_desc(message: Message, state: FSMContext):
+    if not message.text:
+        return await message.answer("Пожалуйста, введите текст.")
+    await state.update_data(desc=message.text)
+    await message.answer("Введите стоимость в рублях (только число):")
+    await state.set_state(CreatePaymentLink.waiting_for_amount)
+
+@router.message(CreatePaymentLink.waiting_for_amount)
+async def tbank_link_amount(message: Message, state: FSMContext):
+    try:
+        amount_rub = float(message.text.strip())
+        amount_kopecks = int(amount_rub * 100)
+    except ValueError:
+        return await message.answer("Неверный формат. Введите число.")
+    
+    data = await state.get_data()
+    desc = data.get("desc", "Оплата")
+    await state.clear()
+    
+    try:
+        TERMINAL_KEY = "1788107588966DEMO"
+        PASSWORD = "2&5TQ7&$Xi6PC3ch"
+        order_id = str(uuid.uuid4())
+        
+        payload = {
+            "TerminalKey": TERMINAL_KEY,
+            "Amount": amount_kopecks,
+            "OrderId": order_id,
+            "Description": desc
+        }
+        
+        sign_data = payload.copy()
+        sign_data["Password"] = PASSWORD
+        
+        sorted_keys = sorted(sign_data.keys())
+        token_str = "".join([str(sign_data[k]) for k in sorted_keys])
+        token = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
+        payload["Token"] = token
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post("https://securepay.tinkoff.ru/v2/Init", json=payload) as resp:
+                resp_data = await resp.json()
+                
+        if resp_data.get("Success"):
+            link = resp_data.get("PaymentURL")
+            await message.answer(f"✅ Ссылка на оплату успешно создана:\n\n{link}", reply_markup=get_admin_kb(message.from_user.id))
+        else:
+            err = resp_data.get("Message", "Unknown") + " - " + resp_data.get("Details", "")
+            await message.answer(f"❌ Ошибка API Т-Банк: {err}", reply_markup=get_admin_kb(message.from_user.id))
+            
+    except Exception as e:
+        await message.answer(f"❌ Системная ошибка: {str(e)}", reply_markup=get_admin_kb(message.from_user.id))
 
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
