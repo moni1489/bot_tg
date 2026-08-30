@@ -2035,7 +2035,7 @@ async def reset_account_process(message: Message, state: FSMContext):
     await state.clear()
 
 # --- ADMIN: ALL CODES ---
-@router.message(F.text.in_(["🏷 Все промокоды", "🎫 Все промокоды"]), StateFilter("*"))
+@router.message(F.text.contains("Все промокоды"), StateFilter("*"))
 async def all_codes(message: Message, state: FSMContext):
     await state.clear()
     if not await is_admin(message.from_user.id):
@@ -2704,7 +2704,7 @@ BONUS_CARD_NAMES = {
     8: "5 Бонус Паков"
 }
 
-@router.message(F.text == "🎁 Выдать приз", StateFilter("*"))
+@router.message(F.text.contains("Выдать приз"), StateFilter("*"))
 async def give_prize_start(message: Message, state: FSMContext):
     await state.clear()
     if not await is_admin(message.from_user.id):
