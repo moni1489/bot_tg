@@ -2927,8 +2927,9 @@ async def tbank_link_amount(message: Message, state: FSMContext):
     await state.clear()
     
     try:
-        TERMINAL_KEY = "1788107588966DEMO"
-        PASSWORD = "2&5TQ7&$Xi6PC3ch"
+        # Реальные данные терминала (не DEMO)
+        TERMINAL_KEY = os.getenv("TBANK_TERMINAL_KEY", "1788107588985")
+        PASSWORD = os.getenv("TBANK_PASSWORD", "XV7#HPN$fi%yN1gl")
         order_id = str(uuid.uuid4())
         
         payload = {
