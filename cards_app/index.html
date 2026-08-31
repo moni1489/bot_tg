@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>FunkoStop Cards</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/cards/cards.css?v=106">
+    <link rel="stylesheet" href="/cards/cards.css?v=107">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -257,6 +257,14 @@
                     <div class="tradein-slot empty-slot pulse" id="slot-2" onclick="openInventoryForSlot(2)">+</div>
                     <div class="tradein-slot empty-slot pulse" id="slot-3" onclick="openInventoryForSlot(3)">+</div>
                 </div>
+
+                <!-- CHANCES PREVIEW DISPLAY -->
+                <div class="tradein-chances-box" id="tradein-chances-box">
+                    <div class="chances-title">Вероятность результата:</div>
+                    <div class="chances-pills" id="chances-pills">
+                        <span class="chance-hint">Заполните 4 слота для расчёта шансов</span>
+                    </div>
+                </div>
                 
                 <div class="tradein-action">
                     <button class="craft-btn" id="btn-craft" disabled onclick="craftCards()">Скрафтить новую карту</button>
@@ -404,7 +412,7 @@
         </div>
     </div>
 
-    <script src="/cards/cards.js?v=106"></script>
+    <script src="/cards/cards.js?v=107"></script>
 
     <!-- Inventory Modal for Trade-in -->
     <div id="inventory-modal" class="modal hidden" onclick="if(event.target === this) closeInventoryModal()">
