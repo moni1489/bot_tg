@@ -483,9 +483,9 @@ function rollRandomCard() {
     const rareThresh = epicThresh + rareRate;
 
     let selectedRarity = 'common';
-    if (rand <= legThresh) selectedRarity = 'legendary'; 
-    else if (rand <= epicThresh) selectedRarity = 'epic'; 
-    else if (rand <= rareThresh) selectedRarity = 'rare'; 
+    if (rand <= legThresh) selectedRarity = 'legendary';
+    else if (rand <= epicThresh) selectedRarity = 'epic';
+    else if (rand <= rareThresh) selectedRarity = 'rare';
     else selectedRarity = 'common';
 
     const matching = [];
@@ -584,6 +584,9 @@ openPackBtn.addEventListener('click', async () => {
         let currentBonus = rollBonusCard();
         const cardKey = `${drop.series.slug}_${drop.card.index}`;
         userCards[cardKey] = (userCards[cardKey] || 0) + 1;
+
+        // Immediately sync to server DB so card is never lost if user closes early
+        syncOpenedCard(drop.series.slug, drop.card.index);
 
         cardFront.innerHTML = `
             <div class="card-frame ${drop.series.theme}" style="padding: 0; border: none; background: transparent; box-shadow: none; position: relative;">
@@ -698,8 +701,6 @@ openPackBtn.addEventListener('click', async () => {
                                     ['#4caf50', '#8bc34a', '#fff']
                     });
                 }
-
-                syncOpenedCard(drop.series.slug, drop.card.index);
 
                 // Show action buttons
                 actions.classList.remove('hidden');
@@ -958,7 +959,7 @@ async function syncOpenedCard(seriesSlug, cardIndex) {
             console.error("Open error:", data.error);
             // Revert local state: re-sync from server to get exact DB state
             // (do NOT manually decrement - could delete legitimate cards)
-            try { await fetchProfile(); } catch(e2) {}
+            try { await fetchProfile(); } catch (e2) { }
             alert("Ошибка: у вас закончились паки. Отображение коллекции обновлено.");
             renderCollection();
         }
@@ -1057,6 +1058,84 @@ function closeLightbox() {
 function setupLightboxClose() {
     document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
     document.getElementById('lightbox-close-btn').addEventListener('click', closeLightbox);
+}
+
+// ===== PRIZE CODE MODAL LOGIC =====
+let currentPrizeCode = '';
+let currentPrizeSeriesName = '';
+
+function showPrizeCodeModal(seriesName, code) {
+    currentPrizeCode = code;
+    currentPrizeSeriesName = seriesName;
+    
+    const modal = document.getElementById('prize-code-modal');
+    const seriesEl = document.getElementById('prize-code-series-name');
+    const codeEl = document.getElementById('prize-code-val');
+    const copyBtn = document.getElementById('prize-code-copy-btn');
+    
+    if (seriesEl) seriesEl.textContent = seriesName;
+    if (codeEl) codeEl.textContent = code;
+    if (copyBtn) copyBtn.textContent = '📋 Скопировать';
+    
+    if (modal) {
+        modal.classList.remove('hidden');
+        void modal.offsetWidth;
+        modal.classList.add('open');
+    }
+
+    if (window.confetti) {
+        confetti({
+            particleCount: 150,
+            spread: 90,
+            origin: { y: 0.5 },
+            colors: ['#ffc107', '#ff9800', '#ff0032', '#fff']
+        });
+    }
+}
+
+function closePrizeCodeModal() {
+    const modal = document.getElementById('prize-code-modal');
+    if (!modal) return;
+    modal.classList.remove('open');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 250);
+}
+
+function copyPrizeCode() {
+    if (!currentPrizeCode) return;
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(currentPrizeCode);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = currentPrizeCode;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+    } catch (e) {}
+
+    const copyBtn = document.getElementById('prize-code-copy-btn');
+    if (copyBtn) {
+        copyBtn.textContent = '✅ Скопировано!';
+        setTimeout(() => { copyBtn.textContent = '📋 Скопировать'; }, 2000);
+    }
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+    }
+}
+
+function openManagerWithCode() {
+    if (!currentPrizeCode) return;
+    const msg = encodeURIComponent(`Здравствуйте! Я собрал серию ${currentPrizeSeriesName}, мой промокод: ${currentPrizeCode}`);
+    const url = `https://t.me/Funko_Stop?text=${msg}`;
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
+        window.Telegram.WebApp.openTelegramLink(url);
+    } else {
+        window.open(url, '_blank');
+    }
 }
 
 function renderCollection() {
@@ -1180,7 +1259,7 @@ function renderCollection() {
                 if (btn) {
                     btn.addEventListener('click', async () => {
                         const originalText = btn.textContent;
-                        btn.textContent = 'Генерация...';
+                        btn.textContent = 'Получение кода...';
                         btn.disabled = true;
                         try {
                             const res = await fetch('/api/cards/generate_code', {
@@ -1191,13 +1270,12 @@ function renderCollection() {
                             const data = await res.json();
                             if (data.success || data.code) {
                                 const code = data.code;
-                                const msg = encodeURIComponent(`Здравствуйте! Я собрал серию ${series.name}, мой код: ${code}`);
-                                window.open(`https://t.me/Funko_Stop?text=${msg}`, '_blank');
+                                showPrizeCodeModal(series.name, code);
                             } else {
                                 alert('Ошибка: ' + (data.error || 'Не удалось сгенерировать код.'));
                             }
                         } catch (e) {
-                            alert('Ошибка сети.');
+                            alert('Ошибка сети. Попробуйте ещё раз.');
                         } finally {
                             btn.textContent = originalText;
                             btn.disabled = false;
@@ -1248,7 +1326,7 @@ function renderPrizes() {
         `;
 
         // Click: open card in fullscreen lightbox
-        item.onclick = function() {
+        item.onclick = function () {
             openLightbox(prize, { name: "Призы" }, true);
         };
 
@@ -1392,18 +1470,18 @@ function preloadImagesAndInit() {
     const loadingScreen = document.getElementById('loading-screen');
     const loadingBar = document.getElementById('loading-bar');
     const loadingText = document.getElementById('loading-text');
-    
+
     // 1. Initialize app DOM
     initApp();
-    
+
     if (!loadingScreen) return;
-    
+
     let isCompleted = false;
 
     function hideLoadingScreen() {
         if (isCompleted) return;
         isCompleted = true;
-        
+
         loadingScreen.classList.add('fade-out');
         setTimeout(() => {
             loadingScreen.style.display = 'none';
@@ -1412,13 +1490,13 @@ function preloadImagesAndInit() {
 
     function showReadyState() {
         if (isCompleted) return; // already skipped
-        
+
         if (loadingBar) loadingBar.style.width = '100%';
         if (loadingText) {
             loadingText.innerText = 'Загрузка завершена! Можете играть или прочитать FAQ.';
             loadingText.style.color = '#00ff88';
         }
-        
+
         const playBtn = document.getElementById('loading-play-btn');
         if (playBtn) playBtn.classList.remove('hidden');
     }
@@ -1432,37 +1510,37 @@ function preloadImagesAndInit() {
 
     // 3. Image Preloader (FAQ first, then DOM)
     const faqImages = [];
-    for(let i=1; i<=totalFaqImages; i++) {
+    for (let i = 1; i <= totalFaqImages; i++) {
         const img = new Image();
         img.src = `/cards/images/faq${i}.webp`;
         faqImages.push(img);
     }
-    
+
     const domImages = Array.from(document.querySelectorAll('img')).filter(img => img.src);
     const images = [...faqImages, ...domImages];
     const totalImages = images.length;
-    
+
     if (totalImages === 0) {
         clearTimeout(safetyTimeout);
         hideLoadingScreen();
         return;
     }
-    
+
     let loadedImages = 0;
-    
+
     function updateProgress() {
         loadedImages++;
         const progress = Math.min(100, Math.floor((loadedImages / totalImages) * 100));
-        
+
         if (loadingBar) loadingBar.style.width = progress + '%';
         if (loadingText) loadingText.innerText = 'Загрузка... ' + progress + '%';
-        
+
         if (loadedImages >= totalImages) {
             clearTimeout(safetyTimeout);
             setTimeout(showReadyState, 200);
         }
     }
-    
+
     images.forEach(img => {
         if (img.complete) {
             updateProgress();
@@ -1486,27 +1564,27 @@ function openInventoryForSlot(index) {
     activeSlotIndex = index;
     const invList = document.getElementById('inventory-list');
     invList.innerHTML = '';
-    
+
     let hasDupes = false;
     let cardItemIndex = 0;
-    
+
     // Find all duplicate cards
     for (const [key, count] of Object.entries(userCards)) {
         if (key.startsWith('bonus_card')) continue;
-        
+
         // Find how many of this card are currently in slots
         let inSlotsCount = tradeinSlots.filter(s => s === key).length;
         let availableCount = count - inSlotsCount;
-        
+
         // You can only spend if count > 1 (keep at least 1)
         let spendable = (count > 1) ? (count - 1) : 0;
         let leftToSpend = spendable - inSlotsCount;
-        
+
         // If current slot already holds this card, allow re-selecting or keeping it
         if (tradeinSlots[index] === key) {
             leftToSpend += 1;
         }
-        
+
         if (leftToSpend > 0) {
             hasDupes = true;
             const parts = key.split('_');
@@ -1514,7 +1592,7 @@ function openInventoryForSlot(index) {
             const seriesSlug = parts.join('_');
             const sConf = SERIES_CONFIG.find(s => s.slug === seriesSlug);
             const cConf = sConf ? sConf.cards.find(c => c.index == cardIdx) : null;
-            
+
             if (sConf && cConf) {
                 const item = document.createElement('div');
                 item.className = `inventory-item rarity-${cConf.rarity}`;
@@ -1527,11 +1605,11 @@ function openInventoryForSlot(index) {
             }
         }
     }
-    
+
     if (!hasDupes) {
         invList.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.6);padding:30px 10px;font-size:0.95rem;line-height:1.5;">У вас нет свободных повторок для обмена.<br><span style="font-size:0.8rem;color:rgba(255,255,255,0.4);margin-top:6px;display:inline-block;">(Нужно иметь 2+ одинаковые карты)</span></div>';
     }
-    
+
     // Smooth opening
     const modal = document.getElementById('inventory-modal');
     modal.classList.remove('hidden');
@@ -1558,12 +1636,12 @@ function selectCardForSlot(key, cConf, sConf) {
         slotEl.classList.remove('empty-slot', 'pulse', 'slot-filled');
         slotEl.style.backgroundImage = `url('${cConf.img}')`;
         slotEl.style.border = `2px solid var(--rarity-${cConf.rarity})`;
-        
+
         // Trigger smooth pop animation
         void slotEl.offsetWidth;
         slotEl.classList.add('slot-filled');
     }
-    
+
     closeInventoryModal();
     checkCraftReady();
 }
@@ -1628,9 +1706,9 @@ function updateCraftChancesPreview() {
     // Build pills
     const labels = [
         { key: 'legendary', name: 'LEGENDARY', class: 'pill-legendary', color: '#ffc107' },
-        { key: 'epic',      name: 'EPIC',      class: 'pill-epic',      color: '#e040fb' },
-        { key: 'rare',      name: 'RARE',      class: 'pill-rare',      color: '#2196f3' },
-        { key: 'common',    name: 'COMMON',    class: 'pill-common',    color: '#ffffff' }
+        { key: 'epic', name: 'EPIC', class: 'pill-epic', color: '#e040fb' },
+        { key: 'rare', name: 'RARE', class: 'pill-rare', color: '#2196f3' },
+        { key: 'common', name: 'COMMON', class: 'pill-common', color: '#ffffff' }
     ];
 
     let pillsHtml = '';
@@ -1836,9 +1914,9 @@ async function craftCards() {
                     spread: rarity === 'legendary' ? 130 : 90,
                     origin: { y: 0.5 },
                     colors: rarity === 'legendary' ? ['#ffc107', '#ff9800', '#fff'] :
-                            rarity === 'epic'      ? ['#e040fb', '#9c27b0', '#fff'] :
-                            rarity === 'rare'      ? ['#2196f3', '#00bcd4', '#fff'] :
-                                                     ['#4caf50', '#8bc34a', '#fff']
+                        rarity === 'epic' ? ['#e040fb', '#9c27b0', '#fff'] :
+                            rarity === 'rare' ? ['#2196f3', '#00bcd4', '#fff'] :
+                                ['#4caf50', '#8bc34a', '#fff']
                 });
             }
             if (btnCloseDrop) btnCloseDrop.classList.remove('hidden');
@@ -1877,7 +1955,7 @@ function showCardModal(seriesSlug, cardIndex, rarity, isCraft) {
         svetBg.style.opacity = '0';
     }
     if (rarityBadge) rarityBadge.className = 'drop-rarity-badge hidden';
-    
+
     cardStage.classList.remove('hidden');
 
     cardFront.innerHTML = `
@@ -1903,12 +1981,12 @@ function showCardModal(seriesSlug, cardIndex, rarity, isCraft) {
         card3d.classList.add('flipped');
         card3d.style.transition = 'transform 200ms ease-in';
         card3d.style.transform = 'rotateY(90deg)';
-        
+
         setTimeout(() => {
             if (cardBack) { cardBack.style.display = 'none'; cardBack.style.opacity = '0'; }
             cardFront.style.display = 'block';
             cardFront.style.opacity = '1';
-            
+
             card3d.style.transition = 'none';
             card3d.style.transform = 'rotateY(-90deg)';
             void card3d.offsetWidth;
