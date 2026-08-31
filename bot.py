@@ -195,6 +195,7 @@ async def get_card_profile(request):
                     "message": "Для участия в игре необходимо быть подписанным на наш Telegram канал @FunkoStop!"
                 }, status=403)
 
+            drop_settings = await get_drop_settings()
             return web.json_response({
                 "packs_count": packs_count,
                 "last_daily_pack": last_daily,
@@ -202,7 +203,8 @@ async def get_card_profile(request):
                 "completed_tasks": completed_tasks,
                 "ref_count": ref_count,
                 "bot_username": bot_username,
-                "is_admin": is_adm
+                "is_admin": is_adm,
+                "drop_settings": drop_settings
             })
     except Exception as e:
         logging.error(f"get_card_profile error: {e}")
@@ -212,7 +214,8 @@ async def get_card_profile(request):
             "user_cards": {},
             "completed_tasks": [],
             "ref_count": 0,
-            "bot_username": "funkostop_bot"
+            "bot_username": "funkostop_bot",
+            "drop_settings": DEFAULT_DROP_SETTINGS
         })
 
 async def claim_task_reward(request):
@@ -424,27 +427,78 @@ async def craft_cards_api(request):
                 counts = {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
                 for r in rarities: counts[r] += 1
                 
-                new_rarity = "common"
+                # 2. Determine new rarity based on rules
+                # ПРАВИЛО: Нет прыжков через грейд!
+                # 4 Common -> 75% Common, 25% Rare (0% Epic, 0% Legendary)
+                # 4 Rare -> 70% Rare, 30% Epic (0% Legendary)
+                # 4 Epic -> 80% Epic, 20% Legendary
+                # Смеси Common + Rare -> 0% Legendary, шанс на Epic только если есть хотя бы 1 Rare
+                n_c = counts["common"]
+                n_r = counts["rare"]
+                n_e = counts["epic"]
+                n_l = counts["legendary"]
+
                 rand = random.uniform(0, 100)
-                
-                if counts["common"] == 4:
-                    if rand <= 1.0: new_rarity = "epic"
-                    elif rand <= 15.0: new_rarity = "rare"
-                    else: new_rarity = "common"
-                elif counts["rare"] == 4:
-                    if rand <= 2.0: new_rarity = "legendary"
-                    elif rand <= 20.0: new_rarity = "epic"
-                    else: new_rarity = "rare"
-                elif counts["epic"] == 4:
+                new_rarity = "common"
+
+                if n_c == 4:
+                    # 4× Common → Common 75%, Rare 25%, Epic 0%, Legendary 0%
+                    if rand <= 25.0: new_rarity = "rare"
+                    else:            new_rarity = "common"
+
+                elif n_r == 4:
+                    # 4× Rare → Rare 70%, Epic 30%, Legendary 0% (строго 70/30)
+                    if rand <= 30.0: new_rarity = "epic"
+                    else:            new_rarity = "rare"
+
+                elif n_e == 4:
+                    # 4× Epic → Epic 80%, Legendary 20%
                     if rand <= 20.0: new_rarity = "legendary"
-                    else: new_rarity = "epic"
+                    else:            new_rarity = "epic"
+
+                elif n_l == 4:
+                    new_rarity = "legendary"
+
+                elif n_l > 0:
+                    # Наборы с легендарками (1-3 леги)
+                    leg_chance = min(75.0, 25.0 * n_l)
+                    if rand <= leg_chance: new_rarity = "legendary"
+                    else:                  new_rarity = "epic"
+
+                elif n_e > 0:
+                    # Смеси с Эпиками (без лег):
+                    # Шанс на Легендарку зависит от числа эпиков (1E: 4%, 2E: 8%, 3E: 14%)
+                    leg_chance = 4.0 * n_e if n_e < 3 else 14.0
+                    epic_chance = leg_chance + (35.0 + 15.0 * n_e + 5.0 * n_r)
+                    if rand <= leg_chance:
+                        new_rarity = "legendary"
+                    elif rand <= epic_chance:
+                        new_rarity = "epic"
+                    else:
+                        if n_c >= 2 and random.uniform(0, 100) <= 30.0:
+                            new_rarity = "common"
+                        else:
+                            new_rarity = "rare"
+
                 else:
-                    # Mixed / Standard
-                    if rand <= 1.5: new_rarity = "legendary"
-                    elif rand <= 6.5: new_rarity = "epic"
-                    elif rand <= 32.5: new_rarity = "rare"
-                    else: new_rarity = "common"
-                    
+                    # Смеси только Common + Rare (без эпиков и без лег)
+                    # 0% шанс на Legendary!
+                    if n_r == 1:
+                        # 3C + 1R
+                        if rand <= 5.0:    new_rarity = "epic"
+                        elif rand <= 55.0: new_rarity = "rare"
+                        else:              new_rarity = "common"
+                    elif n_r == 2:
+                        # 2C + 2R
+                        if rand <= 12.0:   new_rarity = "epic"
+                        elif rand <= 70.0: new_rarity = "rare"
+                        else:              new_rarity = "common"
+                    elif n_r == 3:
+                        # 1C + 3R
+                        if rand <= 22.0:   new_rarity = "epic"
+                        elif rand <= 90.0: new_rarity = "rare"
+                        else:              new_rarity = "common"
+
                 # 3. Pick random card of that rarity
                 matching = []
                 for sc in SERIES_CONFIG:
@@ -874,12 +928,24 @@ class CreatePaymentLink(StatesGroup):
     waiting_for_desc = State()
     waiting_for_amount = State()
 
+class EditDropRate(StatesGroup):
+    waiting_for_legendary = State()
+    waiting_for_epic = State()
+    waiting_for_rare = State()
+    waiting_for_penalty = State()
+
 
 # --- DATABASE ---
 async def init_db():
     global pool
     pool = await asyncpg.create_pool(DATABASE_URL)
     async with pool.acquire() as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS game_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -985,6 +1051,34 @@ async def init_db():
                 )
             except asyncpg.exceptions.UniqueViolationError:
                 pass
+
+DEFAULT_DROP_SETTINGS = {
+    "legendary_rate": 1.5,
+    "epic_rate": 5.0,
+    "rare_rate": 26.0,
+    "series_penalty": 67.0 # % reduction after 1+ completed series (e.g. 67% reduction = multiplier 0.33)
+}
+
+async def get_drop_settings() -> dict:
+    try:
+        async with pool.acquire() as db:
+            val = await db.fetchval("SELECT value FROM game_settings WHERE key = 'drop_settings'")
+            if val:
+                d = json.loads(val)
+                res = DEFAULT_DROP_SETTINGS.copy()
+                res.update(d)
+                return res
+    except Exception as e:
+        logging.error(f"Error fetching drop settings: {e}")
+    return DEFAULT_DROP_SETTINGS.copy()
+
+async def save_drop_settings(data: dict):
+    async with pool.acquire() as db:
+        await db.execute("""
+            INSERT INTO game_settings (key, value)
+            VALUES ('drop_settings', $1)
+            ON CONFLICT (key) DO UPDATE SET value = $1
+        """, json.dumps(data))
 
 async def is_admin(user_tg_id: int) -> bool:
     if user_tg_id in ADMIN_IDS:
@@ -1127,10 +1221,10 @@ def get_game_admin_kb(user_id=None):
         keyboard=[
             [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))],
             [KeyboardButton(text="📊 Статистика Игры"), KeyboardButton(text="🔍 Проверить Игрока")],
-            [KeyboardButton(text="🎫 Проверить код"), KeyboardButton(text="🎁 Выдать паки")],
-            [KeyboardButton(text="📤 Забрать паки"), KeyboardButton(text="🔄 Сброс аккаунта")],
-            [KeyboardButton(text="🎫 Все промокоды"), KeyboardButton(text="🎁 Выдать приз")],
-            [KeyboardButton(text="🔙 Назад в гл. меню")]
+            [KeyboardButton(text="🎲 Шансы дропа"), KeyboardButton(text="🎫 Проверить код")],
+            [KeyboardButton(text="🎁 Выдать паки"), KeyboardButton(text="📤 Забрать паки")],
+            [KeyboardButton(text="🔄 Сброс аккаунта"), KeyboardButton(text="🎫 Все промокоды")],
+            [KeyboardButton(text="🎁 Выдать приз"), KeyboardButton(text="🔙 Назад в гл. меню")]
         ],
         resize_keyboard=True
     )
@@ -2082,6 +2176,166 @@ async def all_codes(message: Message, state: FSMContext):
     for i, chunk in enumerate(chunks):
         markup = get_game_admin_kb(message.from_user.id) if i == len(chunks) - 1 else None
         await message.answer(chunk, parse_mode="HTML", reply_markup=markup)
+
+
+# --- ADMIN: DROP RATES SETTINGS ---
+def get_drop_settings_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🟡 Изм. % Легендарных", callback_data="edit_drop_legendary"),
+            InlineKeyboardButton(text="🟣 Изм. % Эпических", callback_data="edit_drop_epic")
+        ],
+        [
+            InlineKeyboardButton(text="🔵 Изм. % Редких", callback_data="edit_drop_rare"),
+            InlineKeyboardButton(text="📉 Снижение после серии", callback_data="edit_drop_penalty")
+        ],
+        [
+            InlineKeyboardButton(text="🔄 Сбросить на стандартные", callback_data="edit_drop_reset")
+        ]
+    ])
+
+async def build_drop_settings_text() -> str:
+    s = await get_drop_settings()
+    leg = float(s.get("legendary_rate", 1.5))
+    epic = float(s.get("epic_rate", 5.0))
+    rare = float(s.get("rare_rate", 26.0))
+    common = max(0.0, round(100.0 - leg - epic - rare, 2))
+    penalty = float(s.get("series_penalty", 67.0))
+    multiplier = max(0.0, round((100.0 - penalty) / 100.0, 2))
+
+    return (
+        "🎲 <b>Настройки шансов дропа из паков</b>\n\n"
+        "<b>Текущие базовые шансы:</b>\n"
+        f"• 🟡 <b>Легендарные:</b> <code>{leg}%</code>\n"
+        f"• 🟣 <b>Эпические:</b> <code>{epic}%</code>\n"
+        f"• 🔵 <b>Редкие:</b> <code>{rare}%</code>\n"
+        f"• ⚪ <b>Обычные:</b> <code>{common}%</code>\n\n"
+        "<b>Снижение после собранной серии:</b>\n"
+        f"• 📉 <b>Штраф:</b> <code>-{penalty}%</code> (множитель <code>x{multiplier}</code>)\n"
+        f"<i>(После того как игрок собрал 1+ серию, его шансы на редкие карты умножаются на x{multiplier})</i>\n\n"
+        "👇 <i>Выберите что хотите изменить:</i>"
+    )
+
+@router.message(F.text == "🎲 Шансы дропа", StateFilter("*"))
+async def show_drop_settings_handler(message: Message, state: FSMContext):
+    await state.clear()
+    if not await is_admin(message.from_user.id):
+        return
+    text = await build_drop_settings_text()
+    await message.answer(text, parse_mode="HTML", reply_markup=get_drop_settings_kb())
+
+@router.callback_query(F.data == "edit_drop_legendary")
+async def edit_drop_legendary_cb(callback: CallbackQuery, state: FSMContext):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("Нет прав", show_alert=True)
+    await callback.message.answer("Введите новый % для <b>Легендарных</b> карт (например: <code>1.5</code> или <code>2.0</code>):", parse_mode="HTML", reply_markup=get_cancel_kb())
+    await state.set_state(EditDropRate.waiting_for_legendary)
+    await callback.answer()
+
+@router.message(EditDropRate.waiting_for_legendary)
+async def process_edit_legendary(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await state.clear()
+        return await message.answer("Отменено.", reply_markup=get_game_admin_kb(message.from_user.id))
+    try:
+        val = float(message.text.replace(",", ".").strip())
+        if val < 0 or val > 100:
+            raise ValueError()
+    except ValueError:
+        return await message.answer("❌ Введите корректное число от 0 до 100.")
+    s = await get_drop_settings()
+    s["legendary_rate"] = round(val, 2)
+    await save_drop_settings(s)
+    await state.clear()
+    await message.answer(f"✅ Шанс для <b>Легендарных</b> карт установлен на <b>{round(val, 2)}%</b>!\n\n" + await build_drop_settings_text(), parse_mode="HTML", reply_markup=get_drop_settings_kb())
+
+@router.callback_query(F.data == "edit_drop_epic")
+async def edit_drop_epic_cb(callback: CallbackQuery, state: FSMContext):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("Нет прав", show_alert=True)
+    await callback.message.answer("Введите новый % для <b>Эпических</b> карт (например: <code>5.0</code>):", parse_mode="HTML", reply_markup=get_cancel_kb())
+    await state.set_state(EditDropRate.waiting_for_epic)
+    await callback.answer()
+
+@router.message(EditDropRate.waiting_for_epic)
+async def process_edit_epic(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await state.clear()
+        return await message.answer("Отменено.", reply_markup=get_game_admin_kb(message.from_user.id))
+    try:
+        val = float(message.text.replace(",", ".").strip())
+        if val < 0 or val > 100:
+            raise ValueError()
+    except ValueError:
+        return await message.answer("❌ Введите корректное число от 0 до 100.")
+    s = await get_drop_settings()
+    s["epic_rate"] = round(val, 2)
+    await save_drop_settings(s)
+    await state.clear()
+    await message.answer(f"✅ Шанс для <b>Эпических</b> карт установлен на <b>{round(val, 2)}%</b>!\n\n" + await build_drop_settings_text(), parse_mode="HTML", reply_markup=get_drop_settings_kb())
+
+@router.callback_query(F.data == "edit_drop_rare")
+async def edit_drop_rare_cb(callback: CallbackQuery, state: FSMContext):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("Нет прав", show_alert=True)
+    await callback.message.answer("Введите новый % для <b>Редких</b> карт (например: <code>26.0</code>):", parse_mode="HTML", reply_markup=get_cancel_kb())
+    await state.set_state(EditDropRate.waiting_for_rare)
+    await callback.answer()
+
+@router.message(EditDropRate.waiting_for_rare)
+async def process_edit_rare(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await state.clear()
+        return await message.answer("Отменено.", reply_markup=get_game_admin_kb(message.from_user.id))
+    try:
+        val = float(message.text.replace(",", ".").strip())
+        if val < 0 or val > 100:
+            raise ValueError()
+    except ValueError:
+        return await message.answer("❌ Введите корректное число от 0 до 100.")
+    s = await get_drop_settings()
+    s["rare_rate"] = round(val, 2)
+    await save_drop_settings(s)
+    await state.clear()
+    await message.answer(f"✅ Шанс для <b>Редких</b> карт установлен на <b>{round(val, 2)}%</b>!\n\n" + await build_drop_settings_text(), parse_mode="HTML", reply_markup=get_drop_settings_kb())
+
+@router.callback_query(F.data == "edit_drop_penalty")
+async def edit_drop_penalty_cb(callback: CallbackQuery, state: FSMContext):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("Нет прав", show_alert=True)
+    await callback.message.answer("Введите % снижения шансов после сбора 1-й серии (например <code>50</code> для снижения в 2 раза, или <code>67</code>):", parse_mode="HTML", reply_markup=get_cancel_kb())
+    await state.set_state(EditDropRate.waiting_for_penalty)
+    await callback.answer()
+
+@router.message(EditDropRate.waiting_for_penalty)
+async def process_edit_penalty(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await state.clear()
+        return await message.answer("Отменено.", reply_markup=get_game_admin_kb(message.from_user.id))
+    try:
+        val = float(message.text.replace(",", ".").strip())
+        if val < 0 or val > 99:
+            raise ValueError()
+    except ValueError:
+        return await message.answer("❌ Введите число от 0 до 99 (например 50 или 67).")
+    s = await get_drop_settings()
+    s["series_penalty"] = round(val, 2)
+    await save_drop_settings(s)
+    await state.clear()
+    mult = max(0.0, round((100.0 - val) / 100.0, 2))
+    await message.answer(f"✅ Снижение шансов после серии установлено на <b>-{round(val, 2)}%</b> (множитель <code>x{mult}</code>)!\n\n" + await build_drop_settings_text(), parse_mode="HTML", reply_markup=get_drop_settings_kb())
+
+@router.callback_query(F.data == "edit_drop_reset")
+async def edit_drop_reset_cb(callback: CallbackQuery, state: FSMContext):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("Нет прав", show_alert=True)
+    await save_drop_settings(DEFAULT_DROP_SETTINGS.copy())
+    await callback.answer("Шансы сброшены на стандартные!", show_alert=True)
+    text = await build_drop_settings_text()
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_drop_settings_kb())
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=get_drop_settings_kb())
 
 
 
