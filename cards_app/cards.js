@@ -1568,6 +1568,88 @@ function selectCardForSlot(key, cConf, sConf) {
     checkCraftReady();
 }
 
+function updateCraftChancesPreview() {
+    const box = document.getElementById('chances-pills');
+    if (!box) return;
+
+    if (!tradeinSlots.every(s => s !== null)) {
+        const filledCount = tradeinSlots.filter(s => s !== null).length;
+        box.innerHTML = `<span class="chance-hint">Заполнено ${filledCount}/4 слотов</span>`;
+        return;
+    }
+
+    // Determine rarities of the 4 slotted cards
+    const rarities = [];
+    tradeinSlots.forEach(key => {
+        const parts = key.split('_');
+        const cardIdx = parts.pop();
+        const seriesSlug = parts.join('_');
+        const sConf = SERIES_CONFIG.find(s => s.slug === seriesSlug);
+        const cConf = sConf ? sConf.cards.find(c => c.index == cardIdx) : null;
+        if (cConf) rarities.push(cConf.rarity);
+    });
+
+    const counts = { common: 0, rare: 0, epic: 0, legendary: 0 };
+    rarities.forEach(r => counts[r] = (counts[r] || 0) + 1);
+
+    const n_c = counts.common;
+    const n_r = counts.rare;
+    const n_e = counts.epic;
+    const n_l = counts.legendary;
+
+    let odds = { common: 0, rare: 0, epic: 0, legendary: 0 };
+
+    if (n_c === 4) {
+        odds = { common: 70, rare: 30, epic: 0, legendary: 0 };
+    } else if (n_r === 4) {
+        odds = { common: 0, rare: 70, epic: 30, legendary: 0 };
+    } else if (n_e === 4) {
+        odds = { common: 0, rare: 0, epic: 80, legendary: 20 };
+    } else if (n_l === 4) {
+        odds = { common: 0, rare: 0, epic: 0, legendary: 100 };
+    } else if (n_l > 0) {
+        const leg = Math.min(75, 25 * n_l);
+        odds = { common: 0, rare: 0, epic: 100 - leg, legendary: leg };
+    } else if (n_e > 0) {
+        const leg = n_e < 3 ? 4 * n_e : 14;
+        const epic = 35 + 15 * n_e + 5 * n_r;
+        const rem = Math.max(0, 100 - leg - epic);
+        const comm = (n_c >= 2) ? Math.round(rem * 0.3) : 0;
+        const rare = rem - comm;
+        odds = { common: comm, rare: rare, epic: epic, legendary: leg };
+    } else {
+        // Only common + rare
+        if (n_r === 1) odds = { common: 45, rare: 50, epic: 5, legendary: 0 };
+        else if (n_r === 2) odds = { common: 30, rare: 58, epic: 12, legendary: 0 };
+        else if (n_r === 3) odds = { common: 10, rare: 68, epic: 22, legendary: 0 };
+        else odds = { common: 70, rare: 30, epic: 0, legendary: 0 };
+    }
+
+    // Build pills
+    const labels = [
+        { key: 'legendary', name: 'Легендарка', class: 'pill-legendary', color: '#ffc107' },
+        { key: 'epic',      name: 'Эпик',       class: 'pill-epic',      color: '#e040fb' },
+        { key: 'rare',      name: 'Рарка',      class: 'pill-rare',      color: '#2196f3' },
+        { key: 'common',    name: 'Комонка',    class: 'pill-common',    color: '#ffffff' }
+    ];
+
+    let pillsHtml = '';
+    labels.forEach(l => {
+        const pct = odds[l.key];
+        if (pct > 0) {
+            pillsHtml += `
+                <div class="chance-pill ${l.class}">
+                    <span class="pill-dot" style="background:${l.color};box-shadow:0 0 8px ${l.color}"></span>
+                    <span class="pill-name">${l.name}</span>
+                    <span class="pill-val">${pct}%</span>
+                </div>
+            `;
+        }
+    });
+
+    box.innerHTML = pillsHtml || '<span class="chance-hint">Заполните 4 слота</span>';
+}
+
 function checkCraftReady() {
     const btn = document.getElementById('btn-craft');
     if (tradeinSlots.every(s => s !== null)) {
@@ -1575,6 +1657,7 @@ function checkCraftReady() {
     } else {
         btn.setAttribute('disabled', 'true');
     }
+    updateCraftChancesPreview();
 }
 
 async function craftCards() {
