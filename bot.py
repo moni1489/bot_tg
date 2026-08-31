@@ -687,6 +687,21 @@ async def generate_series_code(request):
             code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
             await db.execute("INSERT INTO series_codes (telegram_id, series_slug, code) VALUES ($1, $2, $3)", tg_id, series_slug, code)
             
+            # Send code directly to the player in PM
+            try:
+                await bot.send_message(
+                    chat_id=tg_id,
+                    text=(
+                        f"🎉 <b>Поздравляем с собранной коллекцией!</b>\n\n"
+                        f"Вы полностью собрали серию <b>{series_slug.upper()}</b>!\n\n"
+                        f"🏷 Ваш промокод на приз: <code>{code}</code>\n\n"
+                        f"Отправьте этот код нашему менеджеру @Funko_Stop для получения приза 🎁"
+                    ),
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logging.warning(f"Could not send code to user {tg_id}: {e}")
+
             # Get all admin IDs (from .env + from database)
             admin_targets = set(ADMIN_IDS)
             db_admins = await db.fetch("SELECT user_tg_id FROM users WHERE role = 'admin' AND user_tg_id IS NOT NULL")
