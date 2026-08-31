@@ -314,7 +314,7 @@ async def claim_daily_pack(request):
                     })
                 
             new_count = user["packs_count"] + 1
-            await db.execute("UPDATE card_users SET packs_count = $1, last_daily_pack = CURRENT_TIMESTAMP, daily_notified = FALSE WHERE telegram_id = $2", new_count, tg_id)
+            await db.execute("UPDATE card_users SET packs_count = $1, last_daily_pack = CURRENT_TIMESTAMP, daily_notified = FALSE, last_daily_notify = NULL WHERE telegram_id = $2", new_count, tg_id)
             return web.json_response({"success": True, "packs_count": new_count})
     except Exception as e:
         logging.error(f"Daily pack error: {e}")
@@ -833,20 +833,20 @@ async def start_webserver():
     logging.info(f"🌐 Веб-сервер и Cards Mini App запущены на порту {port}")
 
 async def daily_notification_task():
-    """Background task: notifies users when their 24h daily pack timer is ready."""
+    """Background task: notifies users once exactly 24 hours have passed since their last daily pack claim."""
     logging.info("Daily notification task started")
     while True:
         try:
-            await asyncio.sleep(300)  # Check every 5 minutes
+            await asyncio.sleep(60)  # Check every 60 seconds
             async with pool.acquire() as db:
-                now = datetime.now(timezone.utc).replace(tzinfo=None)
                 users = await db.fetch("""
                     SELECT telegram_id FROM card_users
                     WHERE last_daily_pack IS NOT NULL
                       AND daily_notified = FALSE
-                      AND EXTRACT(EPOCH FROM ($1 - last_daily_pack)) >= 86400
-                """, now)
-                logging.info(f"Daily task: found {len(users)} users to notify")
+                      AND EXTRACT(EPOCH FROM (LOCALTIMESTAMP - last_daily_pack)) >= 86400
+                """)
+                if users:
+                    logging.info(f"Daily task: found {len(users)} users ready for daily pack notification")
                 for row in users:
                     tg_id = row['telegram_id']
                     try:
@@ -865,7 +865,7 @@ async def daily_notification_task():
                         logging.info(f"Daily notify sent to {tg_id}")
                     except Exception as e:
                         err_str = str(e).lower()
-                        # If user blocked bot or chat not found — mark done, won't fix itself
+                        # If user blocked bot or chat not found — mark done so we don't retry forever
                         if "blocked" in err_str or "chat not found" in err_str or "user is deactivated" in err_str:
                             await db.execute("UPDATE card_users SET daily_notified = TRUE WHERE telegram_id = $1", tg_id)
                             logging.warning(f"Daily notify skipped (blocked/not found) for {tg_id}: {e}")
@@ -1032,6 +1032,10 @@ async def init_db():
         try:
             await db.execute("ALTER TABLE card_users ADD COLUMN inviter_rewarded BOOLEAN DEFAULT FALSE")
         except asyncpg.exceptions.DuplicateColumnError:
+            pass
+        try:
+            await db.execute("ALTER TABLE card_users ADD COLUMN last_daily_notify TIMESTAMP")
+        except (asyncpg.exceptions.DuplicateColumnError, Exception):
             pass
         
         await db.execute("""
