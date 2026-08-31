@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>FunkoStop Cards</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/cards/cards.css?v=108">
+    <link rel="stylesheet" href="/cards/cards.css?v=111">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -412,7 +412,7 @@
         </div>
     </div>
 
-    <script src="/cards/cards.js?v=109"></script>
+    <script src="/cards/cards.js?v=111"></script>
 
     <!-- Inventory Modal for Trade-in -->
     <div id="inventory-modal" class="modal hidden" onclick="if(event.target === this) closeInventoryModal()">
@@ -423,6 +423,29 @@
             </div>
             <div class="modal-body" id="inventory-list">
                 <!-- Cards injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Prize Code Modal -->
+    <div id="prize-code-modal" class="modal hidden" onclick="if(event.target === this) closePrizeCodeModal()">
+        <div class="modal-content prize-code-content">
+            <div class="prize-code-icon">🏆</div>
+            <h3 class="prize-code-title">КОЛЛЕКЦИЯ СОБРАНА!</h3>
+            <p class="prize-code-series" id="prize-code-series-name">Breaking Bad</p>
+            
+            <div class="prize-code-box">
+                <span class="prize-code-text" id="prize-code-val">--------</span>
+                <button class="prize-code-copy-btn" id="prize-code-copy-btn" onclick="copyPrizeCode()">
+                    📋 Скопировать
+                </button>
+            </div>
+            
+            <p class="prize-code-subtext">Промокод сохранён и отправлен вам в сообщения бота. Отправьте его менеджеру для получения приза!</p>
+            
+            <div class="prize-code-actions">
+                <button class="btn-action-primary" id="prize-code-chat-btn" onclick="openManagerWithCode()">💬 Написать менеджеру</button>
+                <button class="btn-action-secondary" onclick="closePrizeCodeModal()" style="margin-top: 10px; width: 80%;">✕ Закрыть</button>
             </div>
         </div>
     </div>
