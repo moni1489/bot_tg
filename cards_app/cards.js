@@ -262,6 +262,14 @@ async function fetchProfile() {
                 botUsername = data.bot_username;
                 setupRefLink();
             }
+
+            // Show Trade-in button ONLY for admins — regular users never see it
+            if (userData.is_admin) {
+                const adminBtn = document.getElementById('admin-tradein-btn');
+                if (adminBtn) {
+                    adminBtn.style.display = '';  // show the button
+                }
+            }
         } else if (res.status === 403) {
             const data = await res.json();
             document.body.innerHTML = `
