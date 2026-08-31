@@ -422,17 +422,28 @@ async def craft_cards_api(request):
                                     rarities.append(cc["rarity"])
                                     break
                                     
-                # 2. Determine new rarity based on rules
+                # 2. Determine new rarity based on rules with post-series penalty multiplier
+                # Check if user has completed any series
+                user_cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
+                has_completed_code = await db.fetchval("SELECT 1 FROM series_codes WHERE telegram_id = $1 LIMIT 1", tg_id)
+                has_completed_series = bool(has_completed_code)
+
+                if not has_completed_series and user_cards_rows:
+                    user_cards_map = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in user_cards_rows}
+                    for sc in SERIES_CONFIG:
+                        if sc["slug"] == "bonus_card": continue
+                        if all(user_cards_map.get(f"{sc['slug']}_{cc['index']}", 0) > 0 for cc in sc["cards"]):
+                            has_completed_series = True
+                            break
+
+                drop_settings = await get_drop_settings()
+                penalty_pct = float(drop_settings.get("series_penalty", 67.0))
+                chance_multiplier = max(0.05, (100.0 - penalty_pct) / 100.0) if has_completed_series else 1.0
+
                 import random
                 counts = {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
                 for r in rarities: counts[r] += 1
                 
-                # 2. Determine new rarity based on rules
-                # ПРАВИЛО: Нет прыжков через грейд!
-                # 4 Common -> 75% Common, 25% Rare (0% Epic, 0% Legendary)
-                # 4 Rare -> 70% Rare, 30% Epic (0% Legendary)
-                # 4 Epic -> 80% Epic, 20% Legendary
-                # Смеси Common + Rare -> 0% Legendary, шанс на Epic только если есть хотя бы 1 Rare
                 n_c = counts["common"]
                 n_r = counts["rare"]
                 n_e = counts["epic"]
@@ -442,34 +453,36 @@ async def craft_cards_api(request):
                 new_rarity = "common"
 
                 if n_c == 4:
-                    # 4× Common → Common 75%, Rare 25%, Epic 0%, Legendary 0%
-                    if rand <= 25.0: new_rarity = "rare"
-                    else:            new_rarity = "common"
+                    # 4× Common → Rare 25% * multiplier, rest Common
+                    rare_chance = 25.0 * chance_multiplier
+                    if rand <= rare_chance: new_rarity = "rare"
+                    else:                   new_rarity = "common"
 
                 elif n_r == 4:
-                    # 4× Rare → Rare 70%, Epic 30%, Legendary 0% (строго 70/30)
-                    if rand <= 30.0: new_rarity = "epic"
-                    else:            new_rarity = "rare"
+                    # 4× Rare → Epic 30% * multiplier, rest Rare
+                    epic_chance = 30.0 * chance_multiplier
+                    if rand <= epic_chance: new_rarity = "epic"
+                    else:                   new_rarity = "rare"
 
                 elif n_e == 4:
-                    # 4× Epic → Epic 80%, Legendary 20%
-                    if rand <= 20.0: new_rarity = "legendary"
-                    else:            new_rarity = "epic"
+                    # 4× Epic → Legendary 20% * multiplier, rest Epic
+                    leg_chance = 20.0 * chance_multiplier
+                    if rand <= leg_chance: new_rarity = "legendary"
+                    else:                  new_rarity = "epic"
 
                 elif n_l == 4:
                     new_rarity = "legendary"
 
                 elif n_l > 0:
                     # Наборы с легендарками (1-3 леги)
-                    leg_chance = min(75.0, 25.0 * n_l)
+                    leg_chance = min(75.0, 25.0 * n_l) * chance_multiplier
                     if rand <= leg_chance: new_rarity = "legendary"
                     else:                  new_rarity = "epic"
 
                 elif n_e > 0:
                     # Смеси с Эпиками (без лег):
-                    # Шанс на Легендарку зависит от числа эпиков (1E: 4%, 2E: 8%, 3E: 14%)
-                    leg_chance = 4.0 * n_e if n_e < 3 else 14.0
-                    epic_chance = leg_chance + (35.0 + 15.0 * n_e + 5.0 * n_r)
+                    leg_chance = (4.0 * n_e if n_e < 3 else 14.0) * chance_multiplier
+                    epic_chance = leg_chance + (35.0 + 15.0 * n_e + 5.0 * n_r) * chance_multiplier
                     if rand <= leg_chance:
                         new_rarity = "legendary"
                     elif rand <= epic_chance:
@@ -485,19 +498,25 @@ async def craft_cards_api(request):
                     # 0% шанс на Legendary!
                     if n_r == 1:
                         # 3C + 1R
-                        if rand <= 5.0:    new_rarity = "epic"
-                        elif rand <= 55.0: new_rarity = "rare"
-                        else:              new_rarity = "common"
+                        epic_chance = 5.0 * chance_multiplier
+                        rare_chance = epic_chance + (50.0 * chance_multiplier)
+                        if rand <= epic_chance:    new_rarity = "epic"
+                        elif rand <= rare_chance:  new_rarity = "rare"
+                        else:                      new_rarity = "common"
                     elif n_r == 2:
                         # 2C + 2R
-                        if rand <= 12.0:   new_rarity = "epic"
-                        elif rand <= 70.0: new_rarity = "rare"
-                        else:              new_rarity = "common"
+                        epic_chance = 12.0 * chance_multiplier
+                        rare_chance = epic_chance + (58.0 * chance_multiplier)
+                        if rand <= epic_chance:    new_rarity = "epic"
+                        elif rand <= rare_chance:  new_rarity = "rare"
+                        else:                      new_rarity = "common"
                     elif n_r == 3:
                         # 1C + 3R
-                        if rand <= 22.0:   new_rarity = "epic"
-                        elif rand <= 90.0: new_rarity = "rare"
-                        else:              new_rarity = "common"
+                        epic_chance = 22.0 * chance_multiplier
+                        rare_chance = epic_chance + (68.0 * chance_multiplier)
+                        if rand <= epic_chance:    new_rarity = "epic"
+                        elif rand <= rare_chance:  new_rarity = "rare"
+                        else:                      new_rarity = "common"
 
                 # 3. Pick random card of that rarity
                 matching = []
