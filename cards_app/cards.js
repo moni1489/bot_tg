@@ -1627,10 +1627,10 @@ function updateCraftChancesPreview() {
 
     // Build pills
     const labels = [
-        { key: 'legendary', name: 'Легендарка', class: 'pill-legendary', color: '#ffc107' },
-        { key: 'epic',      name: 'Эпик',       class: 'pill-epic',      color: '#e040fb' },
-        { key: 'rare',      name: 'Рарка',      class: 'pill-rare',      color: '#2196f3' },
-        { key: 'common',    name: 'Комонка',    class: 'pill-common',    color: '#ffffff' }
+        { key: 'legendary', name: 'LEGENDARY', class: 'pill-legendary', color: '#ffc107' },
+        { key: 'epic',      name: 'EPIC',      class: 'pill-epic',      color: '#e040fb' },
+        { key: 'rare',      name: 'RARE',      class: 'pill-rare',      color: '#2196f3' },
+        { key: 'common',    name: 'COMMON',    class: 'pill-common',    color: '#ffffff' }
     ];
 
     let pillsHtml = '';
