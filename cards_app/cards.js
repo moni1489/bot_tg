@@ -258,6 +258,9 @@ async function fetchProfile() {
             userData.completed_tasks = data.completed_tasks || [];
             userData.ref_count = data.ref_count || 0;
             userData.is_admin = data.is_admin || false;
+            if (data.drop_settings) {
+                window.dropSettings = data.drop_settings;
+            }
             if (data.bot_username) {
                 botUsername = data.bot_username;
                 setupRefLink();
@@ -459,15 +462,30 @@ function rollRandomCard() {
         });
     }
 
-    let chanceMultiplier = hasCompletedAnySeries ? 0.33 : 1;
-    if (tg?.initDataUnsafe?.user?.id === 1413663899) {
-        chanceMultiplier *= 0.5;
-    }
-    let selectedRarity = 'common';
+    const settings = window.dropSettings || {
+        legendary_rate: 1.5,
+        epic_rate: 5.0,
+        rare_rate: 26.0,
+        series_penalty: 67.0
+    };
 
-    if (rand <= 1.5 * chanceMultiplier) selectedRarity = 'legendary'; 
-    else if (rand <= 6.5 * chanceMultiplier) selectedRarity = 'epic'; 
-    else if (rand <= 32.5 * chanceMultiplier) selectedRarity = 'rare'; 
+    // Calculate penalty multiplier after 1+ completed series
+    const penaltyPercent = typeof settings.series_penalty === 'number' ? settings.series_penalty : 67.0;
+    const penaltyMultiplier = Math.max(0, (100.0 - penaltyPercent) / 100.0);
+    const chanceMultiplier = hasCompletedAnySeries ? penaltyMultiplier : 1.0;
+
+    const legRate = (settings.legendary_rate !== undefined ? settings.legendary_rate : 1.5) * chanceMultiplier;
+    const epicRate = (settings.epic_rate !== undefined ? settings.epic_rate : 5.0) * chanceMultiplier;
+    const rareRate = (settings.rare_rate !== undefined ? settings.rare_rate : 26.0) * chanceMultiplier;
+
+    const legThresh = legRate;
+    const epicThresh = legThresh + epicRate;
+    const rareThresh = epicThresh + rareRate;
+
+    let selectedRarity = 'common';
+    if (rand <= legThresh) selectedRarity = 'legendary'; 
+    else if (rand <= epicThresh) selectedRarity = 'epic'; 
+    else if (rand <= rareThresh) selectedRarity = 'rare'; 
     else selectedRarity = 'common';
 
     const matching = [];
@@ -479,6 +497,10 @@ function rollRandomCard() {
             }
         });
     });
+
+    if (matching.length === 0) {
+        return { series: SERIES_CONFIG[0], card: SERIES_CONFIG[0].cards[0] };
+    }
 
     return matching[Math.floor(Math.random() * matching.length)];
 }
@@ -1458,6 +1480,7 @@ preloadImagesAndInit();
 // --- TRADE-IN LOGIC ---
 let tradeinSlots = [null, null, null, null];
 let activeSlotIndex = -1;
+let isClosingInventoryModal = false;
 
 function openInventoryForSlot(index) {
     activeSlotIndex = index;
@@ -1465,6 +1488,7 @@ function openInventoryForSlot(index) {
     invList.innerHTML = '';
     
     let hasDupes = false;
+    let cardItemIndex = 0;
     
     // Find all duplicate cards
     for (const [key, count] of Object.entries(userCards)) {
@@ -1474,16 +1498,17 @@ function openInventoryForSlot(index) {
         let inSlotsCount = tradeinSlots.filter(s => s === key).length;
         let availableCount = count - inSlotsCount;
         
-        // We only allow selecting if we have more than 1 in total (it's a dupe)
-        // AND after accounting for already slotted cards, we still have some of this dupe to use.
-        // Wait, the rule is you must NOT spend your last card.
-        // So you can only spend if count > 1. Total spendable = count - 1.
+        // You can only spend if count > 1 (keep at least 1)
         let spendable = (count > 1) ? (count - 1) : 0;
         let leftToSpend = spendable - inSlotsCount;
         
+        // If current slot already holds this card, allow re-selecting or keeping it
+        if (tradeinSlots[index] === key) {
+            leftToSpend += 1;
+        }
+        
         if (leftToSpend > 0) {
             hasDupes = true;
-            // Find series config
             const parts = key.split('_');
             const cardIdx = parts.pop();
             const seriesSlug = parts.join('_');
@@ -1494,31 +1519,50 @@ function openInventoryForSlot(index) {
                 const item = document.createElement('div');
                 item.className = `inventory-item rarity-${cConf.rarity}`;
                 item.style.backgroundImage = `url('${cConf.img}')`;
+                item.style.animationDelay = `${cardItemIndex * 0.035}s`;
                 item.innerHTML = `<span class="badge">x${leftToSpend}</span>`;
                 item.onclick = () => selectCardForSlot(key, cConf, sConf);
                 invList.appendChild(item);
+                cardItemIndex++;
             }
         }
     }
     
     if (!hasDupes) {
-        invList.innerHTML = '<p style="text-align:center;color:#888;">У вас нет повторок для обмена.</p>';
+        invList.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.6);padding:30px 10px;font-size:0.95rem;line-height:1.5;">У вас нет свободных повторок для обмена.<br><span style="font-size:0.8rem;color:rgba(255,255,255,0.4);margin-top:6px;display:inline-block;">(Нужно иметь 2+ одинаковые карты)</span></div>';
     }
     
-    document.getElementById('inventory-modal').classList.remove('hidden');
+    // Smooth opening
+    const modal = document.getElementById('inventory-modal');
+    modal.classList.remove('hidden');
+    void modal.offsetWidth; // force reflow
+    modal.classList.add('open');
 }
 
 function closeInventoryModal() {
-    document.getElementById('inventory-modal').classList.add('hidden');
+    const modal = document.getElementById('inventory-modal');
+    if (!modal || isClosingInventoryModal) return;
+    isClosingInventoryModal = true;
+    modal.classList.remove('open');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        isClosingInventoryModal = false;
+    }, 260);
 }
 
 function selectCardForSlot(key, cConf, sConf) {
     tradeinSlots[activeSlotIndex] = key;
     const slotEl = document.getElementById(`slot-${activeSlotIndex}`);
-    slotEl.innerHTML = '';
-    slotEl.classList.remove('empty-slot', 'pulse');
-    slotEl.style.backgroundImage = `url('${cConf.img}')`;
-    slotEl.style.border = `2px solid var(--rarity-${cConf.rarity})`;
+    if (slotEl) {
+        slotEl.innerHTML = '';
+        slotEl.classList.remove('empty-slot', 'pulse', 'slot-filled');
+        slotEl.style.backgroundImage = `url('${cConf.img}')`;
+        slotEl.style.border = `2px solid var(--rarity-${cConf.rarity})`;
+        
+        // Trigger smooth pop animation
+        void slotEl.offsetWidth;
+        slotEl.classList.add('slot-filled');
+    }
     
     closeInventoryModal();
     checkCraftReady();
@@ -1537,16 +1581,20 @@ async function craftCards() {
     if (!tradeinSlots.every(s => s !== null)) return;
     const btn = document.getElementById('btn-craft');
     btn.setAttribute('disabled', 'true');
-    btn.textContent = 'Крафт...';
-    
+    btn.textContent = '🔮 Крафт...';
+
+    // Spin all slots
     for (let i = 0; i < 4; i++) {
         document.getElementById(`slot-${i}`).classList.add('crafting-anim');
     }
-    await new Promise(r => setTimeout(r, 600));
-    
+
+    // Short suspense delay before API call
+    await new Promise(r => setTimeout(r, 800));
+
+    let craftResult = null;
     try {
         const payload = {
-            telegram_id: tg?.initDataUnsafe?.user?.id || 12345,
+            telegram_id: tg?.initDataUnsafe?.user?.id || userData.telegram_id,
             cards: tradeinSlots
         };
         const res = await fetch('/api/cards/craft', {
@@ -1554,43 +1602,170 @@ async function craftCards() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        const data = await res.json();
-        
-        if (data.success) {
-            // Remove cards from local state
-            tradeinSlots.forEach(key => {
-                userCards[key]--;
-            });
-            // Add new card
-            const newKey = `${data.series}_${data.card_index}`;
-            userCards[newKey] = (userCards[newKey] || 0) + 1;
-            
-            // Show result
-            showCardModal(data.series, data.card_index, data.rarity, false);
-            
-            // Reset slots
-            tradeinSlots = [null, null, null, null];
-            for (let i = 0; i < 4; i++) {
-                const slotEl = document.getElementById(`slot-${i}`);
-                slotEl.innerHTML = '+';
-                slotEl.style.backgroundImage = 'none';
-                slotEl.style.border = '';
-                slotEl.classList.remove('crafting-anim');
-                slotEl.classList.add('empty-slot', 'pulse');
-            }
-        } else {
-            alert("Ошибка крафта: " + data.error);
-        }
+        craftResult = await res.json();
     } catch (e) {
-        alert("Ошибка сети");
+        alert('Ошибка сети');
+        btn.removeAttribute('disabled');
+        btn.textContent = 'Скрафтить новую карту';
+        for (let i = 0; i < 4; i++) document.getElementById(`slot-${i}`).classList.remove('crafting-anim');
+        return;
     }
-    
+
+    if (!craftResult || !craftResult.success) {
+        alert('Ошибка крафта: ' + (craftResult?.error || 'unknown'));
+        btn.removeAttribute('disabled');
+        btn.textContent = 'Скрафтить новую карту';
+        for (let i = 0; i < 4; i++) document.getElementById(`slot-${i}`).classList.remove('crafting-anim');
+        return;
+    }
+
+    // Update local state
+    tradeinSlots.forEach(key => { if (userCards[key]) userCards[key]--; });
+    const newKey = `${craftResult.series}_${craftResult.card_index}`;
+    userCards[newKey] = (userCards[newKey] || 0) + 1;
+
+    // Reset slots visually
+    tradeinSlots = [null, null, null, null];
+    for (let i = 0; i < 4; i++) {
+        const slotEl = document.getElementById(`slot-${i}`);
+        slotEl.innerHTML = '+';
+        slotEl.style.backgroundImage = 'none';
+        slotEl.style.border = '';
+        slotEl.classList.remove('crafting-anim');
+        slotEl.classList.add('empty-slot', 'pulse');
+    }
     btn.removeAttribute('disabled');
     btn.textContent = 'Скрафтить новую карту';
-    for (let i = 0; i < 4; i++) {
-        document.getElementById(`slot-${i}`).classList.remove('crafting-anim');
-    }
+    checkCraftReady();
+
+    // ====== FULL PACK-STYLE REVEAL ======
+    const rarity = craftResult.rarity;
+    const seriesSlug = craftResult.series;
+    const cardIndex = craftResult.card_index;
+
+    let sConf = SERIES_CONFIG.find(s => s.slug === seriesSlug);
+    const cConf = sConf ? sConf.cards.find(c => c.index == cardIndex) : null;
+    const cardName = cConf ? cConf.name : 'Карта';
+    const cardImg = cConf ? cConf.img : '';
+
+    // Prepare stage elements
+    const cardStageEl = document.getElementById('card-stage');
+    const card3dEl = document.getElementById('card-3d');
+    const cardFrontEl = card3dEl.querySelector('.card-front');
+    const cardBackEl = card3dEl.querySelector('.card-back');
+    const rarityBadge = document.getElementById('drop-rarity-badge');
+    const svetBg = document.getElementById('svet-bg');
+    const btnFlipCard = document.getElementById('btn-flip-card');
+    const btnCloseDrop = document.getElementById('btn-close-drop');
+    const actions = document.getElementById('opened-card-actions');
+
+    // Reset all previous state
+    card3dEl.classList.remove('flipped', 'aura-common', 'aura-rare', 'aura-epic', 'aura-legendary', 'card-fly-in');
+    card3dEl.style.filter = '';
+    if (rarityBadge) rarityBadge.className = 'drop-rarity-badge hidden';
+    if (svetBg) { svetBg.className = ''; svetBg.style.opacity = '0'; }
+    if (actions) actions.classList.add('hidden');
+
+    // Set card front content
+    cardFrontEl.innerHTML = `
+        <div class="card-frame ${seriesSlug}" style="padding:0;border:none;background:transparent;box-shadow:none;display:flex;align-items:center;justify-content:center;">
+            <img src="${cardImg}" class="full-card-image" alt="${cardName}" onerror="this.style.opacity='0.3'">
+        </div>
+    `;
+
+    // Show back, hide front
+    if (cardBackEl) { cardBackEl.style.display = ''; cardBackEl.style.opacity = '1'; }
+    cardFrontEl.style.display = 'none';
+
+    // Position card off-screen below
+    card3dEl.style.transition = 'none';
+    card3dEl.style.transform = 'translateY(120vh) rotateY(0deg)';
+    card3dEl.style.opacity = '0';
+    void card3dEl.offsetHeight;
+
+    // Show stage
+    cardStageEl.style.opacity = '';
+    cardStageEl.style.visibility = '';
+    cardStageEl.classList.remove('hidden');
+
+    // Show "tap to reveal" button, hide close button
+    if (btnFlipCard) btnFlipCard.classList.remove('hidden');
+    if (btnCloseDrop) btnCloseDrop.classList.add('hidden');
+
+    // Fly card up from bottom
+    await new Promise(r => setTimeout(r, 50));
+    card3dEl.style.transition = 'transform 0.9s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.35s ease';
+    card3dEl.style.transform = 'translateY(0) rotateY(0deg)';
+    card3dEl.style.opacity = '1';
+
+    // Wait for user tap to flip
+    const handleCraftFlip = (e) => {
+        if (e && e.target && e.target.closest('#opened-card-actions')) return;
+        if (btnFlipCard) btnFlipCard.removeEventListener('click', handleCraftFlip);
+        card3dEl.removeEventListener('click', handleCraftFlip);
+        if (btnFlipCard) btnFlipCard.classList.add('hidden');
+
+        const halfSpeed = 500;
+
+        // Rotate to 90° (half flip)
+        card3dEl.style.transition = `transform ${halfSpeed}ms ease-in`;
+        card3dEl.style.transform = 'rotateY(-90deg)';
+
+        setTimeout(() => {
+            // Swap back → front
+            if (cardBackEl) cardBackEl.style.display = 'none';
+            cardFrontEl.style.display = 'block';
+            cardFrontEl.style.opacity = '1';
+
+            card3dEl.style.transition = 'none';
+            card3dEl.style.transform = 'rotateY(90deg)';
+            void card3dEl.offsetWidth;
+
+            // Apply rarity aura
+            card3dEl.classList.remove('aura-common', 'aura-rare', 'aura-epic', 'aura-legendary');
+            card3dEl.classList.add('aura-' + rarity);
+            if (rarity === 'legendary' && typeof flashScreen === 'function') flashScreen();
+
+            if (svetBg && (rarity === 'epic' || rarity === 'legendary')) {
+                svetBg.classList.add('svet-' + rarity);
+                svetBg.style.transition = 'opacity 0.2s ease';
+                svetBg.style.opacity = '1';
+            }
+
+            if (rarityBadge) {
+                rarityBadge.innerHTML = `<div style="font-size:1.3rem;font-weight:900;margin-bottom:2px;">${cardName.toUpperCase()}</div><div style="font-size:0.9rem;opacity:0.8;letter-spacing:3px;">${rarity.toUpperCase()}</div>`;
+                rarityBadge.classList.remove('hidden');
+                void rarityBadge.offsetWidth;
+                rarityBadge.classList.add('reveal-' + rarity);
+                rarityBadge.classList.add('show');
+            }
+
+            // Complete flip 90° → 0°
+            card3dEl.style.transition = `transform ${Math.round(halfSpeed * 1.2)}ms cubic-bezier(0.175, 0.885, 0.32, 1.4)`;
+            card3dEl.style.transform = 'rotateY(0deg)';
+        }, halfSpeed);
+
+        // Confetti burst
+        setTimeout(() => {
+            if (window.confetti) {
+                confetti({
+                    particleCount: rarity === 'legendary' ? 220 : rarity === 'epic' ? 110 : 50,
+                    spread: rarity === 'legendary' ? 130 : 90,
+                    origin: { y: 0.5 },
+                    colors: rarity === 'legendary' ? ['#ffc107', '#ff9800', '#fff'] :
+                            rarity === 'epic'      ? ['#e040fb', '#9c27b0', '#fff'] :
+                            rarity === 'rare'      ? ['#2196f3', '#00bcd4', '#fff'] :
+                                                     ['#4caf50', '#8bc34a', '#fff']
+                });
+            }
+            if (btnCloseDrop) btnCloseDrop.classList.remove('hidden');
+        }, halfSpeed + 600);
+    };
+
+    if (btnFlipCard) btnFlipCard.addEventListener('click', handleCraftFlip);
+    card3dEl.addEventListener('click', handleCraftFlip);
 }
+
 
 
 
