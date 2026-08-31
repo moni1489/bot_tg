@@ -241,12 +241,14 @@
         </main>
 
         
-        <!-- TRADE-IN VIEW (Temporarily Disabled)
+
+        <!-- TRADE-IN VIEW — admin only (shown via JS when is_admin=true) -->
         <main id="view-tradein" class="tab-view hidden">
             <div class="tradein-container">
                 <div class="tradein-header">
                     <h2>ОБМЕН КАРТ (TRADE-IN)</h2>
                     <p class="section-desc">Выберите 4 дубликата (повторки), чтобы скрафтить 1 новую случайную карту.</p>
+                    <p style="color:rgba(229,9,20,0.7);font-size:0.75rem;margin-top:6px;">🔒 Режим тестирования — только для администраторов</p>
                 </div>
                 
                 <div class="tradein-slots" id="tradein-slots-container">
@@ -261,7 +263,6 @@
                 </div>
             </div>
         </main>
-        -->
 
         <!-- Bottom Navigation Bar -->
         <nav class="bottom-nav">
@@ -306,8 +307,8 @@
                 <span class="nav-label">ЗАДАНИЯ</span>
             </button>
         
-            <!--
-            <button class="nav-btn" data-target="view-tradein">
+        <!-- Trade-in button: hidden by default, shown by JS only for admins -->
+            <button class="nav-btn" id="admin-tradein-btn" data-target="view-tradein" style="display:none;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linejoin="round">
                     <path d="M21 2v6h-6"></path>
@@ -315,9 +316,10 @@
                     <path d="M3 22v-6h6"></path>
                     <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
                 </svg>
-                <span class="nav-label">Обмен</span>
+                <span class="nav-label">Обмен 🔧</span>
             </button>
-            -->
+
+
 
         </nav>
     </div>
