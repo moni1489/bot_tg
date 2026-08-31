@@ -453,8 +453,8 @@ async def craft_cards_api(request):
                 new_rarity = "common"
 
                 if n_c == 4:
-                    # 4× Common → Rare 25% * multiplier, rest Common
-                    rare_chance = 25.0 * chance_multiplier
+                    # 4× Common → Rare 30% * multiplier, rest Common (70%)
+                    rare_chance = 30.0 * chance_multiplier
                     if rand <= rare_chance: new_rarity = "rare"
                     else:                   new_rarity = "common"
 
