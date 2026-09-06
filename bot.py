@@ -2841,8 +2841,17 @@ async def handle_link(message: Message, state: FSMContext):
     if not url.startswith("http"):
         return
 
+    # 1. Expand shortlinks (like ebay.io, bit.ly, etc.)
+    if "ebay.io" in url or "t.co" in url or "bit.ly" in url or "tinyurl" in url:
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(url, headers={'User-Agent': 'Mozilla/5.0'}, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                    url = str(r.url)
+        except Exception as e:
+            logging.warning(f"Shortlink resolve failed for {url}: {e}")
+
     # Force US region for eBay to ensure domestic shipping is visible
-    if "ebay.com" in url or "ebay.io" in url:
+    if "ebay.com" in url or "ebay." in url:
         from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
         parsed = urlparse(url)
         q = parse_qs(parsed.query)
@@ -2855,24 +2864,32 @@ async def handle_link(message: Message, state: FSMContext):
         await message.answer("❌ API ключи не настроены в .env")
         return
         
+    page_html = ""
     try:
-        scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url}&country_code=us&render=true"
-        timeout = aiohttp.ClientTimeout(total=80)
+        # Fast mode without render=true is 10x faster and prevents 500 error timeouts
+        scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url}&country_code=us"
+        timeout = aiohttp.ClientTimeout(total=25)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(scraper_url) as resp:
-                if resp.status != 200:
-                    await message.answer(f"❌ Ошибка парсера: {resp.status}")
-                    return
-                html = await resp.text()
+                if resp.status == 200:
+                    page_html = await resp.text()
+                else:
+                    # Fallback to render=true if basic fetch failed
+                    scraper_url_render = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url}&country_code=us&render=true"
+                    async with session.get(scraper_url_render, timeout=aiohttp.ClientTimeout(total=35)) as resp_render:
+                        if resp_render.status != 200:
+                            await message.answer(f"❌ Ошибка парсера: {resp_render.status}")
+                            return
+                        page_html = await resp_render.text()
     except asyncio.TimeoutError:
-        await message.answer("❌ Ошибка: Сайт загружался слишком долго (более 80 секунд) и парсер отменил запрос. Попробуйте еще раз.")
+        await message.answer("❌ Ошибка: Сайт загружался слишком долго и парсер отменил запрос. Попробуйте еще раз.")
         return
     except Exception as e:
         await message.answer(f"❌ Ошибка загрузки страницы: {e}")
         return
         
     # Убираем лишний код (скрипты и стили), чтобы сэкономить лимиты (токены) бесплатного Groq
-    clean_html = re.sub(r'<script.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+    clean_html = re.sub(r'<script.*?</script>', '', page_html, flags=re.DOTALL | re.IGNORECASE)
     clean_html = re.sub(r'<style.*?</style>', '', clean_html, flags=re.DOTALL | re.IGNORECASE)
     
     # Чтобы уместить всю страницу в бесплатные лимиты, вырезаем ВООБЩЕ все HTML-теги, оставляем только чистый текст
@@ -2920,9 +2937,9 @@ async def handle_link(message: Message, state: FSMContext):
                             last_err = ai_data["error"].get("message", "Unknown error")
                             logging.warning(f"Groq model {model_name} failed: {last_err}, trying next...")
                             continue
-                        result_str = ai_data["choices"][0]["message"]["content"]
-                        result = json.loads(result_str)
-                        if result and isinstance(result, dict):
+                        result_raw = json.loads(result_str)
+                        if result_raw and isinstance(result_raw, dict):
+                            result = {str(k).strip(): v for k, v in result_raw.items()}
                             break
                 except Exception as inner_e:
                     last_err = str(inner_e)
