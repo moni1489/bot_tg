@@ -2912,10 +2912,12 @@ async def handle_link(message: Message, state: FSMContext):
     result = None
     last_err = ""
     
+    groq_api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY")
+
     try:
         async with aiohttp.ClientSession() as session:
             headers = {
-                "Authorization": f"Bearer {OPENAI_API_KEY}", 
+                "Authorization": f"Bearer {groq_api_key}", 
                 "Content-Type": "application/json",
                 "HTTP-Referer": "https://t.me/Funko_Stop",
                 "X-Title": "FunkoBot"
@@ -2926,7 +2928,7 @@ async def handle_link(message: Message, state: FSMContext):
                         "model": model_name,
                         "messages": [
                             {"role": "system", "content": prompt},
-                            {"role": "user", "content": text_content[:15000]}
+                            {"role": "user", "content": text_content[:5000]}
                         ],
                         "response_format": {"type": "json_object"},
                         "max_tokens": 400
@@ -2937,6 +2939,7 @@ async def handle_link(message: Message, state: FSMContext):
                             last_err = ai_data["error"].get("message", "Unknown error")
                             logging.warning(f"Groq model {model_name} failed: {last_err}, trying next...")
                             continue
+                        result_str = ai_data["choices"][0]["message"]["content"]
                         result_raw = json.loads(result_str)
                         if result_raw and isinstance(result_raw, dict):
                             result = {str(k).strip(): v for k, v in result_raw.items()}
@@ -2950,7 +2953,7 @@ async def handle_link(message: Message, state: FSMContext):
         return
         
     if not result:
-        await message.answer(f"❌ Нейросеть временно перегружена. Пожалуйста, попробуйте еще раз через минуту или введите цену вручную.")
+        await message.answer(f"❌ Ошибка ИИ ({last_err}). Пожалуйста, попробуйте еще раз или введите цену вручную.")
         return
         
     price = float(result.get("price", 0.0) or 0.0)
