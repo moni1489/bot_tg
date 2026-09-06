@@ -8,6 +8,7 @@ import json
 import math
 import re
 import xml.etree.ElementTree as ET
+import html
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -713,11 +714,14 @@ async def generate_series_code(request):
                 try:
                     await bot.send_message(
                         chat_id=admin_id,
-                        text=f"🎁 Игрок [{tg_id}](tg://user?id={tg_id}) собрал серию **{series_slug.upper()}**!\n\nСгенерирован код: `{code}`",
-                        parse_mode="Markdown"
+                        text=(
+                            f"🎁 Игрок <a href=\"tg://user?id={tg_id}\">{tg_id}</a> собрал серию <b>{html.escape(series_slug.upper())}</b>!\n\n"
+                            f"Сгенерирован код: <code>{code}</code>"
+                        ),
+                        parse_mode="HTML"
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logging.warning(f"Admin series notify error for {admin_id}: {e}")
                     
             return web.json_response({"success": True, "code": code})
     except Exception as e:
@@ -2887,6 +2891,10 @@ async def handle_link(message: Message, state: FSMContext):
     {"name": "Funko Pop Batman", "price": 49.99, "shipping": 5.99, "weight": 0.5}
     """
     
+    models_to_try = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+    result = None
+    last_err = ""
+    
     try:
         async with aiohttp.ClientSession() as session:
             headers = {
@@ -2895,23 +2903,37 @@ async def handle_link(message: Message, state: FSMContext):
                 "HTTP-Referer": "https://t.me/Funko_Stop",
                 "X-Title": "FunkoBot"
             }
-            payload = {
-                "model": "qwen/qwen3.6-27b",
-                "messages": [
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": text_content[:20000]} # send up to 20000 chars of pure text
-                ],
-                "response_format": {"type": "json_object"}
-            }
-            async with session.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=30) as resp:
-                ai_data = await resp.json()
-                if "error" in ai_data:
-                    await message.answer(f"❌ Ошибка ИИ: {ai_data['error']['message']}")
-                    return
-                result_str = ai_data["choices"][0]["message"]["content"]
-                result = json.loads(result_str)
+            for model_name in models_to_try:
+                try:
+                    payload = {
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": prompt},
+                            {"role": "user", "content": text_content[:15000]}
+                        ],
+                        "response_format": {"type": "json_object"},
+                        "max_tokens": 400
+                    }
+                    async with session.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25) as resp:
+                        ai_data = await resp.json()
+                        if "error" in ai_data:
+                            last_err = ai_data["error"].get("message", "Unknown error")
+                            logging.warning(f"Groq model {model_name} failed: {last_err}, trying next...")
+                            continue
+                        result_str = ai_data["choices"][0]["message"]["content"]
+                        result = json.loads(result_str)
+                        if result and isinstance(result, dict):
+                            break
+                except Exception as inner_e:
+                    last_err = str(inner_e)
+                    logging.warning(f"Groq model {model_name} error: {inner_e}")
+                    continue
     except Exception as e:
-        await message.answer(f"❌ Ошибка обработки ИИ: {e}")
+        await message.answer(f"❌ Ошибка подключения к сервису анализа: {e}")
+        return
+        
+    if not result:
+        await message.answer(f"❌ Нейросеть временно перегружена. Пожалуйста, попробуйте еще раз через минуту или введите цену вручную.")
         return
         
     price = float(result.get("price", 0.0) or 0.0)
@@ -3167,14 +3189,16 @@ async def claim_prize_api(request):
                 try:
                     await bot.send_message(
                         admin_id,
-                        f"🎟 Игрок [{user_name}](tg://user?id={tg_id}) активировал бонус-карту!\n"
-                        f"Приз: **{c_name}**\n"
-                        f"Промокод: `{promo_code}`\n\n"
-                        f"Используй /all_promos или кнопку «🎫 Все промокоды» для проверки.",
-                        parse_mode="Markdown"
+                        (
+                            f"🎟 Игрок <a href=\"tg://user?id={tg_id}\">{html.escape(user_name)}</a> активировал бонус-карту!\n"
+                            f"Приз: <b>{html.escape(c_name)}</b>\n"
+                            f"Промокод: <code>{promo_code}</code>\n\n"
+                            f"Используй /all_promos или кнопку «🎫 Все промокоды» для проверки."
+                        ),
+                        parse_mode="HTML"
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logging.warning(f"Admin prize notify error for {admin_id}: {e}")
         except Exception as e:
             logging.error(f"Admin notify error in claim_prize_api: {e}")
             
