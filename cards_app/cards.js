@@ -314,13 +314,6 @@ function setupTasks() {
                 window.open('https://t.me/FunkoStop', '_blank');
             }
 
-            // Open FunkoStop main chat (verification) for join_chat task
-            if (taskId === 'join_chat') {
-                window.open('https://t.me/+y_E3_0tKEhpiMjg6', '_blank');
-                // Small delay so user can join before we verify
-                await new Promise(r => setTimeout(r, 2500));
-            }
-
             try {
                 const res = await fetch('/api/cards/tasks/claim', {
                     method: 'POST',
@@ -347,11 +340,19 @@ function setupTasks() {
         });
     });
 
+    // join_chat — just open the link, pack awarded ONLY via captcha verification in group
+    const joinBtn = document.getElementById('task-join-btn');
+    if (joinBtn) {
+        joinBtn.addEventListener('click', () => {
+            window.open('https://t.me/FunkoStopChat', '_blank');
+        });
+    }
+
     // Review task — just opens link, no auto-claim (manual moderation by admin)
     const reviewBtn = document.getElementById('task-review-btn');
     if (reviewBtn) {
         reviewBtn.addEventListener('click', () => {
-            window.open('https://t.me/+n_jx6XVjTyw0NDVi', '_blank');
+            window.open('https://t.me/FunkoStopReviews', '_blank');
         });
     }
 }
@@ -364,6 +365,22 @@ function updateTaskButtons() {
             btn.classList.add('completed');
         }
     });
+
+    if (userData.completed_tasks && userData.completed_tasks.includes('join_chat')) {
+        const joinBtn = document.getElementById('task-join-btn');
+        if (joinBtn) {
+            joinBtn.textContent = 'ВЫПОЛНЕНО';
+            joinBtn.classList.add('completed');
+        }
+    }
+
+    if (userData.completed_tasks && userData.completed_tasks.includes('leave_review')) {
+        const reviewBtn = document.getElementById('task-review-btn');
+        if (reviewBtn) {
+            reviewBtn.textContent = 'ВЫПОЛНЕНО';
+            reviewBtn.classList.add('completed');
+        }
+    }
 
     // Update referral counter tag
     const refCountTag = document.getElementById('ref-count-tag');
@@ -1691,44 +1708,88 @@ function updateCraftChancesPreview() {
     const counts = { common: 0, rare: 0, epic: 0, legendary: 0 };
     rarities.forEach(r => counts[r] = (counts[r] || 0) + 1);
 
-    const n_c = counts.common;
-    const n_r = counts.rare;
-    const n_e = counts.epic;
-    const n_l = counts.legendary;
+    const c = counts.common;
+    const r = counts.rare;
+    const e = counts.epic;
+    const l = counts.legendary;
 
     let odds = { common: 0, rare: 0, epic: 0, legendary: 0 };
 
-    // Score-based system: each rarity has point value, total score drives output
-    // common=1, rare=2, epic=3, legendary=4 → score range: 4 (4C) to 16 (4L)
-    // Anchors: score4→{C70,R30}, score8→{R70,E30}, score12→{E80,L20}, score16→{L100}
-    const pts = { common: 1, rare: 2, epic: 3, legendary: 4 };
-    const score = rarities.reduce((sum, r) => sum + (pts[r] || 1), 0);
-    const t = Math.max(0, Math.min(1, (score - 4) / 12)); // 0.0 to 1.0
-
-    let common, rare, epic, legendary;
-    if (t <= 1 / 3) {
-        // Zone 1: common ↔ rare region (score 4–8)
-        const t1 = t * 3;
-        common = Math.round(70 * (1 - t1));
-        epic   = Math.round(30 * t1);
-        rare   = 100 - common - epic;
-        legendary = 0;
-    } else if (t <= 2 / 3) {
-        // Zone 2: rare ↔ epic region (score 8–12)
-        const t2 = (t - 1 / 3) * 3;
-        common    = 0;
-        legendary = Math.round(20 * t2);
-        rare      = Math.round(70 * (1 - t2));
-        epic      = 100 - rare - legendary;
-    } else {
-        // Zone 3: epic ↔ legendary region (score 12–16)
-        const t3 = (t - 2 / 3) * 3;
-        common    = 0;
-        rare      = 0;
-        epic      = Math.round(80 * (1 - t3));
-        legendary = 100 - epic;
+    // ---- BALANCED CRAFT SYSTEM (ANTI-ABUSE) ----
+    // 1. All 4 identical
+    if (c === 4) odds = { common: 70, rare: 30, epic: 0, legendary: 0 };
+    else if (r === 4) odds = { common: 0, rare: 70, epic: 30, legendary: 0 };
+    else if (e === 4) odds = { common: 0, rare: 0, epic: 80, legendary: 20 };
+    else if (l === 4) odds = { common: 0, rare: 0, epic: 0, legendary: 100 };
+    // 2. Only Epic + Legendary (c === 0 && r === 0)
+    else if (c === 0 && r === 0) {
+        const leg = 15 + l * 20; // 3E+1L: 35% L; 2E+2L: 55% L; 1E+3L: 75% L
+        odds = { common: 0, rare: 0, epic: 100 - leg, legendary: leg };
     }
-    odds = { common, rare, epic, legendary };
+    // 3. Only Rare, Epic, Legendary (c === 0, r >= 1)
+    else if (c === 0) {
+        let rare, epic, leg;
+        if (l === 0) {
+            if (e === 1)      { rare = 55; epic = 45; leg = 0; }
+            else if (e === 2) { rare = 35; epic = 60; leg = 5; }
+            else              { rare = 20; epic = 68; leg = 12; }
+        } else if (l === 1) {
+            if (e === 0)      { rare = 60; epic = 32; leg = 8; }
+            else if (e === 1) { rare = 45; epic = 45; leg = 10; }
+            else              { rare = 25; epic = 60; leg = 15; }
+        } else if (l === 2) {
+            if (e === 0)      { rare = 45; epic = 40; leg = 15; }
+            else              { rare = 30; epic = 50; leg = 20; }
+        } else { // l === 3 (1R + 3L)
+            rare = 30; epic = 45; leg = 25;
+        }
+        odds = { common: 0, rare, epic, legendary: leg };
+    }
+    // 4. Common is present (c >= 1) — common always has a drop chance!
+    else if (l === 0 && e === 0) {
+        if (c === 3) odds = { common: 55, rare: 45, epic: 0, legendary: 0 };
+        else if (c === 2) odds = { common: 40, rare: 60, epic: 0, legendary: 0 };
+        else odds = { common: 25, rare: 75, epic: 0, legendary: 0 };
+    }
+    else if (l === 3) {
+        // 1C + 3L — ANTI-ABUSE: 1 common drastically pulls down legendary chance!
+        // Drops: 10% Legendary, 25% Epic, 45% Rare, 20% Common
+        odds = { common: 20, rare: 45, epic: 25, legendary: 10 };
+    }
+    else if (l === 2) {
+        const leg = c === 2 ? 7 : (e > 0 ? 10 : 8);
+        const epic = c === 2 ? 18 : (e > 0 ? 35 : 27);
+        const comm = c === 2 ? 35 : 20;
+        const rare = 100 - comm - epic - leg;
+        odds = { common: comm, rare, epic, legendary: leg };
+    }
+    else if (l === 1) {
+        if (c === 3) {
+            odds = { common: 50, rare: 37, epic: 10, legendary: 3 };
+        } else if (c === 2) {
+            odds = { common: 35, rare: 45, epic: 15, legendary: 5 };
+        } else {
+            let comm, rare, epic, leg;
+            if (e === 2)      { comm = 20; rare = 28; epic = 42; leg = 10; }
+            else if (e === 1) { comm = 20; rare = 38; epic = 32; leg = 10; } // 1 of each (1C + 1R + 1E + 1L)
+            else              { comm = 20; rare = 55; epic = 19; leg = 6; }
+            odds = { common: comm, rare, epic, legendary: leg };
+        }
+    }
+    else { // l === 0, e >= 1
+        if (c === 3) {
+            odds = { common: 50, rare: 40, epic: 10, legendary: 0 };
+        } else if (c === 2) {
+            if (e === 2) odds = { common: 35, rare: 45, epic: 20, legendary: 0 };
+            else         odds = { common: 35, rare: 50, epic: 15, legendary: 0 };
+        } else {
+            let comm, rare, epic, leg;
+            if (e === 3)      { comm = 20; rare = 40; epic = 35; leg = 5; }
+            else if (e === 2) { comm = 20; rare = 48; epic = 29; leg = 3; }
+            else              { comm = 20; rare = 58; epic = 22; leg = 0; }
+            odds = { common: comm, rare, epic, legendary: leg };
+        }
+    }
 
     // Build pills
     const labels = [
