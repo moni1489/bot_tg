@@ -18,11 +18,13 @@
     <!-- LOADING SCREEN -->
     <div id="loading-screen" class="loading-overlay">
         <div class="loading-content">
-            <div class="loading-logo" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
+            <div class="loading-logo"
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;">
                 <svg width="45" height="45" viewBox="0 0 24 24" fill="none" stroke="var(--neon-red)" stroke-width="1.5">
                     <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5z" fill="transparent"></path>
                 </svg>
-                <div style="font-size: 3rem; font-weight: 900; letter-spacing: 2px; color: white; text-shadow: 0 0 20px var(--neon-red-glow), 0 0 40px var(--neon-red-glow), 0 0 60px var(--neon-red-glow);">
+                <div
+                    style="font-size: 3rem; font-weight: 900; letter-spacing: 2px; color: white; text-shadow: 0 0 20px var(--neon-red-glow), 0 0 40px var(--neon-red-glow), 0 0 60px var(--neon-red-glow);">
                     FUNKO<span style="color: var(--neon-red);">STOP</span>
                 </div>
             </div>
@@ -40,7 +42,12 @@
                 </button>
                 <button id="loading-play-btn" class="hidden"
                     style="padding: 16px 24px; background: var(--neon-red); border: none; border-radius: 12px; color: white; font-weight: 900; letter-spacing: 2px; cursor: pointer; box-shadow: 0 0 20px var(--neon-red-glow); font-size: 1.1rem; display: flex; align-items: center; justify-content: space-between;">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M9 12h.01"></path></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;">
+                        <rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect>
+                        <circle cx="12" cy="12" r="2"></circle>
+                        <path d="M6 12h.01M9 12h.01"></path>
+                    </svg>
                     ИГРАТЬ
                     <span style="font-size: 1.2rem;">›</span>
                 </button>
@@ -240,9 +247,10 @@
                     <div class="task-card">
                         <div class="task-info">
                             <h4>💬 Вступить в беседу FunkoStop</h4>
-                            <span class="task-reward">Награда: +1 пак (начисляется автоматически после верификации)</span>
+                            <span class="task-reward">Награда: +1 пак (начисляется автоматически после
+                                верификации)</span>
                         </div>
-                        <button class="btn-task" id="task-join-btn" data-task="join_chat">Вступить</button>
+                        <button class="btn-task" id="task-join-btn">Вступить</button>
                     </div>
 
                     <!-- Task 5: Leave Review -->
@@ -258,17 +266,19 @@
             </div>
         </main>
 
-        
+
 
         <!-- TRADE-IN VIEW — admin only (shown via JS when is_admin=true) -->
         <main id="view-tradein" class="tab-view hidden">
             <div class="tradein-container">
                 <div class="tradein-header">
                     <h2>ОБМЕН КАРТ (TRADE-IN)</h2>
-                    <p class="section-desc">Выберите 4 дубликата (повторки), чтобы скрафтить 1 новую случайную карту.</p>
-                    <p style="color:rgba(229,9,20,0.7);font-size:0.75rem;margin-top:6px;">🔒 Режим тестирования — только для администраторов</p>
+                    <p class="section-desc">Выберите 4 дубликата (повторки), чтобы скрафтить 1 новую случайную карту.
+                    </p>
+                    <p style="color:rgba(229,9,20,0.7);font-size:0.75rem;margin-top:6px;">🔒 Режим тестирования — только
+                        для администраторов</p>
                 </div>
-                
+
                 <div class="tradein-slots" id="tradein-slots-container">
                     <div class="tradein-slot empty-slot pulse" id="slot-0" onclick="openInventoryForSlot(0)">+</div>
                     <div class="tradein-slot empty-slot pulse" id="slot-1" onclick="openInventoryForSlot(1)">+</div>
@@ -283,9 +293,10 @@
                         <span class="chance-hint">Заполните 4 слота для расчёта шансов</span>
                     </div>
                 </div>
-                
+
                 <div class="tradein-action">
-                    <button class="craft-btn" id="btn-craft" disabled onclick="craftCards()">Скрафтить новую карту</button>
+                    <button class="craft-btn" id="btn-craft" disabled onclick="craftCards()">Скрафтить новую
+                        карту</button>
                 </div>
             </div>
         </main>
@@ -332,8 +343,8 @@
                 </svg>
                 <span class="nav-label">ЗАДАНИЯ</span>
             </button>
-        
-        <!-- Trade-in button: hidden by default, shown by JS only for admins -->
+
+            <!-- Trade-in button: hidden by default, shown by JS only for admins -->
             <button class="nav-btn" id="admin-tradein-btn" data-target="view-tradein" style="display:none;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linejoin="round">
@@ -374,7 +385,8 @@
         <button id="btn-flip-card" class="hidden"
             style="position: absolute; bottom: 100px; z-index: 10; font-size: 1.0rem; font-weight: 900; color: #fff; background: transparent; border: none; outline: none; letter-spacing: 2px; text-shadow: 0 0 10px rgba(255,0,34,0.8);">ОТКРЫТЬ</button>
         <button id="btn-close-drop" class="hidden"
-            style="position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 1.2rem; font-weight: 900; color: #fff; background: rgba(255,0,50,0.8); border: 2px solid #ff0032; border-radius: 8px; padding: 10px 20px; outline: none; letter-spacing: 1px; box-shadow: 0 0 15px rgba(255,0,50,0.5); cursor: pointer;">ЗАБРАТЬ КАРТУ</button>
+            style="position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: 1.2rem; font-weight: 900; color: #fff; background: rgba(255,0,50,0.8); border: 2px solid #ff0032; border-radius: 8px; padding: 10px 20px; outline: none; letter-spacing: 1px; box-shadow: 0 0 15px rgba(255,0,50,0.5); cursor: pointer;">ЗАБРАТЬ
+            КАРТУ</button>
         <div class="opened-card-actions hidden" id="opened-card-actions">
             <button id="btn-next-pack" class="btn-action-primary">ОТКРЫТЬ СЛЕДУЮЩУЮ</button>
             <button id="btn-exit-pack" class="btn-action-secondary">ВЫЙТИ</button>
@@ -451,19 +463,22 @@
             <div class="prize-code-icon">🏆</div>
             <h3 class="prize-code-title">КОЛЛЕКЦИЯ СОБРАНА!</h3>
             <p class="prize-code-series" id="prize-code-series-name">Breaking Bad</p>
-            
+
             <div class="prize-code-box">
                 <span class="prize-code-text" id="prize-code-val">--------</span>
                 <button class="prize-code-copy-btn" id="prize-code-copy-btn" onclick="copyPrizeCode()">
                     📋 Скопировать
                 </button>
             </div>
-            
-            <p class="prize-code-subtext">Промокод сохранён и отправлен вам в сообщения бота. Отправьте его менеджеру для получения приза!</p>
-            
+
+            <p class="prize-code-subtext">Промокод сохранён и отправлен вам в сообщения бота. Отправьте его менеджеру
+                для получения приза!</p>
+
             <div class="prize-code-actions">
-                <button class="btn-action-primary" id="prize-code-chat-btn" onclick="openManagerWithCode()">💬 Написать менеджеру</button>
-                <button class="btn-action-secondary" onclick="closePrizeCodeModal()" style="margin-top: 10px; width: 80%;">✕ Закрыть</button>
+                <button class="btn-action-primary" id="prize-code-chat-btn" onclick="openManagerWithCode()">💬 Написать
+                    менеджеру</button>
+                <button class="btn-action-secondary" onclick="closePrizeCodeModal()"
+                    style="margin-top: 10px; width: 80%;">✕ Закрыть</button>
             </div>
         </div>
     </div>
