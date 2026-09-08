@@ -303,16 +303,19 @@ async def claim_task_reward(request):
                         "message": "У вас пока нет оформленных и оплаченных заказов от 2000 рублей."
                     })
 
-            # Verify join chat — task is auto-awarded via captcha, but allow manual claim too
-            # Admin-only until launch
+            # Join chat — awarded ONLY automatically via captcha verification in the group
             elif task_id == 'join_chat':
-                if not await is_admin(tg_id):
-                    return web.json_response({"success": False, "message": "🔒 Это задание будет доступно на старте игры!"})
+                return web.json_response({
+                    "success": False, 
+                    "message": "Пак за вступление в беседу начисляется автоматически ботом после прохождения проверки в чате!"
+                })
 
-            # Review task — admin-only until launch
+            # Review task — manual verification by admin
             elif task_id == 'leave_review':
-                if not await is_admin(tg_id):
-                    return web.json_response({"success": False, "message": "🔒 Это задание будет доступно на старте игры!"})
+                return web.json_response({
+                    "success": False, 
+                    "message": "Отзывы проверяются администратором вручную, награда начисляется после проверки!"
+                })
 
             completed.append(task_id)
             if task_id == 'order_2000':
@@ -327,6 +330,22 @@ async def claim_task_reward(request):
                 "UPDATE card_users SET packs_count = $1, completed_tasks = $2 WHERE telegram_id = $3", 
                 new_count, json.dumps(completed), tg_id
             )
+
+            # Send Telegram notification in PM
+            task_titles = {
+                'sub_channel': '«Подписаться на канал»',
+                'order_2000': '«Оформить заказ от 2000 рублей»',
+            }
+            title = task_titles.get(task_id, '«Задание»')
+            try:
+                await bot.send_message(
+                    tg_id,
+                    f"🎉 Вы успешно выполнили задание {title}!\n🎁 Вам начислено: **+{reward_count} пак(а)**.",
+                    parse_mode="Markdown"
+                )
+            except Exception as notify_err:
+                logging.warning(f"Failed to send task claim notification to {tg_id}: {notify_err}")
+
             return web.json_response({"success": True, "packs_count": new_count, "completed_tasks": completed})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
@@ -492,40 +511,81 @@ async def craft_cards_api(request):
                 counts = {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
                 for r in rarities: counts[r] += 1
                 
-                n_c = counts["common"]
-                n_r = counts["rare"]
-                n_e = counts["epic"]
-                n_l = counts["legendary"]
+                c = counts["common"]
+                r = counts["rare"]
+                e = counts["epic"]
+                l = counts["legendary"]
 
-                # Score-based system: mirrors frontend exactly
-                # common=1, rare=2, epic=3, legendary=4 → score 4..16
-                # Anchors: score4→{C70,R30}, score8→{R70,E30}, score12→{E80,L20}, score16→{L100}
-                rarity_pts = {"common": 1, "rare": 2, "epic": 3, "legendary": 4}
-                score = sum(rarity_pts.get(r, 1) for r in rarities)
-                t = max(0.0, min(1.0, (score - 4) / 12.0))
+                # ---- BALANCED CRAFT SYSTEM (ANTI-ABUSE) ----
+                # 1. All 4 identical
+                if c == 4: odds = {"common": 70.0, "rare": 30.0, "epic": 0.0, "legendary": 0.0}
+                elif r == 4: odds = {"common": 0.0, "rare": 70.0, "epic": 30.0, "legendary": 0.0}
+                elif e == 4: odds = {"common": 0.0, "rare": 0.0, "epic": 80.0, "legendary": 20.0}
+                elif l == 4: odds = {"common": 0.0, "rare": 0.0, "epic": 0.0, "legendary": 100.0}
+                # 2. Only Epic + Legendary (c == 0 and r == 0)
+                elif c == 0 and r == 0:
+                    leg = 15.0 + l * 20.0  # 3E+1L: 35% L; 2E+2L: 55% L; 1E+3L: 75% L
+                    odds = {"common": 0.0, "rare": 0.0, "epic": 100.0 - leg, "legendary": leg}
+                # 3. Only Rare, Epic, Legendary (c == 0, r >= 1)
+                elif c == 0:
+                    if l == 0:
+                        if e == 1:   rare, epic, leg = 55.0, 45.0, 0.0
+                        elif e == 2: rare, epic, leg = 35.0, 60.0, 5.0
+                        else:        rare, epic, leg = 20.0, 68.0, 12.0
+                    elif l == 1:
+                        if e == 0:   rare, epic, leg = 60.0, 32.0, 8.0
+                        elif e == 1: rare, epic, leg = 45.0, 45.0, 10.0
+                        else:        rare, epic, leg = 25.0, 60.0, 15.0
+                    elif l == 2:
+                        if e == 0:   rare, epic, leg = 45.0, 40.0, 15.0
+                        else:        rare, epic, leg = 30.0, 50.0, 20.0
+                    else: # l == 3 (1R + 3L)
+                        rare, epic, leg = 30.0, 45.0, 25.0
+                    odds = {"common": 0.0, "rare": rare, "epic": epic, "legendary": leg}
+                # 4. Common is present (c >= 1) — common always has drop chance!
+                elif l == 0 and e == 0:
+                    if c == 3: odds = {"common": 55.0, "rare": 45.0, "epic": 0.0, "legendary": 0.0}
+                    elif c == 2: odds = {"common": 40.0, "rare": 60.0, "epic": 0.0, "legendary": 0.0}
+                    else: odds = {"common": 25.0, "rare": 75.0, "epic": 0.0, "legendary": 0.0}
+                elif l == 3:
+                    # 1C + 3L — ANTI-ABUSE: 1 common drastically pulls down legendary chance!
+                    # Drops: 10% Legendary, 25% Epic, 45% Rare, 20% Common
+                    odds = {"common": 20.0, "rare": 45.0, "epic": 25.0, "legendary": 10.0}
+                elif l == 2:
+                    leg = 7.0 if c == 2 else (10.0 if e > 0 else 8.0)
+                    epic = 18.0 if c == 2 else (35.0 if e > 0 else 27.0)
+                    comm = 35.0 if c == 2 else 20.0
+                    rare = 100.0 - comm - epic - leg
+                    odds = {"common": comm, "rare": rare, "epic": epic, "legendary": leg}
+                elif l == 1:
+                    if c == 3:
+                        odds = {"common": 50.0, "rare": 37.0, "epic": 10.0, "legendary": 3.0}
+                    elif c == 2:
+                        odds = {"common": 35.0, "rare": 45.0, "epic": 15.0, "legendary": 5.0}
+                    else:
+                        if e == 2:   comm, rare, epic, leg = 20.0, 28.0, 42.0, 10.0
+                        elif e == 1: comm, rare, epic, leg = 20.0, 38.0, 32.0, 10.0 # 1 of each
+                        else:        comm, rare, epic, leg = 20.0, 55.0, 19.0, 6.0
+                        odds = {"common": comm, "rare": rare, "epic": epic, "legendary": leg}
+                else: # l == 0, e >= 1
+                    if c == 3:
+                        odds = {"common": 50.0, "rare": 40.0, "epic": 10.0, "legendary": 0.0}
+                    elif c == 2:
+                        if e == 2: odds = {"common": 35.0, "rare": 45.0, "epic": 20.0, "legendary": 0.0}
+                        else:      odds = {"common": 35.0, "rare": 50.0, "epic": 15.0, "legendary": 0.0}
+                    else:
+                        if e == 3:   comm, rare, epic, leg = 20.0, 40.0, 35.0, 5.0
+                        elif e == 2: comm, rare, epic, leg = 20.0, 48.0, 29.0, 3.0
+                        else:        comm, rare, epic, leg = 20.0, 58.0, 22.0, 0.0
+                        odds = {"common": comm, "rare": rare, "epic": epic, "legendary": leg}
 
-                # Apply series penalty: reduces upgrade probability
-                t_eff = t * chance_multiplier  # shrink t so higher zones are harder to reach
+                # Apply series penalty if user already completed a series
+                leg_pct = odds["legendary"] * chance_multiplier
+                epic_pct = odds["epic"] * chance_multiplier
+                rare_pct = odds["rare"] * chance_multiplier
+                common_pct = 100.0 - leg_pct - epic_pct - rare_pct
 
-                if t_eff <= 1 / 3:
-                    t1 = t_eff * 3
-                    common_pct  = 70.0 * (1 - t1)
-                    epic_pct    = 30.0 * t1
-                    rare_pct    = 100.0 - common_pct - epic_pct
-                    leg_pct     = 0.0
-                elif t_eff <= 2 / 3:
-                    t2 = (t_eff - 1 / 3) * 3
-                    common_pct  = 0.0
-                    leg_pct     = 20.0 * t2
-                    rare_pct    = 70.0 * (1 - t2)
-                    epic_pct    = 100.0 - rare_pct - leg_pct
-                else:
-                    t3 = (t_eff - 2 / 3) * 3
-                    common_pct  = 0.0
-                    rare_pct    = 0.0
-                    epic_pct    = 80.0 * (1 - t3)
-                    leg_pct     = 100.0 - epic_pct
-
+                rand = random.uniform(0, 100)
                 if rand <= leg_pct:
                     new_rarity = "legendary"
                 elif rand <= leg_pct + epic_pct:
