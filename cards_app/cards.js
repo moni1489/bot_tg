@@ -314,17 +314,11 @@ function setupTasks() {
                 window.open('https://t.me/FunkoStop', '_blank');
             }
 
-            // Open FunkoStop chat for join_chat task
+            // Open FunkoStop main chat (verification) for join_chat task
             if (taskId === 'join_chat') {
-                window.open('https://t.me/+n_jx6XVjTyw0NDVi', '_blank');
+                window.open('https://t.me/+y_E3_0tKEhpiMjg6', '_blank');
                 // Small delay so user can join before we verify
                 await new Promise(r => setTimeout(r, 2500));
-            }
-
-            // Open reviews thread for leave_review task
-            if (taskId === 'leave_review') {
-                window.open('https://t.me/+n_jx6XVjTyw0NDVi', '_blank');
-                await new Promise(r => setTimeout(r, 1500));
             }
 
             try {
@@ -352,6 +346,14 @@ function setupTasks() {
             }
         });
     });
+
+    // Review task — just opens link, no auto-claim (manual moderation by admin)
+    const reviewBtn = document.getElementById('task-review-btn');
+    if (reviewBtn) {
+        reviewBtn.addEventListener('click', () => {
+            window.open('https://t.me/+n_jx6XVjTyw0NDVi', '_blank');
+        });
+    }
 }
 
 function updateTaskButtons() {
@@ -1696,37 +1698,37 @@ function updateCraftChancesPreview() {
 
     let odds = { common: 0, rare: 0, epic: 0, legendary: 0 };
 
-    if (n_c === 4) {
-        odds = { common: 70, rare: 30, epic: 0, legendary: 0 };
-    } else if (n_r === 4) {
-        odds = { common: 0, rare: 70, epic: 30, legendary: 0 };
-    } else if (n_e === 4) {
-        odds = { common: 0, rare: 0, epic: 80, legendary: 20 };
-    } else if (n_l === 4) {
-        odds = { common: 0, rare: 0, epic: 0, legendary: 100 };
-    } else if (n_l > 0) {
-        // Mixed with legendaries: scale epic/legendary based on legendary count
-        // 1 leg: leg=25%, 2 leg: leg=50%, 3 leg: leg=75%
-        const leg = Math.min(75, 25 * n_l);
-        // If also has epics, chance for legendary increases
-        const legBonus = n_e * 5;
-        const legFinal = Math.min(90, leg + legBonus);
-        odds = { common: 0, rare: 0, epic: 100 - legFinal, legendary: legFinal };
-    } else if (n_e > 0) {
-        // Mixed with epics (no legendary): scale by epic count + rarity of rest
-        const leg = n_e < 3 ? 4 * n_e : 14;
-        const epic = 35 + 15 * n_e + 5 * n_r;
-        const rem = Math.max(0, 100 - leg - epic);
-        const comm = (n_c >= 2) ? Math.round(rem * 0.3) : 0;
-        const rare = rem - comm;
-        odds = { common: comm, rare: rare, epic: epic, legendary: leg };
+    // Score-based system: each rarity has point value, total score drives output
+    // common=1, rare=2, epic=3, legendary=4 → score range: 4 (4C) to 16 (4L)
+    // Anchors: score4→{C70,R30}, score8→{R70,E30}, score12→{E80,L20}, score16→{L100}
+    const pts = { common: 1, rare: 2, epic: 3, legendary: 4 };
+    const score = rarities.reduce((sum, r) => sum + (pts[r] || 1), 0);
+    const t = Math.max(0, Math.min(1, (score - 4) / 12)); // 0.0 to 1.0
+
+    let common, rare, epic, legendary;
+    if (t <= 1 / 3) {
+        // Zone 1: common ↔ rare region (score 4–8)
+        const t1 = t * 3;
+        common = Math.round(70 * (1 - t1));
+        epic   = Math.round(30 * t1);
+        rare   = 100 - common - epic;
+        legendary = 0;
+    } else if (t <= 2 / 3) {
+        // Zone 2: rare ↔ epic region (score 8–12)
+        const t2 = (t - 1 / 3) * 3;
+        common    = 0;
+        legendary = Math.round(20 * t2);
+        rare      = Math.round(70 * (1 - t2));
+        epic      = 100 - rare - legendary;
     } else {
-        // Only common + rare
-        if (n_r === 1) odds = { common: 45, rare: 50, epic: 5, legendary: 0 };
-        else if (n_r === 2) odds = { common: 30, rare: 58, epic: 12, legendary: 0 };
-        else if (n_r === 3) odds = { common: 10, rare: 68, epic: 22, legendary: 0 };
-        else odds = { common: 70, rare: 30, epic: 0, legendary: 0 };
+        // Zone 3: epic ↔ legendary region (score 12–16)
+        const t3 = (t - 2 / 3) * 3;
+        common    = 0;
+        rare      = 0;
+        epic      = Math.round(80 * (1 - t3));
+        legendary = 100 - epic;
     }
+    odds = { common, rare, epic, legendary };
 
     // Build pills
     const labels = [
