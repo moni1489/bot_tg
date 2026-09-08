@@ -192,6 +192,12 @@ function updateUI() {
         if (packInside) packInside.classList.remove('peeking');
     }
 
+    // Hide new tasks (join_chat, leave_review) for non-admins until launch
+    const joinTaskCard = document.getElementById('task-join-btn')?.closest('.task-card');
+    const reviewTaskCard = document.getElementById('task-review-btn')?.closest('.task-card');
+    if (joinTaskCard) joinTaskCard.style.display = userData.is_admin ? '' : 'none';
+    if (reviewTaskCard) reviewTaskCard.style.display = userData.is_admin ? '' : 'none';
+
     updateTaskButtons();
     renderCollection();
 }
@@ -306,6 +312,19 @@ function setupTasks() {
             // Open official Telegram channel if tg_sub task
             if (taskId === 'tg_sub') {
                 window.open('https://t.me/FunkoStop', '_blank');
+            }
+
+            // Open FunkoStop chat for join_chat task
+            if (taskId === 'join_chat') {
+                window.open('https://t.me/+n_jx6XVjTyw0NDVi', '_blank');
+                // Small delay so user can join before we verify
+                await new Promise(r => setTimeout(r, 2500));
+            }
+
+            // Open reviews thread for leave_review task
+            if (taskId === 'leave_review') {
+                window.open('https://t.me/+n_jx6XVjTyw0NDVi', '_blank');
+                await new Promise(r => setTimeout(r, 1500));
             }
 
             try {
@@ -1686,9 +1705,15 @@ function updateCraftChancesPreview() {
     } else if (n_l === 4) {
         odds = { common: 0, rare: 0, epic: 0, legendary: 100 };
     } else if (n_l > 0) {
+        // Mixed with legendaries: scale epic/legendary based on legendary count
+        // 1 leg: leg=25%, 2 leg: leg=50%, 3 leg: leg=75%
         const leg = Math.min(75, 25 * n_l);
-        odds = { common: 0, rare: 0, epic: 100 - leg, legendary: leg };
+        // If also has epics, chance for legendary increases
+        const legBonus = n_e * 5;
+        const legFinal = Math.min(90, leg + legBonus);
+        odds = { common: 0, rare: 0, epic: 100 - legFinal, legendary: legFinal };
     } else if (n_e > 0) {
+        // Mixed with epics (no legendary): scale by epic count + rarity of rest
         const leg = n_e < 3 ? 4 * n_e : 14;
         const epic = 35 + 15 * n_e + 5 * n_r;
         const rem = Math.max(0, 100 - leg - epic);
