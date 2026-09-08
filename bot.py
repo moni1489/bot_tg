@@ -497,77 +497,43 @@ async def craft_cards_api(request):
                 n_e = counts["epic"]
                 n_l = counts["legendary"]
 
-                rand = random.uniform(0, 100)
-                new_rarity = "common"
+                # Score-based system: mirrors frontend exactly
+                # common=1, rare=2, epic=3, legendary=4 → score 4..16
+                # Anchors: score4→{C70,R30}, score8→{R70,E30}, score12→{E80,L20}, score16→{L100}
+                rarity_pts = {"common": 1, "rare": 2, "epic": 3, "legendary": 4}
+                score = sum(rarity_pts.get(r, 1) for r in rarities)
+                t = max(0.0, min(1.0, (score - 4) / 12.0))
 
-                if n_c == 4:
-                    # 4× Common → Rare 30% * multiplier, rest Common (70%)
-                    rare_chance = 30.0 * chance_multiplier
-                    if rand <= rare_chance: new_rarity = "rare"
-                    else:                   new_rarity = "common"
+                # Apply series penalty: reduces upgrade probability
+                t_eff = t * chance_multiplier  # shrink t so higher zones are harder to reach
 
-                elif n_r == 4:
-                    # 4× Rare → Epic 30% * multiplier, rest Rare
-                    epic_chance = 30.0 * chance_multiplier
-                    if rand <= epic_chance: new_rarity = "epic"
-                    else:                   new_rarity = "rare"
-
-                elif n_e == 4:
-                    # 4× Epic → Legendary 20% * multiplier, rest Epic
-                    leg_chance = 20.0 * chance_multiplier
-                    if rand <= leg_chance: new_rarity = "legendary"
-                    else:                  new_rarity = "epic"
-
-                elif n_l == 4:
-                    new_rarity = "legendary"
-
-                elif n_l > 0:
-                    # Наборы с легендарками (1-3 леги) - смесь с другими редкостями
-                    leg_chance = min(75.0, 25.0 * n_l) * chance_multiplier
-                    # Бонус за наличие эпиков в наборе
-                    leg_bonus = n_e * 5.0 * chance_multiplier
-                    leg_chance = min(90.0 * chance_multiplier, leg_chance + leg_bonus)
-                    if rand <= leg_chance: new_rarity = "legendary"
-                    else:                  new_rarity = "epic"
-
-                elif n_e > 0:
-                    # Смеси с Эпиками (без лег):
-                    leg_chance = (4.0 * n_e if n_e < 3 else 14.0) * chance_multiplier
-                    epic_chance = leg_chance + (35.0 + 15.0 * n_e + 5.0 * n_r) * chance_multiplier
-                    if rand <= leg_chance:
-                        new_rarity = "legendary"
-                    elif rand <= epic_chance:
-                        new_rarity = "epic"
-                    else:
-                        if n_c >= 2 and random.uniform(0, 100) <= 30.0:
-                            new_rarity = "common"
-                        else:
-                            new_rarity = "rare"
-
+                if t_eff <= 1 / 3:
+                    t1 = t_eff * 3
+                    common_pct  = 70.0 * (1 - t1)
+                    epic_pct    = 30.0 * t1
+                    rare_pct    = 100.0 - common_pct - epic_pct
+                    leg_pct     = 0.0
+                elif t_eff <= 2 / 3:
+                    t2 = (t_eff - 1 / 3) * 3
+                    common_pct  = 0.0
+                    leg_pct     = 20.0 * t2
+                    rare_pct    = 70.0 * (1 - t2)
+                    epic_pct    = 100.0 - rare_pct - leg_pct
                 else:
-                    # Смеси только Common + Rare (без эпиков и без лег)
-                    # 0% шанс на Legendary!
-                    if n_r == 1:
-                        # 3C + 1R
-                        epic_chance = 5.0 * chance_multiplier
-                        rare_chance = epic_chance + (50.0 * chance_multiplier)
-                        if rand <= epic_chance:    new_rarity = "epic"
-                        elif rand <= rare_chance:  new_rarity = "rare"
-                        else:                      new_rarity = "common"
-                    elif n_r == 2:
-                        # 2C + 2R
-                        epic_chance = 12.0 * chance_multiplier
-                        rare_chance = epic_chance + (58.0 * chance_multiplier)
-                        if rand <= epic_chance:    new_rarity = "epic"
-                        elif rand <= rare_chance:  new_rarity = "rare"
-                        else:                      new_rarity = "common"
-                    elif n_r == 3:
-                        # 1C + 3R
-                        epic_chance = 22.0 * chance_multiplier
-                        rare_chance = epic_chance + (68.0 * chance_multiplier)
-                        if rand <= epic_chance:    new_rarity = "epic"
-                        elif rand <= rare_chance:  new_rarity = "rare"
-                        else:                      new_rarity = "common"
+                    t3 = (t_eff - 2 / 3) * 3
+                    common_pct  = 0.0
+                    rare_pct    = 0.0
+                    epic_pct    = 80.0 * (1 - t3)
+                    leg_pct     = 100.0 - epic_pct
+
+                if rand <= leg_pct:
+                    new_rarity = "legendary"
+                elif rand <= leg_pct + epic_pct:
+                    new_rarity = "epic"
+                elif rand <= leg_pct + epic_pct + rare_pct:
+                    new_rarity = "rare"
+                else:
+                    new_rarity = "common"
 
                 # 3. Pick random card of that rarity
                 matching = []
