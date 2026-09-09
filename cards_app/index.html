@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>FunkoStop Cards</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/cards/cards.css?v=114">
+    <link rel="stylesheet" href="/cards/cards.css?v=115">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -268,7 +268,7 @@
 
 
 
-        <!-- TRADE-IN VIEW — admin only (shown via JS when is_admin=true) -->
+        <!-- TRADE-IN / CRAFT VIEW -->
         <main id="view-tradein" class="tab-view hidden">
             <div class="tradein-container">
                 <div class="tradein-header">
@@ -344,8 +344,8 @@
                 <span class="nav-label">ЗАДАНИЯ</span>
             </button>
 
-            <!-- Trade-in button: hidden by default, shown by JS only for admins -->
-            <button class="nav-btn" id="admin-tradein-btn" data-target="view-tradein" style="display:none;">
+            <!-- Trade-in / Craft button -->
+            <button class="nav-btn" id="tradein-btn" data-target="view-tradein">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linejoin="round">
                     <path d="M21 2v6h-6"></path>
@@ -353,7 +353,7 @@
                     <path d="M3 22v-6h6"></path>
                     <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
                 </svg>
-                <span class="nav-label">Крафты 🔧</span>
+                <span class="nav-label">КРАФТЫ</span>
             </button>
 
 
@@ -442,7 +442,7 @@
         </div>
     </div>
 
-    <script src="/cards/cards.js?v=114"></script>
+    <script src="/cards/cards.js?v=115"></script>
 
     <!-- Inventory Modal for Trade-in -->
     <div id="inventory-modal" class="modal hidden" onclick="if(event.target === this) closeInventoryModal()">
