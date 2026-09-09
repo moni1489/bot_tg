@@ -719,7 +719,7 @@ async def claim_bonus_packs_api(request):
 async def serve_cards_app(request):
     index_path = os.path.join(cards_dir, "index.html")
     if os.path.exists(index_path):
-        return web.FileResponse(index_path)
+        return web.FileResponse(index_path, headers={'Cache-Control': 'no-cache, no-store, must-revalidate'})
     return web.Response(text="index.html not found", status=404)
 
 async def health_check(request):

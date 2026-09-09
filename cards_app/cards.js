@@ -192,12 +192,6 @@ function updateUI() {
         if (packInside) packInside.classList.remove('peeking');
     }
 
-    // Hide new tasks (join_chat, leave_review) for non-admins until launch
-    const joinTaskCard = document.getElementById('task-join-btn')?.closest('.task-card');
-    const reviewTaskCard = document.getElementById('task-review-btn')?.closest('.task-card');
-    if (joinTaskCard) joinTaskCard.style.display = userData.is_admin ? '' : 'none';
-    if (reviewTaskCard) reviewTaskCard.style.display = userData.is_admin ? '' : 'none';
-
     updateTaskButtons();
     renderCollection();
 }
