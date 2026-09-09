@@ -513,6 +513,29 @@ def calculate_craft_odds(c, r, e, l):
 
     return {"common": co, "rare": ra, "epic": ep, "legendary": le}
 
+def apply_craft_penalty(odds: dict, multiplier: float) -> dict:
+    """
+    Applies post-series penalty to craft odds:
+    - Active rarities (chances > 0) are ordered highest to lowest.
+    - Highest active rarities are reduced by multiplier.
+    - The difference is added to the lowest active rarity (e.g. in 4E, Epic rises; in 3R+1L, Rare rises).
+    - Inactive rarities remain strictly 0% (impossible rarities never drop).
+    """
+    order = ['legendary', 'epic', 'rare', 'common']
+    active = [r for r in order if odds.get(r, 0) > 0]
+    if len(active) <= 1:
+        return odds.copy()
+        
+    lowest = active[-1]
+    higher = active[:-1]
+    
+    res = {k: 0 for k in order}
+    for r in higher:
+        res[r] = round(odds[r] * multiplier)
+        
+    res[lowest] = 100 - sum(res[r] for r in higher)
+    return res
+
 async def craft_cards_api(request):
     try:
         body = await request.json()
@@ -550,7 +573,7 @@ async def craft_cards_api(request):
                                     rarities.append(cc["rarity"])
                                     break
                                     
-                # 2. Determine new rarity based on craft probabilities (100% parity with UI preview)
+                # 2. Determine new rarity based on craft probabilities
                 import random
                 counts = {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
                 for r_name in rarities: counts[r_name] += 1
@@ -561,6 +584,27 @@ async def craft_cards_api(request):
                 l = counts["legendary"]
 
                 odds = calculate_craft_odds(c, r, e, l)
+
+                # Check if user has completed any series
+                user_cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
+                has_completed_code = await db.fetchval("SELECT 1 FROM series_codes WHERE telegram_id = $1 LIMIT 1", tg_id)
+                has_completed_series = bool(has_completed_code)
+
+                if not has_completed_series and user_cards_rows:
+                    user_cards_map = {f"{row['series_slug']}_{row['card_index']}": row['count'] for row in user_cards_rows}
+                    for sc in SERIES_CONFIG:
+                        if sc["slug"] == "bonus_card": continue
+                        if all(user_cards_map.get(f"{sc['slug']}_{cc['index']}", 0) > 0 for cc in sc["cards"]):
+                            has_completed_series = True
+                            break
+
+                # If user has completed a series, apply craft penalty:
+                # highest active rarities are reduced, lowest active rarity rises, inactive rarities stay 0%
+                if has_completed_series:
+                    drop_settings = await get_drop_settings()
+                    craft_pen = float(drop_settings.get("craft_penalty", 33.0))
+                    craft_mult = max(0.05, (100.0 - craft_pen) / 100.0)
+                    odds = apply_craft_penalty(odds, craft_mult)
 
                 # Pick rarity strictly based on odds; any rarity with 0% weight cannot drop
                 available_rarities = [k for k, v in odds.items() if v > 0]
@@ -1022,6 +1066,7 @@ class EditDropRate(StatesGroup):
     waiting_for_epic = State()
     waiting_for_rare = State()
     waiting_for_penalty = State()
+    waiting_for_craft_penalty = State()
 
 
 # --- DATABASE ---
@@ -1149,7 +1194,8 @@ DEFAULT_DROP_SETTINGS = {
     "legendary_rate": 1.5,
     "epic_rate": 5.0,
     "rare_rate": 26.0,
-    "series_penalty": 67.0 # % reduction after 1+ completed series (e.g. 67% reduction = multiplier 0.33)
+    "series_penalty": 67.0, # % reduction in packs after 1+ completed series (e.g. 67% reduction = multiplier 0.33)
+    "craft_penalty": 33.0   # % reduction in crafts after 1+ completed series (e.g. 33% reduction = multiplier 0.67 ~ 1.5x)
 }
 
 async def get_drop_settings() -> dict:
@@ -2397,9 +2443,10 @@ def get_drop_settings_kb():
         ],
         [
             InlineKeyboardButton(text="🔵 Изм. % Редких", callback_data="edit_drop_rare"),
-            InlineKeyboardButton(text="📉 Снижение после серии", callback_data="edit_drop_penalty")
+            InlineKeyboardButton(text="📉 Штраф в паках", callback_data="edit_drop_penalty")
         ],
         [
+            InlineKeyboardButton(text="🔨 Штраф в крафтах", callback_data="edit_craft_penalty"),
             InlineKeyboardButton(text="🔄 Сбросить на стандартные", callback_data="edit_drop_reset")
         ]
     ])
@@ -2412,17 +2459,20 @@ async def build_drop_settings_text() -> str:
     common = max(0.0, round(100.0 - leg - epic - rare, 2))
     penalty = float(s.get("series_penalty", 67.0))
     multiplier = max(0.0, round((100.0 - penalty) / 100.0, 2))
+    craft_pen = float(s.get("craft_penalty", 33.0))
+    craft_mult = max(0.0, round((100.0 - craft_pen) / 100.0, 2))
 
     return (
-        "🎲 <b>Настройки шансов дропа из паков</b>\n\n"
-        "<b>Текущие базовые шансы:</b>\n"
+        "🎲 <b>Настройки шансов дропа и крафтов</b>\n\n"
+        "<b>Текущие базовые шансы из паков:</b>\n"
         f"• 🟡 <b>Легендарные:</b> <code>{leg}%</code>\n"
         f"• 🟣 <b>Эпические:</b> <code>{epic}%</code>\n"
         f"• 🔵 <b>Редкие:</b> <code>{rare}%</code>\n"
         f"• ⚪ <b>Обычные:</b> <code>{common}%</code>\n\n"
         "<b>Снижение после собранной серии:</b>\n"
-        f"• 📉 <b>Штраф:</b> <code>-{penalty}%</code> (множитель <code>x{multiplier}</code>)\n"
-        f"<i>(После того как игрок собрал 1+ серию, его шансы на редкие карты умножаются на x{multiplier})</i>\n\n"
+        f"• 📉 <b>Штраф в паках:</b> <code>-{penalty}%</code> (множитель <code>x{multiplier}</code>)\n"
+        f"• 🔨 <b>Штраф в крафтах:</b> <code>-{craft_pen}%</code> (множитель <code>x{craft_mult}</code>, ~1.5x)\n"
+        f"<i>(У игроков с собранной серией в крафтах высшие редкости умножаются на x{craft_mult}, а низшая возрастает, без выпадения лишних редкостей)</i>\n\n"
         "👇 <i>Выберите что хотите изменить:</i>"
     )
 
@@ -2513,7 +2563,7 @@ async def process_edit_rare(message: Message, state: FSMContext):
 async def edit_drop_penalty_cb(callback: CallbackQuery, state: FSMContext):
     if not await is_admin(callback.from_user.id):
         return await callback.answer("Нет прав", show_alert=True)
-    await callback.message.answer("Введите % снижения шансов после сбора 1-й серии (например <code>50</code> для снижения в 2 раза, или <code>67</code>):", parse_mode="HTML", reply_markup=get_cancel_kb())
+    await callback.message.answer("Введите % снижения шансов в паках после сбора 1-й серии (например <code>50</code> для снижения в 2 раза, или <code>67</code>):", parse_mode="HTML", reply_markup=get_cancel_kb())
     await state.set_state(EditDropRate.waiting_for_penalty)
     await callback.answer()
 
@@ -2533,7 +2583,33 @@ async def process_edit_penalty(message: Message, state: FSMContext):
     await save_drop_settings(s)
     await state.clear()
     mult = max(0.0, round((100.0 - val) / 100.0, 2))
-    await message.answer(f"✅ Снижение шансов после серии установлено на <b>-{round(val, 2)}%</b> (множитель <code>x{mult}</code>)!\n\n" + await build_drop_settings_text(), parse_mode="HTML", reply_markup=get_drop_settings_kb())
+    await message.answer(f"✅ Снижение шансов в паках установлено на <b>-{round(val, 2)}%</b> (множитель <code>x{mult}</code>)!\n\n" + await build_drop_settings_text(), parse_mode="HTML", reply_markup=get_drop_settings_kb())
+
+@router.callback_query(F.data == "edit_craft_penalty")
+async def edit_craft_penalty_cb(callback: CallbackQuery, state: FSMContext):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("Нет прав", show_alert=True)
+    await callback.message.answer("Введите % снижения шансов в крафтах после сбора серии (например <code>33</code> для снижения в ~1.5 раза, или <code>50</code> для 2 раз):", parse_mode="HTML", reply_markup=get_cancel_kb())
+    await state.set_state(EditDropRate.waiting_for_craft_penalty)
+    await callback.answer()
+
+@router.message(EditDropRate.waiting_for_craft_penalty)
+async def process_edit_craft_penalty(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await state.clear()
+        return await message.answer("Отменено.", reply_markup=get_game_admin_kb(message.from_user.id))
+    try:
+        val = float(message.text.replace(",", ".").strip())
+        if val < 0 or val > 99:
+            raise ValueError()
+    except ValueError:
+        return await message.answer("❌ Введите число от 0 до 99 (например 33 или 50).")
+    s = await get_drop_settings()
+    s["craft_penalty"] = round(val, 2)
+    await save_drop_settings(s)
+    await state.clear()
+    mult = max(0.0, round((100.0 - val) / 100.0, 2))
+    await message.answer(f"✅ Снижение шансов в крафтах установлено на <b>-{round(val, 2)}%</b> (множитель <code>x{mult}</code>)!\n\n" + await build_drop_settings_text(), parse_mode="HTML", reply_markup=get_drop_settings_kb())
 
 @router.callback_query(F.data == "edit_drop_reset")
 async def edit_drop_reset_cb(callback: CallbackQuery, state: FSMContext):
