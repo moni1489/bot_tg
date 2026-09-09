@@ -77,6 +77,37 @@ class CaptchaMiddleware(BaseMiddleware):
                             logging.error(f"Failed to delete user emoji msg (maybe user is admin?): {e}")
                         
                         await db.execute("DELETE FROM group_captcha WHERE user_id = $1 AND chat_id = $2", event.from_user.id, event.chat.id)
+                        
+                        # Auto-complete 'join_chat' task and give 1 pack reward
+                        try:
+                            user_row = await db.fetchrow(
+                                "SELECT packs_count, completed_tasks FROM card_users WHERE telegram_id = $1",
+                                event.from_user.id
+                            )
+                            if user_row:
+                                completed = []
+                                try:
+                                    completed = json.loads(user_row["completed_tasks"] or "[]")
+                                except Exception:
+                                    pass
+                                if "join_chat" not in completed:
+                                    completed.append("join_chat")
+                                    new_packs = user_row["packs_count"] + 1
+                                    await db.execute(
+                                        "UPDATE card_users SET packs_count = $1, completed_tasks = $2 WHERE telegram_id = $3",
+                                        new_packs, json.dumps(completed), event.from_user.id
+                                    )
+                                    try:
+                                        await bot.send_message(
+                                            event.from_user.id,
+                                            "✅ Вы вступили в наш чат и прошли проверку!\n🎁 Вам начислен **+1 пак** за выполнение задания «Вступить в беседу»!",
+                                            parse_mode="Markdown"
+                                        )
+                                    except Exception:
+                                        pass
+                        except Exception as e:
+                            logging.warning(f"Failed to award join_chat task: {e}")
+                        
                         return # Solved
                     else:
                         # Failed/Spam
@@ -272,14 +303,49 @@ async def claim_task_reward(request):
                         "message": "У вас пока нет оформленных и оплаченных заказов от 2000 рублей."
                     })
 
+            # Join chat — awarded ONLY automatically via captcha verification in the group
+            elif task_id == 'join_chat':
+                return web.json_response({
+                    "success": False, 
+                    "message": "Пак за вступление в беседу начисляется автоматически ботом после прохождения проверки в чате!"
+                })
+
+            # Review task — manual verification by admin
+            elif task_id == 'leave_review':
+                return web.json_response({
+                    "success": False, 
+                    "message": "Отзывы проверяются администратором вручную, награда начисляется после проверки!"
+                })
+
             completed.append(task_id)
-            reward_count = 3 if task_id == 'order_2000' else 1
+            if task_id == 'order_2000':
+                reward_count = 3
+            elif task_id == 'leave_review':
+                reward_count = 2
+            else:
+                reward_count = 1
             new_count = user["packs_count"] + reward_count
             
             await db.execute(
                 "UPDATE card_users SET packs_count = $1, completed_tasks = $2 WHERE telegram_id = $3", 
                 new_count, json.dumps(completed), tg_id
             )
+
+            # Send Telegram notification in PM
+            task_titles = {
+                'sub_channel': '«Подписаться на канал»',
+                'order_2000': '«Оформить заказ от 2000 рублей»',
+            }
+            title = task_titles.get(task_id, '«Задание»')
+            try:
+                await bot.send_message(
+                    tg_id,
+                    f"🎉 Вы успешно выполнили задание {title}!\n🎁 Вам начислено: **+{reward_count} пак(а)**.",
+                    parse_mode="Markdown"
+                )
+            except Exception as notify_err:
+                logging.warning(f"Failed to send task claim notification to {tg_id}: {notify_err}")
+
             return web.json_response({"success": True, "packs_count": new_count, "completed_tasks": completed})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
@@ -389,6 +455,42 @@ SERIES_CONFIG = [
     }
 ]
 
+def calculate_craft_odds(c, r, e, l):
+    """
+    Craft probability calculation.
+    Each slotted card contributes 25% to its base tier and +1 upgrade tier.
+    Max rarity in the craft always unlocks the possibility of (Max_Rarity + 1).
+    """
+    import math
+    if l == 4: return {"common": 0, "rare": 0, "epic": 0, "legendary": 100}
+    if e == 4: return {"common": 0, "rare": 0, "epic": 75, "legendary": 25}
+    if r == 4: return {"common": 0, "rare": 70, "epic": 30, "legendary": 0}
+    if c == 4: return {"common": 70, "rare": 30, "epic": 0, "legendary": 0}
+
+    raw_comm = c * 17.5
+    raw_rare = c * 7.5 + r * 17.5
+    raw_epic = r * 7.5 + e * 18.75 + (l * 5.0 if l < 4 else 0.0)
+    raw_leg  = e * 6.25 + (l * 20.0 if l < 4 else 25.0 * l)
+
+    def js_round(x):
+        return math.floor(x + 0.5)
+
+    co = js_round(raw_comm) if c > 0 else 0
+    ra = js_round(raw_rare) if (c > 0 or r > 0) else 0
+    ep = js_round(raw_epic) if (r > 0 or e > 0 or l > 0) else 0
+
+    if l == 0 and e == 0:
+        le = 0
+        rem = 100 - co - ra - ep
+        ra += rem
+    else:
+        le = 100 - co - ra - ep
+        if le < 0:
+            ep += le
+            le = 0
+
+    return {"common": co, "rare": ra, "epic": ep, "legendary": le}
+
 async def craft_cards_api(request):
     try:
         body = await request.json()
@@ -423,101 +525,22 @@ async def craft_cards_api(request):
                                     rarities.append(cc["rarity"])
                                     break
                                     
-                # 2. Determine new rarity based on rules with post-series penalty multiplier
-                # Check if user has completed any series
-                user_cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
-                has_completed_code = await db.fetchval("SELECT 1 FROM series_codes WHERE telegram_id = $1 LIMIT 1", tg_id)
-                has_completed_series = bool(has_completed_code)
-
-                if not has_completed_series and user_cards_rows:
-                    user_cards_map = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in user_cards_rows}
-                    for sc in SERIES_CONFIG:
-                        if sc["slug"] == "bonus_card": continue
-                        if all(user_cards_map.get(f"{sc['slug']}_{cc['index']}", 0) > 0 for cc in sc["cards"]):
-                            has_completed_series = True
-                            break
-
-                drop_settings = await get_drop_settings()
-                penalty_pct = float(drop_settings.get("series_penalty", 67.0))
-                chance_multiplier = max(0.05, (100.0 - penalty_pct) / 100.0) if has_completed_series else 1.0
-
+                # 2. Determine new rarity based on craft probabilities (100% parity with UI preview)
                 import random
                 counts = {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
-                for r in rarities: counts[r] += 1
+                for r_name in rarities: counts[r_name] += 1
                 
-                n_c = counts["common"]
-                n_r = counts["rare"]
-                n_e = counts["epic"]
-                n_l = counts["legendary"]
+                c = counts["common"]
+                r = counts["rare"]
+                e = counts["epic"]
+                l = counts["legendary"]
 
-                rand = random.uniform(0, 100)
-                new_rarity = "common"
+                odds = calculate_craft_odds(c, r, e, l)
 
-                if n_c == 4:
-                    # 4× Common → Rare 30% * multiplier, rest Common (70%)
-                    rare_chance = 30.0 * chance_multiplier
-                    if rand <= rare_chance: new_rarity = "rare"
-                    else:                   new_rarity = "common"
-
-                elif n_r == 4:
-                    # 4× Rare → Epic 30% * multiplier, rest Rare
-                    epic_chance = 30.0 * chance_multiplier
-                    if rand <= epic_chance: new_rarity = "epic"
-                    else:                   new_rarity = "rare"
-
-                elif n_e == 4:
-                    # 4× Epic → Legendary 20% * multiplier, rest Epic
-                    leg_chance = 20.0 * chance_multiplier
-                    if rand <= leg_chance: new_rarity = "legendary"
-                    else:                  new_rarity = "epic"
-
-                elif n_l == 4:
-                    new_rarity = "legendary"
-
-                elif n_l > 0:
-                    # Наборы с легендарками (1-3 леги)
-                    leg_chance = min(75.0, 25.0 * n_l) * chance_multiplier
-                    if rand <= leg_chance: new_rarity = "legendary"
-                    else:                  new_rarity = "epic"
-
-                elif n_e > 0:
-                    # Смеси с Эпиками (без лег):
-                    leg_chance = (4.0 * n_e if n_e < 3 else 14.0) * chance_multiplier
-                    epic_chance = leg_chance + (35.0 + 15.0 * n_e + 5.0 * n_r) * chance_multiplier
-                    if rand <= leg_chance:
-                        new_rarity = "legendary"
-                    elif rand <= epic_chance:
-                        new_rarity = "epic"
-                    else:
-                        if n_c >= 2 and random.uniform(0, 100) <= 30.0:
-                            new_rarity = "common"
-                        else:
-                            new_rarity = "rare"
-
-                else:
-                    # Смеси только Common + Rare (без эпиков и без лег)
-                    # 0% шанс на Legendary!
-                    if n_r == 1:
-                        # 3C + 1R
-                        epic_chance = 5.0 * chance_multiplier
-                        rare_chance = epic_chance + (50.0 * chance_multiplier)
-                        if rand <= epic_chance:    new_rarity = "epic"
-                        elif rand <= rare_chance:  new_rarity = "rare"
-                        else:                      new_rarity = "common"
-                    elif n_r == 2:
-                        # 2C + 2R
-                        epic_chance = 12.0 * chance_multiplier
-                        rare_chance = epic_chance + (58.0 * chance_multiplier)
-                        if rand <= epic_chance:    new_rarity = "epic"
-                        elif rand <= rare_chance:  new_rarity = "rare"
-                        else:                      new_rarity = "common"
-                    elif n_r == 3:
-                        # 1C + 3R
-                        epic_chance = 22.0 * chance_multiplier
-                        rare_chance = epic_chance + (68.0 * chance_multiplier)
-                        if rand <= epic_chance:    new_rarity = "epic"
-                        elif rand <= rare_chance:  new_rarity = "rare"
-                        else:                      new_rarity = "common"
+                # Pick rarity strictly based on odds; any rarity with 0% weight cannot drop
+                available_rarities = [k for k, v in odds.items() if v > 0]
+                available_weights = [odds[k] for k in available_rarities]
+                new_rarity = random.choices(available_rarities, weights=available_weights, k=1)[0]
 
                 # 3. Pick random card of that rarity
                 matching = []
@@ -962,6 +985,9 @@ class TakePacksFromPlayer(StatesGroup):
 class ResetPlayerAccount(StatesGroup):
     waiting_for_input = State()
 
+class GiveDuplicates(StatesGroup):
+    waiting_for_input = State()
+
 class CreatePaymentLink(StatesGroup):
     waiting_for_desc = State()
     waiting_for_amount = State()
@@ -1265,8 +1291,9 @@ def get_game_admin_kb(user_id=None):
             [KeyboardButton(text="📊 Статистика Игры"), KeyboardButton(text="🔍 Проверить Игрока")],
             [KeyboardButton(text="🎲 Шансы дропа"), KeyboardButton(text="🎫 Проверить код")],
             [KeyboardButton(text="🎁 Выдать паки"), KeyboardButton(text="📤 Забрать паки")],
-            [KeyboardButton(text="🔄 Сброс аккаунта"), KeyboardButton(text="🎫 Все промокоды")],
-            [KeyboardButton(text="🎁 Выдать приз"), KeyboardButton(text="🔙 Назад в гл. меню")]
+            [KeyboardButton(text="🃏 Выдать повторки"), KeyboardButton(text="🔄 Сброс аккаунта")],
+            [KeyboardButton(text="🎫 Все промокоды"), KeyboardButton(text="🎁 Выдать приз")],
+            [KeyboardButton(text="🔙 Назад в гл. меню")]
         ],
         resize_keyboard=True
     )
@@ -2168,6 +2195,122 @@ async def reset_account_process(message: Message, state: FSMContext):
         )
     except Exception as e:
         await message.answer(f"❌ Ошибка: {e}", reply_markup=get_game_admin_kb(message.from_user.id))
+    await state.clear()
+
+# --- ADMIN: GIVE DUPLICATES (повторки) ---
+@router.message(F.text == "🃏 Выдать повторки", StateFilter("*"))
+async def give_duplicates_start(message: Message, state: FSMContext):
+    await state.clear()
+    if not await is_admin(message.from_user.id):
+        return
+    await message.answer(
+        "Введите @username или Telegram ID игрока, количество повторок и редкость через пробел:\n\n"
+        "Пример: `@goitislav 100 epic`\n"
+        "Редкости: `common`, `rare`, `epic`, `legendary`\n"
+        "Если редкость не указана — выдаются epic.",
+        parse_mode="Markdown",
+        reply_markup=get_cancel_kb()
+    )
+    await state.set_state(GiveDuplicates.waiting_for_input)
+
+@router.message(GiveDuplicates.waiting_for_input)
+async def give_duplicates_process(message: Message, state: FSMContext):
+    parts = message.text.strip().split()
+    try:
+        if len(parts) < 2:
+            raise ValueError("Need at least 2 args")
+
+        input_text = parts[0]
+        count = int(parts[1])
+        rarity = parts[2].lower() if len(parts) >= 3 else "epic"
+
+        if rarity not in ("common", "rare", "epic", "legendary"):
+            raise ValueError(f"Unknown rarity: {rarity}")
+        if count <= 0 or count > 10000:
+            raise ValueError("Count out of range")
+
+        # Resolve target
+        if input_text.isdigit():
+            target_id = int(input_text)
+        else:
+            username_clean = input_text.lstrip("@")
+            target_id = None
+            async with pool.acquire() as db:
+                row = await db.fetchrow("SELECT telegram_id FROM card_users WHERE username ILIKE $1", username_clean)
+            if row:
+                target_id = row['telegram_id']
+            else:
+                try:
+                    chat = await bot.get_chat(f"@{username_clean}")
+                    target_id = chat.id
+                    async with pool.acquire() as db:
+                        await db.execute("""
+                            INSERT INTO card_users (telegram_id, username, first_name, packs_count)
+                            VALUES ($1, $2, $3, 0)
+                            ON CONFLICT (telegram_id) DO UPDATE SET
+                                username = COALESCE(EXCLUDED.username, card_users.username),
+                                first_name = COALESCE(EXCLUDED.first_name, card_users.first_name)
+                        """, chat.id, chat.username, getattr(chat, 'first_name', None))
+                except Exception:
+                    pass
+
+        if not target_id:
+            await message.answer(f"❌ Игрок `{input_text}` не найден.", parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+            await state.clear()
+            return
+
+        # Find all cards of requested rarity (exclude bonus_card)
+        matching_cards = []
+        for sc in SERIES_CONFIG:
+            if sc["slug"] == "bonus_card":
+                continue
+            for cc in sc["cards"]:
+                if cc["rarity"] == rarity:
+                    matching_cards.append((sc["slug"], cc["index"]))
+
+        if not matching_cards:
+            await message.answer(f"❌ Нет карт редкости `{rarity}` в базе!", parse_mode="Markdown", reply_markup=get_game_admin_kb(message.from_user.id))
+            await state.clear()
+            return
+
+        # Distribute count cards randomly among matching cards
+        # Each duplicate card gets count=2 to ensure it's a "повторка" (duplicate)
+        # We'll give 'count' total cards, each as count=1 but picked randomly
+        async with pool.acquire() as db:
+            # Ensure user row exists
+            await db.execute(
+                "INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, 0) ON CONFLICT DO NOTHING",
+                target_id
+            )
+            given = 0
+            for _ in range(count):
+                s_slug, c_idx = random.choice(matching_cards)
+                await db.execute("""
+                    INSERT INTO user_cards (telegram_id, series_slug, card_index, count)
+                    VALUES ($1, $2, $3, 1)
+                    ON CONFLICT (telegram_id, series_slug, card_index)
+                    DO UPDATE SET count = user_cards.count + 1
+                """, target_id, s_slug, c_idx)
+                given += 1
+
+        rarity_names = {"common": "Обычных", "rare": "Редких", "epic": "Эпических", "legendary": "Легендарных"}
+        await message.answer(
+            f"✅ Выдано **{given} {rarity_names.get(rarity, rarity)} повторок** игроку `{target_id}`!",
+            parse_mode="Markdown",
+            reply_markup=get_game_admin_kb(message.from_user.id)
+        )
+        try:
+            if target_id != message.from_user.id:
+                await bot.send_message(target_id, f"🃏 Вам выдано **+{given} карт** от администратора! Заходите в игру!", parse_mode="Markdown")
+        except Exception:
+            pass
+
+    except (ValueError, IndexError) as e:
+        await message.answer(
+            f"❌ Неверный формат. Пример: `@username 100 epic`\nОшибка: {e}",
+            parse_mode="Markdown",
+            reply_markup=get_game_admin_kb(message.from_user.id)
+        )
     await state.clear()
 
 # --- ADMIN: ALL CODES ---
