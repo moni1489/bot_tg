@@ -1719,26 +1719,51 @@ function updateCraftChancesPreview() {
         if (r === 4) return { common: 0, rare: 70, epic: 30, legendary: 0 };
         if (c === 4) return { common: 70, rare: 30, epic: 0, legendary: 0 };
 
-        const rawComm = c * 17.5;
-        const rawRare = c * 7.5 + r * 17.5;
-        const rawEpic = r * 7.5 + e * 18.75 + (l < 4 ? l * 5.0 : 0);
-        const rawLeg  = e * 6.25 + (l < 4 ? l * 20.0 : l * 25.0);
+        if (l === 0) {
+            const rawComm = c * 17.5;
+            const rawRare = c * 7.5 + r * 17.5;
+            const rawEpic = r * 7.5 + e * 18.75;
+            const rawLeg  = e * 6.25;
+
+            let co = c > 0 ? Math.round(rawComm) : 0;
+            let ra = (c > 0 || r > 0) ? Math.round(rawRare) : 0;
+            let ep = (r > 0 || e > 0) ? Math.round(rawEpic) : 0;
+
+            let le;
+            if (e === 0) {
+                le = 0;
+                const rem = 100 - co - ra - ep;
+                ra += rem;
+            } else {
+                le = 100 - co - ra - ep;
+                if (le < 0) {
+                    ep += le;
+                    le = 0;
+                }
+            }
+            return { common: co, rare: ra, epic: ep, legendary: le };
+        }
+
+        const lBases = { 1: 10.0, 2: 25.0, 3: 55.0 };
+        const lBase = lBases[l] || 10.0;
+        const rawLeg = lBase + r * 2.0 + e * 8.0;
+        const rawComm = c > 0 ? c * 18.0 : 0.0;
+        const rawRare = (c > 0 || r > 0) ? (c * 8.0 + r * 17.0) : 0.0;
 
         let co = c > 0 ? Math.round(rawComm) : 0;
-        let ra = (c > 0 || r > 0) ? Math.round(rawRare) : 0;
-        let ep = (r > 0 || e > 0 || l > 0) ? Math.round(rawEpic) : 0;
-        let le;
-        if (l === 0 && e === 0) {
-            le = 0;
-            const rem = 100 - co - ra - ep;
-            ra += rem;
-        } else {
-            le = 100 - co - ra - ep;
-            if (le < 0) {
-                ep += le;
-                le = 0;
-            }
+        let le = Math.round(rawLeg);
+
+        if (c === 0 && r === 0) {
+            return { common: 0, rare: 0, epic: 100 - le, legendary: le };
         }
+
+        let ra = (c > 0 || r > 0) ? Math.round(rawRare) : 0;
+        let ep = 100 - co - ra - le;
+        if (ep < 0) {
+            ra += ep;
+            ep = 0;
+        }
+
         return { common: co, rare: ra, epic: ep, legendary: le };
     }
 

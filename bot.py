@@ -457,9 +457,12 @@ SERIES_CONFIG = [
 
 def calculate_craft_odds(c, r, e, l):
     """
-    Craft probability calculation.
-    Each slotted card contributes 25% to its base tier and +1 upgrade tier.
-    Max rarity in the craft always unlocks the possibility of (Max_Rarity + 1).
+    Craft probability calculation v2.
+    - If 4 identical: guaranteed / strong upgrade odds (4C->30%R, 4R->30%E, 4E->25%L, 4L->100%L).
+    - If l == 0: each tier contributes base + upgrade to +1 tier.
+    - If l >= 1: 1 Legendary base is reduced to 10% (scaled by tier of other slotted cards:
+      Commons add 0% to L; Rares add +2% to L; Epics add +8% to L).
+      Prevents 1L + 3C abuse while properly rewarding 1L + 3R / 1L + 3E.
     """
     import math
     if l == 4: return {"common": 0, "rare": 0, "epic": 0, "legendary": 100}
@@ -467,27 +470,46 @@ def calculate_craft_odds(c, r, e, l):
     if r == 4: return {"common": 0, "rare": 70, "epic": 30, "legendary": 0}
     if c == 4: return {"common": 70, "rare": 30, "epic": 0, "legendary": 0}
 
-    raw_comm = c * 17.5
-    raw_rare = c * 7.5 + r * 17.5
-    raw_epic = r * 7.5 + e * 18.75 + (l * 5.0 if l < 4 else 0.0)
-    raw_leg  = e * 6.25 + (l * 20.0 if l < 4 else 25.0 * l)
-
     def js_round(x):
         return math.floor(x + 0.5)
 
-    co = js_round(raw_comm) if c > 0 else 0
-    ra = js_round(raw_rare) if (c > 0 or r > 0) else 0
-    ep = js_round(raw_epic) if (r > 0 or e > 0 or l > 0) else 0
+    if l == 0:
+        raw_comm = c * 17.5
+        raw_rare = c * 7.5 + r * 17.5
+        raw_epic = r * 7.5 + e * 18.75
+        raw_leg  = e * 6.25
 
-    if l == 0 and e == 0:
-        le = 0
-        rem = 100 - co - ra - ep
-        ra += rem
-    else:
-        le = 100 - co - ra - ep
-        if le < 0:
-            ep += le
+        co = js_round(raw_comm) if c > 0 else 0
+        ra = js_round(raw_rare) if (c > 0 or r > 0) else 0
+        ep = js_round(raw_epic) if (r > 0 or e > 0) else 0
+
+        if e == 0:
             le = 0
+            rem = 100 - co - ra - ep
+            ra += rem
+        else:
+            le = 100 - co - ra - ep
+            if le < 0:
+                ep += le
+                le = 0
+        return {"common": co, "rare": ra, "epic": ep, "legendary": le}
+
+    l_base = {1: 10.0, 2: 25.0, 3: 55.0}[l]
+    raw_leg = l_base + r * 2.0 + e * 8.0
+    raw_comm = c * 18.0 if c > 0 else 0.0
+    raw_rare = (c * 8.0 + r * 17.0) if (c > 0 or r > 0) else 0.0
+
+    co = js_round(raw_comm) if c > 0 else 0
+    le = js_round(raw_leg)
+
+    if c == 0 and r == 0:
+        return {"common": 0, "rare": 0, "epic": 100 - le, "legendary": le}
+
+    ra = js_round(raw_rare) if (c > 0 or r > 0) else 0
+    ep = 100 - co - ra - le
+    if ep < 0:
+        ra += ep
+        ep = 0
 
     return {"common": co, "rare": ra, "epic": ep, "legendary": le}
 
