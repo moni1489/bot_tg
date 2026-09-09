@@ -545,9 +545,6 @@ async def craft_cards_api(request):
         if not tg_id or len(cards) != 4:
             return web.json_response({"error": "Invalid params"}, status=400)
             
-        if not await is_admin(tg_id):
-            return web.json_response({"error": "Режим тестирования: крафт доступен только администраторам"}, status=403)
-            
         async with pool.acquire() as db:
             # 1. Check if user has all cards
             # and deduct them
