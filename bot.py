@@ -303,12 +303,22 @@ async def claim_task_reward(request):
                         "message": "У вас пока нет оформленных и оплаченных заказов от 2000 рублей."
                     })
 
-            # Join chat — awarded ONLY automatically via captcha verification in the group
+            # Join chat — verify membership in @FunkoStopChat
             elif task_id == 'join_chat':
-                return web.json_response({
-                    "success": False, 
-                    "message": "Пак за вступление в беседу начисляется автоматически ботом после прохождения проверки в чате!"
-                })
+                try:
+                    member = await bot.get_chat_member(chat_id="@FunkoStopChat", user_id=tg_id)
+                    status = member.status if isinstance(member.status, str) else member.status.value
+                    if status in ["left", "kicked", "banned"]:
+                        return web.json_response({
+                            "success": False, 
+                            "message": "Вы еще не вступили в беседу FunkoStop! Вступите в @FunkoStopChat и попробуйте снова."
+                        })
+                except Exception as chat_err:
+                    logging.warning(f"Chat check warning: {chat_err}")
+                    return web.json_response({
+                        "success": False, 
+                        "message": "❌ Не удалось проверить участие в беседе. Вступите в @FunkoStopChat и попробуйте снова."
+                    })
 
             # Review task — manual verification by admin
             elif task_id == 'leave_review':
@@ -334,6 +344,8 @@ async def claim_task_reward(request):
             # Send Telegram notification in PM
             task_titles = {
                 'sub_channel': '«Подписаться на канал»',
+                'tg_sub': '«Подписаться на канал»',
+                'join_chat': '«Вступить в беседу FunkoStop»',
                 'order_2000': '«Оформить заказ от 2000 рублей»',
             }
             title = task_titles.get(task_id, '«Задание»')

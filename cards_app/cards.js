@@ -295,9 +295,11 @@ function setupTasks() {
 
             const taskId = btn.getAttribute('data-task');
 
-            // Open official Telegram channel if tg_sub task
+            // Open official Telegram channel or chat
             if (taskId === 'tg_sub') {
                 window.open('https://t.me/FunkoStop', '_blank');
+            } else if (taskId === 'join_chat') {
+                window.open('https://t.me/FunkoStopChat', '_blank');
             }
 
             try {
@@ -325,14 +327,6 @@ function setupTasks() {
             }
         });
     });
-
-    // join_chat — just open the link, pack awarded ONLY via captcha verification in group
-    const joinBtn = document.getElementById('task-join-btn');
-    if (joinBtn) {
-        joinBtn.addEventListener('click', () => {
-            window.open('https://t.me/FunkoStopChat', '_blank');
-        });
-    }
 
     // Review task — just opens link, no auto-claim (manual moderation by admin)
     const reviewBtn = document.getElementById('task-review-btn');
