@@ -3254,11 +3254,11 @@ async def calculate_and_send_result(message: Message, state: FSMContext, weight:
     base_price = price + shipping
     
     if base_price <= 50:
-        commission = base_price * 0.25
+        commission = base_price * 0.30
     elif base_price <= 100:
-        commission = base_price * 0.20
+        commission = base_price * 0.25
     else:
-        commission = base_price * 0.15
+        commission = base_price * 0.21
         
     delivery_rf_rub = weight * 1200.0
     
@@ -3267,6 +3267,7 @@ async def calculate_and_send_result(message: Message, state: FSMContext, weight:
     
     total_usd = base_price + commission
     total_rub = (total_usd * rate) + delivery_rf_rub
+    total_rub = total_rub * 1.01  # +1% на весь чек
     
     final_price_rub = math.ceil(total_rub / 50.0) * 50
     
