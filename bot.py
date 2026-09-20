@@ -3112,9 +3112,10 @@ async def handle_link(message: Message, state: FSMContext):
         q['_ul'] = ['US']
         url = urlunparse(parsed._replace(query=urlencode(q, doseq=True)))
 
+    await message.answer("🔍 Секунду, рассчитываю стоимость товара и доставки в США...")
+
     # 1. Dedicated high-precision eBay parser (ZIP 19801 Delaware delivery + $2.00 surcharge)
-    if "ebay.com" in url or "ebay." in url:
-        await message.answer("🔍 Секунду, подключаюсь к eBay и рассчитываю точную стоимость в США...")
+    if "ebay.com" in url or "ebay." in url or re.search(r'\d{9,15}', url):
         try:
             ebay_res = await fetch_and_parse_ebay(url, scraper_api_key=SCRAPER_API_KEY)
             if ebay_res and ebay_res.get("price") is not None:
@@ -3142,8 +3143,6 @@ async def handle_link(message: Message, state: FSMContext):
                 return
         except Exception as e:
             logging.warning(f"eBay dedicated parser error: {e}, falling back to AI scraper...")
-
-    await message.answer("🔍 Секунду, анализирую ссылку (загружаю страницу и запускаю ИИ)...")
     
     if not SCRAPER_API_KEY or not OPENAI_API_KEY:
         await message.answer("❌ API ключи не настроены в .env")
