@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Funko Deal Bot</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #101114;
+        --card: #1b1d24;
+        --text: #f4f1ea;
+        --muted: #9aa0ad;
+        --accent: #e53238;
+        --deal: #2f9e44;
+        --bundle: #f5b301;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: radial-gradient(1200px 500px at 10% -10%, #3a1214, transparent), var(--bg);
+        color: var(--text);
+      }
+      header, main { max-width: 980px; margin: 0 auto; padding: 24px 20px; }
+      h1 { margin: 0 0 8px; font-size: 1.8rem; }
+      .lead { color: var(--muted); max-width: 62ch; line-height: 1.5; }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin: 24px 0;
+      }
+      .stat {
+        background: var(--card);
+        border: 1px solid #2a2d36;
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .stat b { display: block; font-size: 1.2rem; margin-top: 6px; }
+      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      button, .dl {
+        background: var(--accent);
+        color: white;
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 16px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .dl { background: #2f4a8a; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px;
+        margin-top: 20px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid #2a2d36;
+        border-radius: 16px;
+        padding: 16px;
+      }
+      .card h3 { margin: 10px 0 8px; font-size: 1rem; line-height: 1.35; }
+      .price { font-size: 1.4rem; font-weight: 800; margin: 0; }
+      .meta { color: var(--muted); font-size: 0.92rem; }
+      a { color: #8cb4ff; }
+      .badge {
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 999px;
+      }
+      .badge.deal { background: #16351d; color: #7dff9a; }
+      .badge.bundle { background: #3a2e08; color: #ffd56a; }
+      .empty { color: var(--muted); }
+      footer { color: var(--muted); font-size: 0.85rem; padding: 0 20px 40px; max-width: 980px; margin: 0 auto; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Парсер Funko Pop → Telegram</h1>
+      <p class="lead">
+        Бот смотрит новые листинги по запросу «{{QUERY}}», считает лот + доставку
+        до ZIP {{ZIP}} и пишет в Telegram, если итого дешевле 2–3 самых дешёвых
+        той же фигуры на {{THRESHOLD}}% и больше — 50% это ещё лучше, верхнего потолка нет.
+        Лот из нескольких фигур — только если он на 20%+ дешевле суммы самых дешёвых синглов.
+      </p>
+      <div class="stats">
+        <div class="stat">Каталог<b>{{LISTINGS}}</b></div>
+        <div class="stat">Алерты<b>{{ALERTS}}</b></div>
+        <div class="stat">Последний скан<b>{{LAST_SCAN}}</b></div>
+        <div class="stat">Режим<b>{{MODE}}</b></div>
+      </div>
+      <div class="row">
+        <button id="demo">Прогнать демо</button>
+        <a class="dl" href="/FunkoDealBot.zip">Скачать архив исходников</a>
+        <span class="meta">Токен Telegram: {{TOKEN}}</span>
+      </div>
+    </header>
+    <main>
+      <h2>Последние алерты</h2>
+      <div class="grid">{{CARDS}}</div>
+    </main>
+    <footer>
+      Ошибка eBay: {{ERROR}}. IP не жжём: RSS → Finding → Playwright один раз, паузы 2–5с.
+      Прокси не нужен (свой PROXY_URL — только если сам задал). С облака часто 403 —
+      запускай дома. Команды: /start /status /scan /demo
+    </footer>
+    <script>
+      document.getElementById("demo").addEventListener("click", async () => {
+        await fetch("/api/scan-demo", { method: "POST" });
+        location.reload();
+      });
+    </script>
+  </body>
+</html>
