@@ -23,6 +23,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import aiohttp
 from aiohttp import web
+from ebay_parser import fetch_and_parse_ebay
 
 load_dotenv()
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bot-tg-uyoe.onrender.com/cards")
@@ -3110,6 +3111,37 @@ async def handle_link(message: Message, state: FSMContext):
         q = parse_qs(parsed.query)
         q['_ul'] = ['US']
         url = urlunparse(parsed._replace(query=urlencode(q, doseq=True)))
+
+    # 1. Dedicated high-precision eBay parser (ZIP 19801 Delaware delivery + $2.00 surcharge)
+    if "ebay.com" in url or "ebay." in url:
+        await message.answer("🔍 Секунду, подключаюсь к eBay и рассчитываю точную стоимость в США...")
+        try:
+            ebay_res = await fetch_and_parse_ebay(url, scraper_api_key=SCRAPER_API_KEY)
+            if ebay_res and ebay_res.get("price") is not None:
+                name = ebay_res.get("name") or "Товар eBay"
+                price = float(ebay_res["price"])
+                shipping = float(ebay_res["shipping"])  # Already includes +$2.00 surcharge
+                weight = ebay_res.get("weight")
+
+                await state.update_data(
+                    name=name,
+                    price=price,
+                    shipping=shipping,
+                    weight=weight
+                )
+
+                if weight is None:
+                    await message.answer(
+                        f"📦 **{name}**\n💵 Цена: ${price:.2f}\n🚚 Доставка по США: ${shipping:.2f}\n\n"
+                        f"⚖️ Вес товара не найден на странице.\nПожалуйста, напишите примерный вес товара в **кг** (например, 0.5):",
+                        parse_mode="Markdown"
+                    )
+                    await state.set_state(ParseLink.waiting_for_weight)
+                else:
+                    await calculate_and_send_result(message, state, float(weight))
+                return
+        except Exception as e:
+            logging.warning(f"eBay dedicated parser error: {e}, falling back to AI scraper...")
 
     await message.answer("🔍 Секунду, анализирую ссылку (загружаю страницу и запускаю ИИ)...")
     
