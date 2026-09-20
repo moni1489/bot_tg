@@ -233,10 +233,32 @@ def parse_ebay_html(html: str) -> dict | None:
 
 async def fetch_and_parse_ebay(url: str, scraper_api_key: str | None = None) -> dict | None:
     """Fetch eBay item with ZIP 19801 and parse it using the FunkoDealBot engine."""
+    # Priority 1: Query the server's dedicated FunkoDealBot parser API (port 43147)
+    server_api_url = "http://89.124.96.25:43147/api/parse"
+    try:
+        timeout = aiohttp.ClientTimeout(total=20)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(server_api_url, params={"url": url}) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data and data.get("price") is not None:
+                        price = float(data["price"])
+                        raw_shipping = float(data.get("shipping") or 0.0)
+                        shipping = round(raw_shipping + 2.0, 2)
+                        return {
+                            "name": data.get("name") or "Товар eBay",
+                            "price": price,
+                            "raw_shipping": raw_shipping,
+                            "shipping": shipping,
+                            "weight": data.get("weight"),
+                            "currency": data.get("currency", "USD"),
+                        }
+    except Exception as e:
+        log.warning(f"Server parser API query failed: {e}")
+
+    # Priority 2: ScraperAPI if key available (handles residential IP & bot defense)
     target_url = with_us_shipping(url, "19801")
     html = ""
-    
-    # Priority 1: ScraperAPI if key available (handles residential IP & bot defense)
     if scraper_api_key:
         try:
             scraper_url = f"http://api.scraperapi.com?api_key={scraper_api_key}&url={target_url}&country_code=us"
@@ -250,7 +272,7 @@ async def fetch_and_parse_ebay(url: str, scraper_api_key: str | None = None) -> 
         except Exception as e:
             log.warning(f"ScraperAPI fetch failed: {e}")
 
-    # Priority 2: Direct aiohttp request with eBay headers if ScraperAPI was not used or failed
+    # Priority 3: Direct aiohttp request with eBay headers if ScraperAPI was not used or failed
     if not html:
         try:
             timeout = aiohttp.ClientTimeout(total=15)
