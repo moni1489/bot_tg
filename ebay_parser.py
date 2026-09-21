@@ -34,9 +34,15 @@ async def fetch_and_parse_ebay(url: str, scraper_api_key: str | None = None) -> 
         proxies_to_try.append("")
 
     for proxy in proxies_to_try:
+        client = None
         try:
             client = _get_ebay_client(proxy)
-            listing, err = await asyncio.to_thread(client.fetch_item, item_id)
+            # Direct connection to eBay without proxy can hang on datacenter IPs; limit timeout
+            timeout = 10.0 if not proxy else 15.0
+            listing, err = await asyncio.wait_for(
+                asyncio.to_thread(client.fetch_item, item_id),
+                timeout=timeout
+            )
             if listing and listing.price is not None:
                 price = float(listing.price)
                 raw_shipping = float(listing.shipping_cost if listing.shipping_cost is not None else 0.0)
@@ -51,8 +57,16 @@ async def fetch_and_parse_ebay(url: str, scraper_api_key: str | None = None) -> 
                 }
             else:
                 log.warning(f"EbayClient.fetch_item for {item_id} (proxy={bool(proxy)}): {err}")
+        except asyncio.TimeoutError:
+            log.warning(f"EbayClient.fetch_item timed out for {item_id} (proxy={bool(proxy)})")
         except Exception as e:
             log.warning(f"Error running EbayClient for {url} (proxy={bool(proxy)}): {e}")
+        finally:
+            if client:
+                try:
+                    client.close()
+                except Exception:
+                    pass
 
     # Step 2: Fallback to ScraperAPI + FunkoDealBot parse_item_page_html
     if api_key:

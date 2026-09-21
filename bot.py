@@ -47,40 +47,45 @@ class CaptchaMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
         if hasattr(event, "chat") and event.chat and event.chat.type in ["group", "supergroup"]:
             # If it's a new member message, we don't intercept it here, we let the handler do it
-            if event.new_chat_members:
+            if getattr(event, "new_chat_members", None):
                 return await handler(event, data)
                 
-            async with pool.acquire() as db:
-                captcha_entry = await db.fetchrow(
-                    "SELECT welcome_msg_id, prompt_msg_id FROM group_captcha WHERE user_id = $1 AND chat_id = $2",
-                    event.from_user.id, event.chat.id
-                )
-                if captcha_entry:
-                    msg_text = event.text or event.caption or ""
-                    emoji_match = ("🛑" in msg_text)
-                    if not emoji_match and event.sticker and event.sticker.emoji:
-                        emoji_match = ("🛑" in event.sticker.emoji)
-                        
-                    if emoji_match:
-                        # Passed
+            captcha_entry = None
+            try:
+                async with pool.acquire() as db:
+                    captcha_entry = await db.fetchrow(
+                        "SELECT welcome_msg_id, prompt_msg_id FROM group_captcha WHERE user_id = $1 AND chat_id = $2",
+                        event.from_user.id, event.chat.id
+                    )
+            except Exception as e:
+                logging.error(f"Captcha DB check error: {e}")
+
+            if captcha_entry:
+                msg_text = event.text or event.caption or ""
+                emoji_match = ("🛑" in msg_text)
+                if not emoji_match and event.sticker and event.sticker.emoji:
+                    emoji_match = ("🛑" in event.sticker.emoji)
+                    
+                if emoji_match:
+                    # Passed: delete messages outside DB connection
+                    try:
+                        await bot.delete_message(event.chat.id, captcha_entry['welcome_msg_id'])
+                    except Exception as e:
+                        logging.error(f"Failed to delete welcome msg: {e}")
+                    if captcha_entry['prompt_msg_id']:
                         try:
-                            await bot.delete_message(event.chat.id, captcha_entry['welcome_msg_id'])
+                            await bot.delete_message(event.chat.id, captcha_entry['prompt_msg_id'])
                         except Exception as e:
-                            logging.error(f"Failed to delete welcome msg: {e}")
-                        if captcha_entry['prompt_msg_id']:
-                            try:
-                                await bot.delete_message(event.chat.id, captcha_entry['prompt_msg_id'])
-                            except Exception as e:
-                                logging.error(f"Failed to delete prompt msg: {e}")
-                        try:
-                            await event.delete()
-                        except Exception as e:
-                            logging.error(f"Failed to delete user emoji msg (maybe user is admin?): {e}")
-                        
-                        await db.execute("DELETE FROM group_captcha WHERE user_id = $1 AND chat_id = $2", event.from_user.id, event.chat.id)
-                        
-                        # Auto-complete 'join_chat' task and give 1 pack reward
-                        try:
+                            logging.error(f"Failed to delete prompt msg: {e}")
+                    try:
+                        await event.delete()
+                    except Exception as e:
+                        logging.error(f"Failed to delete user emoji msg: {e}")
+                    
+                    award_join_chat = False
+                    try:
+                        async with pool.acquire() as db:
+                            await db.execute("DELETE FROM group_captcha WHERE user_id = $1 AND chat_id = $2", event.from_user.id, event.chat.id)
                             user_row = await db.fetchrow(
                                 "SELECT packs_count, completed_tasks FROM card_users WHERE telegram_id = $1",
                                 event.from_user.id
@@ -98,25 +103,28 @@ class CaptchaMiddleware(BaseMiddleware):
                                         "UPDATE card_users SET packs_count = $1, completed_tasks = $2 WHERE telegram_id = $3",
                                         new_packs, json.dumps(completed), event.from_user.id
                                     )
-                                    try:
-                                        await bot.send_message(
-                                            event.from_user.id,
-                                            "✅ Вы вступили в наш чат и прошли проверку!\n🎁 Вам начислен **+1 пак** за выполнение задания «Вступить в беседу»!",
-                                            parse_mode="Markdown"
-                                        )
-                                    except Exception:
-                                        pass
-                        except Exception as e:
-                            logging.warning(f"Failed to award join_chat task: {e}")
-                        
-                        return # Solved
-                    else:
-                        # Failed/Spam
+                                    award_join_chat = True
+                    except Exception as e:
+                        logging.warning(f"Failed to award join_chat task in DB: {e}")
+
+                    if award_join_chat:
                         try:
-                            await event.delete()
-                        except Exception as e:
-                            logging.error(f"Failed to delete spam msg (maybe user is admin?): {e}")
-                        return # Stop propagation
+                            await bot.send_message(
+                                event.from_user.id,
+                                "✅ Вы вступили в наш чат и прошли проверку!\n🎁 Вам начислен **+1 пак** за выполнение задания «Вступить в беседу»!",
+                                parse_mode="Markdown"
+                            )
+                        except Exception:
+                            pass
+                    
+                    return # Solved
+                else:
+                    # Failed/Spam
+                    try:
+                        await event.delete()
+                    except Exception as e:
+                        logging.error(f"Failed to delete spam msg: {e}")
+                    return # Stop propagation
         return await handler(event, data)
 
 router.message.outer_middleware(CaptchaMiddleware())
@@ -140,20 +148,22 @@ async def get_card_profile(request):
         username = request.query.get("username")
         first_name = request.query.get("first_name")
         
-        if not tg_id:
+        if not tg_id or tg_id <= 0:
+            drop_settings = await get_drop_settings()
             return web.json_response({
-                "packs_count": 3,
+                "packs_count": 0,
                 "last_daily_pack": None,
                 "user_cards": {},
                 "completed_tasks": [],
                 "ref_count": 0,
                 "bot_username": "funkostop_bot",
-                "is_admin": False
+                "is_admin": False,
+                "drop_settings": drop_settings
             })
         
+        # 1. Quick DB operations in minimal connection scope
         async with pool.acquire() as db:
-            if username and username != "player" or first_name and first_name != "Игрок":
-                # Only update if it's real data from WebApp, not fallback
+            if (username and username != "player") or (first_name and first_name != "Игрок"):
                 db_username = username if username and username != "player" else None
                 db_first_name = first_name if first_name and first_name != "Игрок" else None
                 
@@ -190,66 +200,56 @@ async def get_card_profile(request):
                 
             cards_rows = await db.fetch("SELECT series_slug, card_index, count FROM user_cards WHERE telegram_id = $1", tg_id)
             user_cards = {f"{r['series_slug']}_{r['card_index']}": r['count'] for r in cards_rows}
-            
-            # Count referred friends
             ref_count = await db.fetchval("SELECT COUNT(*) FROM card_users WHERE referred_by = $1", tg_id) or 0
-
-            bot_username = "funkostop_bot"
-            try:
-                bot_info = await bot.get_me()
-                if bot_info and bot_info.username:
-                    bot_username = bot_info.username
-            except Exception:
-                pass
-
-            is_adm = await is_admin(tg_id)
             
-            # Beta testers have access to the game without being admins
-            # BETA_TESTERS = [8908317814]
-            # if not is_adm and tg_id not in BETA_TESTERS:
-            #     return web.json_response({
-            #         "error": "not_admin",
-            #         "message": "Игра находится на стадии тестирования и пока доступна только администраторам."
-            #     }, status=403)
+            # Pass existing db connection to avoid nested pool.acquire
+            is_adm = await is_admin(tg_id, db=db)
 
-            # Check channel subscription
-            is_sub = False
-            try:
-                member = await bot.get_chat_member(chat_id="@FunkoStop", user_id=tg_id)
-                status = member.status.value if hasattr(member.status, 'value') else member.status
-                if status not in ["left", "kicked", "banned"]:
-                    is_sub = True
-            except Exception as e:
-                logging.error(f"Error checking sub: {e}")
-                
-            if not is_sub and not is_adm:
-                return web.json_response({
-                    "error": "not_subscribed",
-                    "message": "Для участия в игре необходимо быть подписанным на наш Telegram канал @FunkoStop!"
-                }, status=403)
+        # 2. Outside DB connection: Bot info and Telegram chat member checks
+        bot_username = "funkostop_bot"
+        try:
+            bot_info = await bot.get_me()
+            if bot_info and bot_info.username:
+                bot_username = bot_info.username
+        except Exception:
+            pass
 
-            drop_settings = await get_drop_settings()
+        # Check channel subscription
+        is_sub = False
+        try:
+            member = await bot.get_chat_member(chat_id="@FunkoStop", user_id=tg_id)
+            status = member.status.value if hasattr(member.status, 'value') else member.status
+            if status not in ["left", "kicked", "banned"]:
+                is_sub = True
+        except Exception as e:
+            logging.error(f"Error checking sub: {e}")
+            # If Telegram check fails, don't lock out existing active players
+            if packs_count > 0 or user_cards:
+                is_sub = True
+            
+        if not is_sub and not is_adm:
             return web.json_response({
-                "packs_count": packs_count,
-                "last_daily_pack": last_daily,
-                "user_cards": user_cards,
-                "completed_tasks": completed_tasks,
-                "ref_count": ref_count,
-                "bot_username": bot_username,
-                "is_admin": is_adm,
-                "drop_settings": drop_settings
-            })
+                "error": "not_subscribed",
+                "message": "Для участия в игре необходимо быть подписанным на наш Telegram канал @FunkoStop!"
+            }, status=403)
+
+        drop_settings = await get_drop_settings()
+        return web.json_response({
+            "packs_count": packs_count,
+            "last_daily_pack": last_daily,
+            "user_cards": user_cards,
+            "completed_tasks": completed_tasks,
+            "ref_count": ref_count,
+            "bot_username": bot_username,
+            "is_admin": is_adm,
+            "drop_settings": drop_settings
+        })
     except Exception as e:
         logging.error(f"get_card_profile error: {e}")
         return web.json_response({
-            "packs_count": 3,
-            "last_daily_pack": None,
-            "user_cards": {},
-            "completed_tasks": [],
-            "ref_count": 0,
-            "bot_username": "funkostop_bot",
-            "drop_settings": DEFAULT_DROP_SETTINGS
-        })
+            "error": "server_error",
+            "message": "Ошибка сервера при загрузке профиля. Пожалуйста, обновите страницу."
+        }, status=500)
 
 async def claim_task_reward(request):
     try:
@@ -1082,7 +1082,13 @@ class EditDropRate(StatesGroup):
 # --- DATABASE ---
 async def init_db():
     global pool
-    pool = await asyncpg.create_pool(DATABASE_URL)
+    pool = await asyncpg.create_pool(
+        DATABASE_URL,
+        min_size=5,
+        max_size=20,
+        timeout=10.0,
+        command_timeout=15.0
+    )
     async with pool.acquire() as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS game_settings (
@@ -1090,6 +1096,7 @@ async def init_db():
                 value TEXT
             )
         """)
+        await init_drop_settings_cache(db)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -1208,33 +1215,68 @@ DEFAULT_DROP_SETTINGS = {
     "craft_penalty": 33.0   # % reduction in crafts after 1+ completed series (e.g. 33% reduction = multiplier 0.67 ~ 1.5x)
 }
 
-async def get_drop_settings() -> dict:
+_drop_settings_cache = None
+
+async def init_drop_settings_cache(db=None):
+    global _drop_settings_cache
     try:
-        async with pool.acquire() as db:
+        if db is not None:
             val = await db.fetchval("SELECT value FROM game_settings WHERE key = 'drop_settings'")
-            if val:
-                d = json.loads(val)
-                res = DEFAULT_DROP_SETTINGS.copy()
-                res.update(d)
-                return res
+        else:
+            async with pool.acquire() as conn:
+                val = await conn.fetchval("SELECT value FROM game_settings WHERE key = 'drop_settings'")
+        if val:
+            d = json.loads(val)
+            res = DEFAULT_DROP_SETTINGS.copy()
+            res.update(d)
+            _drop_settings_cache = res
+            logging.info(f"Drop settings loaded into cache: {_drop_settings_cache}")
+            return
     except Exception as e:
-        logging.error(f"Error fetching drop settings: {e}")
-    return DEFAULT_DROP_SETTINGS.copy()
+        logging.error(f"Error initializing drop settings cache: {e}")
+    if _drop_settings_cache is None:
+        _drop_settings_cache = DEFAULT_DROP_SETTINGS.copy()
 
-async def save_drop_settings(data: dict):
-    async with pool.acquire() as db:
-        await db.execute("""
-            INSERT INTO game_settings (key, value)
-            VALUES ('drop_settings', $1)
-            ON CONFLICT (key) DO UPDATE SET value = $1
-        """, json.dumps(data))
+async def get_drop_settings(db=None) -> dict:
+    global _drop_settings_cache
+    if _drop_settings_cache is not None:
+        return _drop_settings_cache.copy()
+    await init_drop_settings_cache(db)
+    return _drop_settings_cache.copy() if _drop_settings_cache is not None else DEFAULT_DROP_SETTINGS.copy()
 
-async def is_admin(user_tg_id: int) -> bool:
+async def save_drop_settings(data: dict, db=None):
+    global _drop_settings_cache
+    _drop_settings_cache = data.copy()
+    try:
+        if db is not None:
+            await db.execute("""
+                INSERT INTO game_settings (key, value)
+                VALUES ('drop_settings', $1)
+                ON CONFLICT (key) DO UPDATE SET value = $1
+            """, json.dumps(data))
+        else:
+            async with pool.acquire() as conn:
+                await conn.execute("""
+                    INSERT INTO game_settings (key, value)
+                    VALUES ('drop_settings', $1)
+                    ON CONFLICT (key) DO UPDATE SET value = $1
+                """, json.dumps(data))
+    except Exception as e:
+        logging.error(f"Error saving drop settings to DB: {e}")
+
+async def is_admin(user_tg_id: int, db=None) -> bool:
     if user_tg_id in ADMIN_IDS:
         return True
-    async with pool.acquire() as db:
-        row = await db.fetchrow("SELECT id FROM users WHERE user_tg_id = $1 AND role = 'admin'", user_tg_id)
-        return row is not None
+    try:
+        if db is not None:
+            row = await db.fetchrow("SELECT id FROM users WHERE user_tg_id = $1 AND role = 'admin'", user_tg_id)
+            return row is not None
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT id FROM users WHERE user_tg_id = $1 AND role = 'admin'", user_tg_id)
+            return row is not None
+    except Exception as e:
+        logging.error(f"is_admin check error: {e}")
+        return False
 
 async def authenticate_admin(login_id: str, password: str, user_tg_id: int) -> bool:
     async with pool.acquire() as db:
@@ -1551,36 +1593,39 @@ async def start_handler(message: Message, state: FSMContext):
         try:
             inviter_id = int(args[1].replace("ref_", ""))
             if inviter_id != message.from_user.id:
+                user_exists = False
                 async with pool.acquire() as db:
                     # Only truly new users (not in DB at all) can use referral links
                     user = await db.fetchrow("SELECT telegram_id FROM card_users WHERE telegram_id = $1", message.from_user.id)
+                    user_exists = user is not None
+
+                if not user_exists:
+                    # Check subscription before giving referral bonus (outside DB connection)
+                    is_sub = False
+                    try:
+                        member = await bot.get_chat_member(chat_id="@FunkoStop", user_id=message.from_user.id)
+                        status = member.status.value if hasattr(member.status, 'value') else member.status
+                        if status not in ["left", "kicked", "banned"]:
+                            is_sub = True
+                    except Exception as e:
+                        logging.error(f"Error checking sub in start: {e}")
+                        
+                    is_adm = await is_admin(message.from_user.id)
                     
-                    if not user:
-                        # Check subscription before giving referral bonus
-                        is_sub = False
-                        try:
-                            member = await bot.get_chat_member(chat_id="@FunkoStop", user_id=message.from_user.id)
-                            status = member.status.value if hasattr(member.status, 'value') else member.status
-                            if status not in ["left", "kicked", "banned"]:
-                                is_sub = True
-                        except Exception as e:
-                            logging.error(f"Error checking sub in start: {e}")
-                            
-                        is_adm = await is_admin(message.from_user.id)
-                        
-                        if not is_sub and not is_adm:
-                            await message.answer("⚠️ Чтобы получить бонус по реферальной ссылке (и начать играть), **сначала подпишитесь на наш канал** @FunkoStop!\n\nПосле подписки нажмите на ссылку друга еще раз.", parse_mode="Markdown")
-                            return
-                        
-                        # Brand new user: give 3 base + 1 referral bonus = 4 packs, store pending inviter
+                    if not is_sub and not is_adm:
+                        await message.answer("⚠️ Чтобы получить бонус по реферальной ссылке (и начать играть), **сначала подпишитесь на наш канал** @FunkoStop!\n\nПосле подписки нажмите на ссылку друга еще раз.", parse_mode="Markdown")
+                        return
+                    
+                    # Brand new user: give 3 base + 1 referral bonus = 4 packs, store pending inviter
+                    async with pool.acquire() as db:
                         await db.execute(
-                            "INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 4, $4)",
+                            "INSERT INTO card_users (telegram_id, username, first_name, packs_count, referred_by) VALUES ($1, $2, $3, 4, $4) ON CONFLICT DO NOTHING",
                             message.from_user.id, message.from_user.username, message.from_user.first_name, inviter_id
                         )
-                        is_referral = True
-                        await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный <b>+1 пак</b>!\n\nОткройте хотя бы 1 пак, чтобы активировать бонус вашему другу!", parse_mode="HTML")
-                    else:
-                        await message.answer("ℹ️ Бонус за приглашение получают только новые игроки. Вы уже зарегистрированы!")
+                    is_referral = True
+                    await message.answer("🎉 Вы зарегистрировались по приглашению и получили бонусный <b>+1 пак</b>!\n\nОткройте хотя бы 1 пак, чтобы активировать бонус вашему другу!", parse_mode="HTML")
+                else:
+                    await message.answer("ℹ️ Бонус за приглашение получают только новые игроки. Вы уже зарегистрированы!")
         except Exception as e:
             logging.error(f"Ref error: {e}")
 

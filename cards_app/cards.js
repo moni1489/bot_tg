@@ -269,18 +269,17 @@ async function fetchProfile() {
             const data = await res.json();
             document.body.innerHTML = `
                 <div style="color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; padding:20px; font-family:Montserrat,sans-serif; background: radial-gradient(circle at center, #1a0000 0%, #000000 100%);">
-                    <h1 style="color:var(--neon-red); margin-bottom:15px; font-size: 2.5rem; text-shadow: 0 0 20px var(--neon-red-glow);">ДОСТУП ЗАКРЫТ</h1>
-                    <p style="font-size:1.2rem; opacity:0.8; max-width: 400px; line-height: 1.5;">${data.message || 'Игра находится на стадии тестирования и пока доступна только администраторам.'}</p>
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--neon-red)" stroke-width="1.5" style="margin-top: 30px; opacity: 0.7;">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                    </svg>
+                    <h1 style="color:var(--neon-red); margin-bottom:15px; font-size: 2.2rem; text-shadow: 0 0 20px var(--neon-red-glow);">ПОДПИСКА НА КАНАЛ</h1>
+                    <p style="font-size:1.1rem; opacity:0.85; max-width: 400px; line-height: 1.5;">${data.message || 'Для участия в игре необходимо быть подписанным на наш Telegram канал @FunkoStop!'}</p>
+                    <a href="https://t.me/FunkoStop" target="_blank" style="margin-top:20px; padding:12px 26px; background:var(--neon-red); color:white; border-radius:8px; text-decoration:none; font-weight:700; display:inline-block; box-shadow: 0 0 15px rgba(255,0,50,0.5);">ПОДПИСАТЬСЯ</a>
                 </div>
             `;
-            throw new Error("Access denied (Not admin)");
+            throw new Error("Access denied (Not subscribed)");
+        } else {
+            console.error("Server returned non-200 status for profile:", res.status);
         }
     } catch (e) {
-        console.log("Using default profile / fetch error", e);
+        console.log("Profile fetch warning / error:", e);
     } finally {
         checkDailyTimer();
         updateUI();
