@@ -173,7 +173,21 @@ async function initApp() {
     await fetchProfile();
     renderCollection();
     updateUI();
+
+    // Refresh drop_settings from server every 2 minutes silently
+    // so admin panel changes apply without restarting the mini-app
+    setInterval(async () => {
+        try {
+            const params = new URLSearchParams({ tg_id: userData.telegram_id, t: Date.now() });
+            const res = await fetch(`/api/cards/profile?${params.toString()}`, { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.drop_settings) window.dropSettings = data.drop_settings;
+            }
+        } catch (e) { /* silent */ }
+    }, 2 * 60 * 1000);
 }
+
 
 function updateUI() {
     packsCountBadge.textContent = userData.packs_count;
