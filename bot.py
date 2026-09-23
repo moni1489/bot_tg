@@ -1077,6 +1077,7 @@ class EditDropRate(StatesGroup):
     waiting_for_rare = State()
     waiting_for_penalty = State()
     waiting_for_craft_penalty = State()
+    waiting_for_bonus = State()
 
 
 # --- DATABASE ---
@@ -1212,7 +1213,16 @@ DEFAULT_DROP_SETTINGS = {
     "epic_rate": 5.0,
     "rare_rate": 26.0,
     "series_penalty": 67.0, # % reduction in packs after 1+ completed series (e.g. 67% reduction = multiplier 0.33)
-    "craft_penalty": 33.0   # % reduction in crafts after 1+ completed series (e.g. 33% reduction = multiplier 0.67 ~ 1.5x)
+    "craft_penalty": 33.0,  # % reduction in crafts after 1+ completed series (e.g. 33% reduction = multiplier 0.67 ~ 1.5x)
+    # Bonus card individual chances (%)
+    "bonus_jackpot": 0.01,       # Funko Pop фигурка
+    "bonus_discount_20": 0.15,   # Скидка 20%
+    "bonus_discount_25": 0.15,   # Скидка 25% (Авито)
+    "bonus_discount_1000": 0.15, # Скидка 1000р
+    "bonus_packs_10": 0.15,      # 10 Бонус Паков
+    "bonus_discount_500": 0.40,  # Скидка 500р
+    "bonus_packs_5": 0.70,       # 5 Бонус Паков
+    "bonus_discount_300": 1.50,  # Скидка 300р
 }
 
 _drop_settings_cache = None
@@ -2503,6 +2513,22 @@ def get_drop_settings_kb():
         [
             InlineKeyboardButton(text="🔨 Штраф в крафтах", callback_data="edit_craft_penalty"),
             InlineKeyboardButton(text="🔄 Сбросить на стандартные", callback_data="edit_drop_reset")
+        ],
+        [
+            InlineKeyboardButton(text="🏆 Jackpot (фигурка)", callback_data="edit_bonus:bonus_jackpot"),
+            InlineKeyboardButton(text="🎁 5 Паков", callback_data="edit_bonus:bonus_packs_5")
+        ],
+        [
+            InlineKeyboardButton(text="🎁 10 Паков", callback_data="edit_bonus:bonus_packs_10"),
+            InlineKeyboardButton(text="💰 Скидка 300₽", callback_data="edit_bonus:bonus_discount_300")
+        ],
+        [
+            InlineKeyboardButton(text="💰 Скидка 500₽", callback_data="edit_bonus:bonus_discount_500"),
+            InlineKeyboardButton(text="💰 Скидка 1000₽", callback_data="edit_bonus:bonus_discount_1000")
+        ],
+        [
+            InlineKeyboardButton(text="💰 Скидка 20%", callback_data="edit_bonus:bonus_discount_20"),
+            InlineKeyboardButton(text="💰 Скидка 25% (Авито)", callback_data="edit_bonus:bonus_discount_25")
         ]
     ])
 
@@ -2517,6 +2543,16 @@ async def build_drop_settings_text() -> str:
     craft_pen = float(s.get("craft_penalty", 33.0))
     craft_mult = max(0.0, round((100.0 - craft_pen) / 100.0, 2))
 
+    b_jackpot   = float(s.get("bonus_jackpot", 0.01))
+    b_d20       = float(s.get("bonus_discount_20", 0.15))
+    b_d25       = float(s.get("bonus_discount_25", 0.15))
+    b_d1000     = float(s.get("bonus_discount_1000", 0.15))
+    b_p10       = float(s.get("bonus_packs_10", 0.15))
+    b_d500      = float(s.get("bonus_discount_500", 0.40))
+    b_p5        = float(s.get("bonus_packs_5", 0.70))
+    b_d300      = float(s.get("bonus_discount_300", 1.50))
+    b_total     = round(b_jackpot + b_d20 + b_d25 + b_d1000 + b_p10 + b_d500 + b_p5 + b_d300, 3)
+
     return (
         "🎲 <b>Настройки шансов дропа и крафтов</b>\n\n"
         "<b>Текущие базовые шансы из паков:</b>\n"
@@ -2528,6 +2564,15 @@ async def build_drop_settings_text() -> str:
         f"• 📉 <b>Штраф в паках:</b> <code>-{penalty}%</code> (множитель <code>x{multiplier}</code>)\n"
         f"• 🔨 <b>Штраф в крафтах:</b> <code>-{craft_pen}%</code> (множитель <code>x{craft_mult}</code>, ~1.5x)\n"
         f"<i>(У игроков с собранной серией в крафтах высшие редкости умножаются на x{craft_mult}, а низшая возрастает, без выпадения лишних редкостей)</i>\n\n"
+        f"<b>🎁 Бонус-карты (итого ~{b_total}%):</b>\n"
+        f"• 🏆 Jackpot (фигурка): <code>{b_jackpot}%</code>\n"
+        f"• 💰 Скидка 20%: <code>{b_d20}%</code>\n"
+        f"• 💰 Скидка 25% (Авито): <code>{b_d25}%</code>\n"
+        f"• 💰 Скидка 1000₽: <code>{b_d1000}%</code>\n"
+        f"• 🎁 10 Паков: <code>{b_p10}%</code>\n"
+        f"• 💰 Скидка 500₽: <code>{b_d500}%</code>\n"
+        f"• 🎁 5 Паков: <code>{b_p5}%</code>\n"
+        f"• 💰 Скидка 300₽: <code>{b_d300}%</code>\n\n"
         "👇 <i>Выберите что хотите изменить:</i>"
     )
 
@@ -2665,6 +2710,54 @@ async def process_edit_craft_penalty(message: Message, state: FSMContext):
     await state.clear()
     mult = max(0.0, round((100.0 - val) / 100.0, 2))
     await message.answer(f"✅ Снижение шансов в крафтах установлено на <b>-{round(val, 2)}%</b> (множитель <code>x{mult}</code>)!\n\n" + await build_drop_settings_text(), parse_mode="HTML", reply_markup=get_drop_settings_kb())
+
+@router.callback_query(F.data.startswith("edit_bonus:"))
+async def edit_bonus_cb(callback: CallbackQuery, state: FSMContext):
+    if not await is_admin(callback.from_user.id):
+        return await callback.answer("Нет прав", show_alert=True)
+    bonus_key = callback.data.split(":", 1)[1]
+    bonus_labels = {
+        "bonus_jackpot": "Jackpot (Funko Pop фигурка)",
+        "bonus_discount_20": "Скидка 20%",
+        "bonus_discount_25": "Скидка 25% (Авито)",
+        "bonus_discount_1000": "Скидка 1000₽",
+        "bonus_packs_10": "10 Бонус Паков",
+        "bonus_discount_500": "Скидка 500₽",
+        "bonus_packs_5": "5 Бонус Паков",
+        "bonus_discount_300": "Скидка 300₽",
+    }
+    label = bonus_labels.get(bonus_key, bonus_key)
+    await state.set_state(EditDropRate.waiting_for_bonus)
+    await state.update_data(bonus_key=bonus_key, bonus_label=label)
+    await callback.message.answer(
+        f"Введите новый % для <b>{label}</b>\n"
+        f"Например: <code>0.5</code> (можно дробные, минимум 0):",
+        parse_mode="HTML", reply_markup=get_cancel_kb()
+    )
+    await callback.answer()
+
+@router.message(EditDropRate.waiting_for_bonus)
+async def process_edit_bonus(message: Message, state: FSMContext):
+    if message.text == "❌ Отмена":
+        await state.clear()
+        return await message.answer("Отменено.", reply_markup=get_game_admin_kb(message.from_user.id))
+    try:
+        val = float(message.text.replace(",", ".").strip())
+        if val < 0 or val > 100:
+            raise ValueError()
+    except ValueError:
+        return await message.answer("❌ Введите корректное число от 0 до 100 (например 0.5 или 1.5).")
+    data = await state.get_data()
+    bonus_key = data.get("bonus_key")
+    bonus_label = data.get("bonus_label", bonus_key)
+    s = await get_drop_settings()
+    s[bonus_key] = round(val, 3)
+    await save_drop_settings(s)
+    await state.clear()
+    await message.answer(
+        f"✅ Шанс для <b>{bonus_label}</b> установлен на <b>{round(val, 3)}%</b>!\n\n" + await build_drop_settings_text(),
+        parse_mode="HTML", reply_markup=get_drop_settings_kb()
+    )
 
 @router.callback_query(F.data == "edit_drop_reset")
 async def edit_drop_reset_cb(callback: CallbackQuery, state: FSMContext):

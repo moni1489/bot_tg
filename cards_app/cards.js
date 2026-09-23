@@ -525,25 +525,37 @@ function rollRandomCard() {
 // Roll Bonus Card
 function rollBonusCard() {
     const rand = Math.random() * 100;
-    // Probabilities (lowered ~2.5x–5x):
-    // 97.0% nothing
-    // 1.5% - 300r discount (7)
-    // 0.7% - 5 bonus packs (8)
-    // 0.4% - 500r discount (4)
-    // 0.15% - 1000r discount (5)
-    // 0.15% - 10 bonus packs (6)
-    // 0.15% - 20% discount (2)
-    // 0.15% - 25% discount avito (3)
-    // 0.01% - jackpot (1)
+    const s = window.dropSettings || {};
 
-    if (rand <= 0.01) return { id: 1, name: "Funko Pop", img: "/cards/images/bonus_card_1.webp" };
-    if (rand <= 0.16) return { id: 2, name: "Скидка 20%", img: "/cards/images/bonus_card_2.webp" };
-    if (rand <= 0.31) return { id: 3, name: "Скидка 25% (Авито)", img: "/cards/images/bonus_card_3.webp" };
-    if (rand <= 0.46) return { id: 5, name: "Скидка 1000₽", img: "/cards/images/bonus_card_5.webp" };
-    if (rand <= 0.61) return { id: 6, name: "10 Бонус Паков", packs: 10, img: "/cards/images/bonus_card_6.webp" };
-    if (rand <= 1.01) return { id: 4, name: "Скидка 500₽", img: "/cards/images/bonus_card_4.webp" };
-    if (rand <= 1.71) return { id: 8, name: "5 Бонус Паков", packs: 5, img: "/cards/images/bonus_card_8.webp" };
-    if (rand <= 3.21) return { id: 7, name: "Скидка 300₽", img: "/cards/images/bonus_card_7.webp" };
+    // Read individual bonus chances from drop_settings (configurable via admin panel)
+    // Defaults match DEFAULT_DROP_SETTINGS in bot.py (lowered values)
+    const jackpot = s.bonus_jackpot        !== undefined ? s.bonus_jackpot        : 0.01;
+    const d20     = s.bonus_discount_20    !== undefined ? s.bonus_discount_20    : 0.15;
+    const d25     = s.bonus_discount_25    !== undefined ? s.bonus_discount_25    : 0.15;
+    const d1000   = s.bonus_discount_1000  !== undefined ? s.bonus_discount_1000  : 0.15;
+    const p10     = s.bonus_packs_10       !== undefined ? s.bonus_packs_10       : 0.15;
+    const d500    = s.bonus_discount_500   !== undefined ? s.bonus_discount_500   : 0.40;
+    const p5      = s.bonus_packs_5        !== undefined ? s.bonus_packs_5        : 0.70;
+    const d300    = s.bonus_discount_300   !== undefined ? s.bonus_discount_300   : 1.50;
+
+    // Cumulative thresholds
+    const t1 = jackpot;
+    const t2 = t1 + d20;
+    const t3 = t2 + d25;
+    const t4 = t3 + d1000;
+    const t5 = t4 + p10;
+    const t6 = t5 + d500;
+    const t7 = t6 + p5;
+    const t8 = t7 + d300;
+
+    if (rand <= t1) return { id: 1, name: "Funko Pop", img: "/cards/images/bonus_card_1.webp" };
+    if (rand <= t2) return { id: 2, name: "Скидка 20%", img: "/cards/images/bonus_card_2.webp" };
+    if (rand <= t3) return { id: 3, name: "Скидка 25% (Авито)", img: "/cards/images/bonus_card_3.webp" };
+    if (rand <= t4) return { id: 5, name: "Скидка 1000₽", img: "/cards/images/bonus_card_5.webp" };
+    if (rand <= t5) return { id: 6, name: "10 Бонус Паков", packs: 10, img: "/cards/images/bonus_card_6.webp" };
+    if (rand <= t6) return { id: 4, name: "Скидка 500₽", img: "/cards/images/bonus_card_4.webp" };
+    if (rand <= t7) return { id: 8, name: "5 Бонус Паков", packs: 5, img: "/cards/images/bonus_card_8.webp" };
+    if (rand <= t8) return { id: 7, name: "Скидка 300₽", img: "/cards/images/bonus_card_7.webp" };
 
     return null;
 }
