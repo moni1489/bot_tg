@@ -525,25 +525,25 @@ function rollRandomCard() {
 // Roll Bonus Card
 function rollBonusCard() {
     const rand = Math.random() * 100;
-    // Probabilities:
-    // 91.95% nothing
-    // 3% - 300r discount (7)
-    // 2% - 5 bonus packs (8)
-    // 1% - 500r discount (4)
-    // 0.5% - 1000r discount (5)
-    // 0.5% - 10 bonus packs (6)
-    // 0.5% - 20% discount (2)
-    // 0.5% - 25% discount avito (3)
-    // 0.05% - jackpot (1)
+    // Probabilities (lowered ~2.5x–5x):
+    // 97.0% nothing
+    // 1.5% - 300r discount (7)
+    // 0.7% - 5 bonus packs (8)
+    // 0.4% - 500r discount (4)
+    // 0.15% - 1000r discount (5)
+    // 0.15% - 10 bonus packs (6)
+    // 0.15% - 20% discount (2)
+    // 0.15% - 25% discount avito (3)
+    // 0.01% - jackpot (1)
 
-    if (rand <= 0.05) return { id: 1, name: "Funko Pop", img: "/cards/images/bonus_card_1.webp" };
-    if (rand <= 0.55) return { id: 2, name: "Скидка 20%", img: "/cards/images/bonus_card_2.webp" };
-    if (rand <= 1.05) return { id: 3, name: "Скидка 25% (Авито)", img: "/cards/images/bonus_card_3.webp" };
-    if (rand <= 1.55) return { id: 5, name: "Скидка 1000₽", img: "/cards/images/bonus_card_5.webp" };
-    if (rand <= 2.05) return { id: 6, name: "10 Бонус Паков", packs: 10, img: "/cards/images/bonus_card_6.webp" };
-    if (rand <= 3.05) return { id: 4, name: "Скидка 500₽", img: "/cards/images/bonus_card_4.webp" };
-    if (rand <= 5.05) return { id: 8, name: "5 Бонус Паков", packs: 5, img: "/cards/images/bonus_card_8.webp" };
-    if (rand <= 8.05) return { id: 7, name: "Скидка 300₽", img: "/cards/images/bonus_card_7.webp" };
+    if (rand <= 0.01) return { id: 1, name: "Funko Pop", img: "/cards/images/bonus_card_1.webp" };
+    if (rand <= 0.16) return { id: 2, name: "Скидка 20%", img: "/cards/images/bonus_card_2.webp" };
+    if (rand <= 0.31) return { id: 3, name: "Скидка 25% (Авито)", img: "/cards/images/bonus_card_3.webp" };
+    if (rand <= 0.46) return { id: 5, name: "Скидка 1000₽", img: "/cards/images/bonus_card_5.webp" };
+    if (rand <= 0.61) return { id: 6, name: "10 Бонус Паков", packs: 10, img: "/cards/images/bonus_card_6.webp" };
+    if (rand <= 1.01) return { id: 4, name: "Скидка 500₽", img: "/cards/images/bonus_card_4.webp" };
+    if (rand <= 1.71) return { id: 8, name: "5 Бонус Паков", packs: 5, img: "/cards/images/bonus_card_8.webp" };
+    if (rand <= 3.21) return { id: 7, name: "Скидка 300₽", img: "/cards/images/bonus_card_7.webp" };
 
     return null;
 }
