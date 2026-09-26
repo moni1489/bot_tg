@@ -359,7 +359,7 @@ function setupTasks() {
 }
 
 function updateTaskButtons() {
-    const trackableTasks = ['tg_sub', 'order_2000', 'join_chat', 'leave_review', 'content_task'];
+    const trackableTasks = ['tg_sub', 'order_2000', 'join_chat'];
     const completed = userData.completed_tasks || [];
     const completedCount = trackableTasks.filter(t => completed.includes(t)).length;
     const totalTasks = trackableTasks.length;
