@@ -1075,6 +1075,9 @@ class ResetPlayerAccount(StatesGroup):
 class GiveDuplicates(StatesGroup):
     waiting_for_input = State()
 
+class FunkoStockCheck(StatesGroup):
+    waiting_for_pid = State()
+
 class CreatePaymentLink(StatesGroup):
     waiting_for_desc = State()
     waiting_for_amount = State()
@@ -1204,7 +1207,20 @@ async def init_db():
             await db.execute("ALTER TABLE group_captcha ADD COLUMN prompt_msg_id BIGINT")
         except asyncpg.exceptions.DuplicateColumnError:
             pass
-        
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS funko_stock_history (
+                id SERIAL PRIMARY KEY,
+                pid TEXT NOT NULL,
+                product_name TEXT,
+                price TEXT,
+                available BOOLEAN,
+                low_stock BOOLEAN DEFAULT FALSE,
+                checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                checked_by BIGINT
+            )
+        """)
+
         # Admin check
         admin = await db.fetchrow("SELECT id FROM users WHERE role = 'admin'")
         if not admin:
@@ -1419,7 +1435,7 @@ def get_admin_kb(user_id=None):
             [KeyboardButton(text="🔄 Изменить статус заказа"), KeyboardButton(text="💰 Изменить оплату")],
             [KeyboardButton(text="🗃 Архив заказов (Админ)")],
             [KeyboardButton(text="💳 Создать ссылку на оплату")],
-            [KeyboardButton(text="🎮 Админка Игры")]
+            [KeyboardButton(text="📦 Funko Stock"), KeyboardButton(text="🎮 Админка Игры")]
         ],
         resize_keyboard=True
     )
@@ -3727,6 +3743,164 @@ async def tbank_link_amount(message: Message, state: FSMContext):
             
     except Exception as e:
         await message.answer(f"❌ Системная ошибка: {str(e)}", reply_markup=get_admin_kb(message.from_user.id))
+
+# --- FUNKO STOCK CHECKER ---
+
+FUNKO_API_URL = "https://www.funko.com/on/demandware.store/Sites-FunkoUS-Site/default/Product-Variation"
+
+async def fetch_funko_product(pid: str) -> dict | None:
+    url = f"{FUNKO_API_URL}?pid={pid}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+                product = data.get("product")
+                if not product or not product.get("productName"):
+                    return None
+
+                badges = product.get("badgesJSON", {}).get("badges", {})
+                images = product.get("images", {})
+                large_imgs = images.get("large", [])
+                image_url = large_imgs[0]["url"] if large_imgs else None
+
+                selected_url = product.get("selectedProductUrl", "")
+                page_path = selected_url.split("?")[0] if selected_url else f"/{pid}.html"
+
+                return {
+                    "pid": pid,
+                    "name": product["productName"],
+                    "price": product.get("price", {}).get("sales", {}).get("formatted", "N/A"),
+                    "available": product.get("available", False),
+                    "in_stock_msg": ", ".join(product.get("availability", {}).get("messages", [])),
+                    "low_stock": badges.get("isLowStock", False),
+                    "image_url": image_url,
+                    "page_url": f"https://funko.com{page_path}",
+                }
+    except Exception as e:
+        logging.error(f"Funko API error for PID {pid}: {e}")
+        return None
+
+
+async def process_funko_stock(message: Message, pid: str, state: FSMContext):
+    pid = pid.strip()
+    if not pid.isdigit():
+        await message.answer("❌ PID должен быть числом. Пример: `/funkostock 93533`", parse_mode="Markdown", reply_markup=get_admin_kb(message.from_user.id))
+        await state.clear()
+        return
+
+    wait_msg = await message.answer(f"🔍 Проверяю PID `{pid}` на funko.com...", parse_mode="Markdown")
+
+    product = await fetch_funko_product(pid)
+
+    if not product:
+        await wait_msg.delete()
+        await message.answer(
+            f"❌ Продукт с PID `{pid}` не найден на funko.com",
+            parse_mode="Markdown",
+            reply_markup=get_admin_kb(message.from_user.id)
+        )
+        await state.clear()
+        return
+
+    async with pool.acquire() as db:
+        await db.execute(
+            "INSERT INTO funko_stock_history (pid, product_name, price, available, low_stock, checked_by) VALUES ($1, $2, $3, $4, $5, $6)",
+            pid, product["name"], product["price"], product["available"], product["low_stock"], message.from_user.id
+        )
+
+        history = await db.fetch(
+            "SELECT available, low_stock, checked_at FROM funko_stock_history WHERE pid = $1 ORDER BY checked_at DESC LIMIT 5",
+            pid
+        )
+
+    if product["available"]:
+        if product["low_stock"]:
+            stock_status = "⚠️ Low Stock"
+        else:
+            stock_status = "✅ In Stock"
+    else:
+        stock_status = "❌ Out of Stock"
+
+    text = (
+        f"<b>{product['name']}</b>\n\n"
+        f"<b>Price:</b> {product['price']}\n"
+        f"<b>PID:</b> <code>{pid}</code>\n"
+        f"<b>Status:</b> {stock_status}\n"
+    )
+
+    if len(history) > 1:
+        text += "\n📊 <b>Stock History:</b>\n"
+        for h in history:
+            ts = h["checked_at"].strftime("%d.%m.%Y %H:%M")
+            if h["available"]:
+                st = "⚠️ Low" if h["low_stock"] else "✅ In Stock"
+            else:
+                st = "❌ Out"
+            text += f"  • {ts} — {st}\n"
+
+    store_btn = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔗 Open Store Page", url=product["page_url"])]
+    ])
+
+    try:
+        await wait_msg.delete()
+    except Exception:
+        pass
+
+    if product["image_url"]:
+        try:
+            await message.answer_photo(
+                photo=product["image_url"],
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=store_btn
+            )
+        except Exception:
+            await message.answer(text, parse_mode="HTML", reply_markup=store_btn)
+    else:
+        await message.answer(text, parse_mode="HTML", reply_markup=store_btn)
+
+    await state.clear()
+
+
+@router.message(Command("funkostock"))
+async def funkostock_cmd(message: Message, state: FSMContext):
+    if not await is_admin(message.from_user.id):
+        return
+    await state.clear()
+
+    args = message.text.split(maxsplit=1)
+    if len(args) > 1 and args[1].strip():
+        await process_funko_stock(message, args[1].strip(), state)
+    else:
+        await message.answer("Введите PID продукта с funko.com:", reply_markup=get_cancel_kb())
+        await state.set_state(FunkoStockCheck.waiting_for_pid)
+
+
+@router.message(F.text == "📦 Funko Stock", StateFilter("*"))
+async def funkostock_btn(message: Message, state: FSMContext):
+    if not await is_admin(message.from_user.id):
+        return
+    await state.clear()
+    await message.answer("Введите PID продукта с funko.com:\n\nПример: `93533`", parse_mode="Markdown", reply_markup=get_cancel_kb())
+    await state.set_state(FunkoStockCheck.waiting_for_pid)
+
+
+@router.message(FunkoStockCheck.waiting_for_pid)
+async def funkostock_process_pid(message: Message, state: FSMContext):
+    if message.text and message.text.strip() == "❌ Отмена":
+        await message.answer("Действие отменено.", reply_markup=get_admin_kb(message.from_user.id))
+        await state.clear()
+        return
+    if message.text:
+        await process_funko_stock(message, message.text.strip(), state)
+
 
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
