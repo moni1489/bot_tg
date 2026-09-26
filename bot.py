@@ -3750,83 +3750,95 @@ async def tbank_link_amount(message: Message, state: FSMContext):
 FUNKO_API_URL = "https://www.funko.com/on/demandware.store/Sites-FunkoUS-Site/default/Product-Variation"
 
 async def fetch_funko_product(pid: str) -> dict | None:
-    url = f"{FUNKO_API_URL}?pid={pid}"
+    api_url = f"{FUNKO_API_URL}?pid={pid}"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/json",
         "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": "https://www.funko.com/",
     }
-    timeout = aiohttp.ClientTimeout(total=10, connect=5)
+
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, timeout=timeout, ssl=False) as resp:
-                logging.info(f"Funko API response for PID {pid}: status={resp.status}")
-                if resp.status != 200:
-                    text = await resp.text()
-                    logging.warning(f"Funko API non-200 for PID {pid}: {resp.status} — {text[:200]}")
-                    return None
-                data = await resp.json(content_type=None)
-                product = data.get("product")
-                if not product or not product.get("productName"):
-                    return None
+            data = None
 
-                badges = product.get("badgesJSON", {}).get("badges", {})
-                images = product.get("images", {})
-                large_imgs = images.get("large", [])
-                image_url = large_imgs[0]["url"] if large_imgs else None
+            try:
+                timeout = aiohttp.ClientTimeout(total=10, connect=5)
+                async with session.get(api_url, headers=headers, timeout=timeout, ssl=False) as resp:
+                    logging.info(f"Funko direct: PID {pid} status={resp.status}")
+                    if resp.status == 200:
+                        data = await resp.json(content_type=None)
+            except Exception as e:
+                logging.warning(f"Funko direct failed for PID {pid}: {e}")
 
-                selected_url = product.get("selectedProductUrl", "")
-                page_path = selected_url.split("?")[0] if selected_url else f"/{pid}.html"
+            if not data and SCRAPER_API_KEY:
+                try:
+                    from urllib.parse import quote as _quote
+                    scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={_quote(api_url, safe='')}&country_code=us"
+                    timeout = aiohttp.ClientTimeout(total=30)
+                    async with session.get(scraper_url, timeout=timeout) as resp:
+                        logging.info(f"Funko via ScraperAPI: PID {pid} status={resp.status}")
+                        if resp.status == 200:
+                            data = await resp.json(content_type=None)
+                except Exception as e:
+                    logging.warning(f"Funko ScraperAPI failed for PID {pid}: {e}")
 
-                result = {
-                    "pid": pid,
-                    "name": product["productName"],
-                    "price": product.get("price", {}).get("sales", {}).get("formatted", "N/A"),
-                    "available": product.get("available", False),
-                    "in_stock_msg": ", ".join(product.get("availability", {}).get("messages", [])),
-                    "low_stock": badges.get("isLowStock", False),
-                    "image_url": image_url,
-                    "page_url": f"https://funko.com{page_path}",
-                    "stock_count": None,
-                }
+            if not data:
+                return None
 
-                if result["available"] and SCRAPER_API_KEY:
-                    stock_count = await _fetch_funko_stock_count(pid, session)
-                    result["stock_count"] = stock_count
+            product = data.get("product")
+            if not product or not product.get("productName"):
+                return None
 
-                return result
-    except asyncio.TimeoutError:
-        logging.error(f"Funko API timeout for PID {pid}")
-        return None
+            badges = product.get("badgesJSON", {}).get("badges", {})
+            images = product.get("images", {})
+            large_imgs = images.get("large", [])
+            image_url = large_imgs[0]["url"] if large_imgs else None
+
+            selected_url = product.get("selectedProductUrl", "")
+            page_path = selected_url.split("?")[0] if selected_url else f"/{pid}.html"
+
+            result = {
+                "pid": pid,
+                "name": product["productName"],
+                "price": product.get("price", {}).get("sales", {}).get("formatted", "N/A"),
+                "available": product.get("available", False),
+                "in_stock_msg": ", ".join(product.get("availability", {}).get("messages", [])),
+                "low_stock": badges.get("isLowStock", False),
+                "image_url": image_url,
+                "page_url": f"https://funko.com{page_path}",
+                "stock_count": None,
+            }
+
+            if result["available"] and SCRAPER_API_KEY:
+                stock_count = await _fetch_funko_stock_count(pid, session)
+                result["stock_count"] = stock_count
+
+            return result
     except Exception as e:
         logging.error(f"Funko API error for PID {pid}: {e}")
         return None
 
 
 async def _fetch_funko_stock_count(pid: str, session: aiohttp.ClientSession) -> int | None:
-    page_url = f"https://www.funko.com/{pid}.html"
-    scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={page_url}&country_code=us&render=true"
     try:
+        from urllib.parse import quote
+        page_url = f"https://www.funko.com/{pid}.html"
+        scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={quote(page_url, safe='')}&country_code=us&render=true"
         timeout = aiohttp.ClientTimeout(total=30)
         async with session.get(scraper_url, timeout=timeout) as resp:
             if resp.status != 200:
                 logging.warning(f"ScraperAPI non-200 for stock PID {pid}: {resp.status}")
                 return None
             html = await resp.text()
-            match = re.search(r'"ats"\s*:\s*(\d+)', html)
-            if match:
-                return int(match.group(1))
-            match = re.search(r'[Aa]vailable\s*[Ss]tock[:\s]*(\d[\d,]*)', html)
-            if match:
-                return int(match.group(1).replace(",", ""))
-            match = re.search(r'"inventoryCount"\s*:\s*(\d+)', html)
-            if match:
-                return int(match.group(1))
-            match = re.search(r'"stockLevel"\s*:\s*(\d+)', html)
-            if match:
-                return int(match.group(1))
+            for pattern in [
+                r'"ats"\s*:\s*(\d+)',
+                r'[Aa]vailable\s*[Ss]tock[:\s]*(\d[\d,]*)',
+                r'"inventoryCount"\s*:\s*(\d+)',
+                r'"stockLevel"\s*:\s*(\d+)',
+            ]:
+                match = re.search(pattern, html)
+                if match:
+                    return int(match.group(1).replace(",", ""))
             logging.info(f"No stock count found in rendered page for PID {pid}")
             return None
     except Exception as e:
@@ -3855,7 +3867,7 @@ async def process_funko_stock(message: Message, pid: str, state: FSMContext):
         except Exception:
             pass
         await message.answer(
-            f"❌ Продукт с PID `{pid}` не найден на funko.com\n(Возможно, сайт блокирует запросы с сервера)",
+            f"❌ Продукт с PID `{pid}` не найден на funko.com\n(Проверьте правильность PID)",
             parse_mode="Markdown",
             reply_markup=get_admin_kb(message.from_user.id)
         )
