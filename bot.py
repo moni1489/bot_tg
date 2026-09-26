@@ -3797,6 +3797,20 @@ async def fetch_funko_product(pid: str) -> dict | None:
             selected_url = product.get("selectedProductUrl", "")
             page_path = selected_url.split("?")[0] if selected_url else f"/{pid}.html"
 
+            ats = None
+            raw_json = json.dumps(data) if data else ""
+            ats_match = re.search(r'"ats"\s*:\s*(\d+)', raw_json)
+            if ats_match:
+                ats = int(ats_match.group(1))
+            if not ats:
+                inv = product.get("inventoryRecord", {})
+                if inv and inv.get("ats"):
+                    ats = int(inv["ats"])
+            if not ats:
+                avail = product.get("availability", {})
+                if avail.get("ats"):
+                    ats = int(avail["ats"])
+
             result = {
                 "pid": pid,
                 "name": product["productName"],
@@ -3806,10 +3820,10 @@ async def fetch_funko_product(pid: str) -> dict | None:
                 "low_stock": badges.get("isLowStock", False),
                 "image_url": image_url,
                 "page_url": f"https://funko.com{page_path}",
-                "stock_count": None,
+                "stock_count": ats,
             }
 
-            if result["available"] and SCRAPER_API_KEY:
+            if not ats and result["available"] and SCRAPER_API_KEY:
                 stock_count = await _fetch_funko_stock_count(pid, session)
                 result["stock_count"] = stock_count
 
@@ -3886,55 +3900,26 @@ async def process_funko_stock(message: Message, pid: str, state: FSMContext):
         )
 
     if product["available"]:
-        if product["low_stock"]:
-            stock_status = "⚠️ Low Stock"
-        else:
-            stock_status = "✅ In Stock"
+        stock_status = "⚠️ Low Stock" if product["low_stock"] else "✅ In Stock"
     else:
         stock_status = "❌ Out of Stock"
 
     stock_count = product.get("stock_count")
-    stock_line = f"<b>Available Stock:</b> {stock_count:,}\n" if stock_count else ""
+    stock_line = f"\n<b>Available Stock:</b> {stock_count:,}" if stock_count else ""
 
     text = (
-        f"<b>{product['name']}</b>\n\n"
-        f"<b>Price:</b> {product['price']}\n"
-        f"<b>PID:</b> <code>{pid}</code>\n"
-        f"{stock_line}"
-        f"<b>Status:</b> {stock_status}\n"
+        f"📦 <b>{product['name']}</b>\n"
+        f"💰 {product['price']}\n"
+        f"{stock_status}{stock_line}\n\n"
+        f"🔗 <a href=\"{product['page_url']}\">funko.com</a> · PID: <code>{pid}</code>"
     )
-
-    if len(history) > 1:
-        text += "\n📊 <b>Stock History:</b>\n"
-        for h in history:
-            ts = h["checked_at"].strftime("%d.%m.%Y %H:%M")
-            if h["available"]:
-                st = "⚠️ Low" if h["low_stock"] else "✅ In Stock"
-            else:
-                st = "❌ Out"
-            text += f"  • {ts} — {st}\n"
-
-    store_btn = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔗 Open Store Page", url=product["page_url"])]
-    ])
 
     try:
         await wait_msg.delete()
     except Exception:
         pass
 
-    if product["image_url"]:
-        try:
-            await message.answer_photo(
-                photo=product["image_url"],
-                caption=text,
-                parse_mode="HTML",
-                reply_markup=store_btn
-            )
-        except Exception:
-            await message.answer(text, parse_mode="HTML", reply_markup=store_btn)
-    else:
-        await message.answer(text, parse_mode="HTML", reply_markup=store_btn)
+    await message.answer(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=get_admin_kb(message.from_user.id))
 
     await state.clear()
 
