@@ -353,7 +353,7 @@ function setupTasks() {
     const contentBtn = document.getElementById('task-content-btn');
     if (contentBtn) {
         contentBtn.addEventListener('click', () => {
-            window.open('https://t.me/FunkoStop', '_blank');
+            window.open('https://t.me/Funko_Stop', '_blank');
         });
     }
 }
