@@ -3910,8 +3910,6 @@ async def notify_content_task_cmd(message: Message):
     if not await is_admin(message.from_user.id):
         return
 
-    TEST_USER_ID = 965816464
-
     caption = (
         "🎬 <b>Новое задание уже в игре!</b>\n\n"
         "Получили заказ от нас? Снимайте видео, выкладывайте в удобную соцсеть "
@@ -3923,17 +3921,34 @@ async def notify_content_task_cmd(message: Message):
     import pathlib
     photo_path = pathlib.Path(__file__).parent / "cards_app" / "images" / "telegram.jpg"
 
-    try:
-        photo = FSInputFile(str(photo_path))
-        await bot.send_photo(
-            chat_id=TEST_USER_ID,
-            photo=photo,
-            caption=caption,
-            parse_mode="HTML"
-        )
-        await message.answer(f"✅ Тестовое уведомление отправлено пользователю {TEST_USER_ID}", reply_markup=get_admin_kb(message.from_user.id))
-    except Exception as e:
-        await message.answer(f"❌ Ошибка отправки: {e}", reply_markup=get_admin_kb(message.from_user.id))
+    async with pool.acquire() as db:
+        users = await db.fetch("SELECT telegram_id FROM card_users")
+
+    total = len(users)
+    await message.answer(f"📤 Начинаю рассылку {total} игрокам...", reply_markup=get_admin_kb(message.from_user.id))
+
+    sent = 0
+    failed = 0
+    photo_file_id = None
+
+    for user in users:
+        tg_id = user["telegram_id"]
+        try:
+            if photo_file_id:
+                msg = await bot.send_photo(chat_id=tg_id, photo=photo_file_id, caption=caption, parse_mode="HTML")
+            else:
+                photo = FSInputFile(str(photo_path))
+                msg = await bot.send_photo(chat_id=tg_id, photo=photo, caption=caption, parse_mode="HTML")
+                photo_file_id = msg.photo[-1].file_id
+            sent += 1
+        except Exception:
+            failed += 1
+        await asyncio.sleep(0.05)
+
+    await message.answer(
+        f"✅ Рассылка завершена!\n\n📨 Отправлено: {sent}\n❌ Не доставлено: {failed}\n📊 Всего: {total}",
+        reply_markup=get_admin_kb(message.from_user.id)
+    )
 
 
 async def main():
