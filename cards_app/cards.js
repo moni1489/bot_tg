@@ -359,39 +359,60 @@ function setupTasks() {
 }
 
 function updateTaskButtons() {
+    const trackableTasks = ['tg_sub', 'order_2000', 'join_chat', 'leave_review', 'content_task'];
+    const completed = userData.completed_tasks || [];
+    const completedCount = trackableTasks.filter(t => completed.includes(t)).length;
+    const totalTasks = trackableTasks.length;
+
+    const progressText = document.getElementById('tasks-progress-text');
+    const progressFill = document.getElementById('tasks-progress-fill');
+    if (progressText) progressText.textContent = `Выполнено: ${completedCount} / ${totalTasks}`;
+    if (progressFill) progressFill.style.width = `${(completedCount / totalTasks) * 100}%`;
+
+    const archiveList = document.getElementById('tasks-archive-list');
+    const archiveSection = document.getElementById('tasks-archive');
+    const tasksContainer = document.getElementById('tasks-container');
+    if (archiveList) archiveList.innerHTML = '';
+
     document.querySelectorAll('.btn-task[data-task]').forEach(btn => {
         const taskId = btn.getAttribute('data-task');
-        if (userData.completed_tasks.includes(taskId)) {
+        if (completed.includes(taskId)) {
             btn.textContent = 'ВЫПОЛНЕНО';
             btn.classList.add('completed');
+            const card = btn.closest('.task-card');
+            if (card && archiveList && tasksContainer) {
+                const clone = card.cloneNode(true);
+                archiveList.appendChild(clone);
+                card.style.display = 'none';
+            }
         }
     });
 
-    if (userData.completed_tasks && userData.completed_tasks.includes('join_chat')) {
-        const joinBtn = document.getElementById('task-join-btn');
-        if (joinBtn) {
-            joinBtn.textContent = 'ВЫПОЛНЕНО';
-            joinBtn.classList.add('completed');
+    const specialBtns = [
+        { id: 'task-join-btn', task: 'join_chat' },
+        { id: 'task-review-btn', task: 'leave_review' },
+        { id: 'task-content-btn', task: 'content_task' }
+    ];
+    specialBtns.forEach(({ id, task }) => {
+        if (completed.includes(task)) {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.textContent = 'ВЫПОЛНЕНО';
+                btn.classList.add('completed');
+                const card = btn.closest('.task-card');
+                if (card && card.style.display !== 'none' && archiveList) {
+                    const clone = card.cloneNode(true);
+                    archiveList.appendChild(clone);
+                    card.style.display = 'none';
+                }
+            }
         }
+    });
+
+    if (archiveSection) {
+        archiveSection.classList.toggle('hidden', archiveList.children.length === 0);
     }
 
-    if (userData.completed_tasks && userData.completed_tasks.includes('leave_review')) {
-        const reviewBtn = document.getElementById('task-review-btn');
-        if (reviewBtn) {
-            reviewBtn.textContent = 'ВЫПОЛНЕНО';
-            reviewBtn.classList.add('completed');
-        }
-    }
-
-    if (userData.completed_tasks && userData.completed_tasks.includes('content_task')) {
-        const contentBtn = document.getElementById('task-content-btn');
-        if (contentBtn) {
-            contentBtn.textContent = 'ВЫПОЛНЕНО';
-            contentBtn.classList.add('completed');
-        }
-    }
-
-    // Update referral counter tag
     const refCountTag = document.getElementById('ref-count-tag');
     if (refCountTag) {
         refCountTag.textContent = `Приглашено друзей: ${userData.ref_count || 0}`;

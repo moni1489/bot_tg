@@ -14,9 +14,10 @@ from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F, Router, BaseMiddleware
 from aiogram.types import (
-    Message, CallbackQuery, ReplyKeyboardMarkup, 
+    Message, CallbackQuery, ReplyKeyboardMarkup,
     KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton,
-    ReplyKeyboardRemove, WebAppInfo, MenuButtonWebApp, MenuButtonDefault
+    ReplyKeyboardRemove, WebAppInfo, MenuButtonWebApp, MenuButtonDefault,
+    FSInputFile
 )
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -3900,6 +3901,39 @@ async def funkostock_process_pid(message: Message, state: FSMContext):
         return
     if message.text:
         await process_funko_stock(message, message.text.strip(), state)
+
+
+# --- NOTIFY: Content Task Announcement ---
+
+@router.message(Command("notify_content"))
+async def notify_content_task_cmd(message: Message):
+    if not await is_admin(message.from_user.id):
+        return
+
+    TEST_USER_ID = 965816464
+
+    caption = (
+        "🎬 <b>Новое задание уже в игре!</b>\n\n"
+        "Получили заказ от нас? Снимайте видео, выкладывайте в удобную соцсеть "
+        "и отмечайте наш <a href='https://t.me/FunkoStop'>канал</a> или <a href='http://funkostop.org/'>сайт</a>.\n\n"
+        "После этого пишите <a href='https://t.me/Funko_Stop'>нам</a> — "
+        "за качественный ролик выдаем <b>7 паков</b>📦"
+    )
+
+    import pathlib
+    photo_path = pathlib.Path(__file__).parent / "cards_app" / "images" / "telegram.jpg"
+
+    try:
+        photo = FSInputFile(str(photo_path))
+        await bot.send_photo(
+            chat_id=TEST_USER_ID,
+            photo=photo,
+            caption=caption,
+            parse_mode="HTML"
+        )
+        await message.answer(f"✅ Тестовое уведомление отправлено пользователю {TEST_USER_ID}", reply_markup=get_admin_kb(message.from_user.id))
+    except Exception as e:
+        await message.answer(f"❌ Ошибка отправки: {e}", reply_markup=get_admin_kb(message.from_user.id))
 
 
 async def main():

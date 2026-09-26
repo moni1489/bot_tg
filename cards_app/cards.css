@@ -1574,6 +1574,72 @@ body {
     /* Stop shine on completed cards */
 }
 
+/* Tasks Progress Bar */
+.tasks-progress {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: linear-gradient(145deg, rgba(30, 0, 5, 0.85) 0%, rgba(5, 0, 0, 0.95) 100%);
+    border: 1px solid rgba(255, 0, 34, 0.3);
+    border-radius: 12px;
+}
+
+.tasks-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#tasks-progress-text {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.tasks-progress-bar {
+    width: 100%;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.tasks-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon-red), #ff4466, #00ff88);
+    border-radius: 5px;
+    transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+}
+
+/* Tasks Archive */
+.tasks-archive {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tasks-archive-header h3 {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 14px;
+}
+
+.tasks-archive .task-card {
+    opacity: 0.5;
+    border-color: rgba(0, 255, 136, 0.2);
+}
+
+.tasks-archive .task-card::after {
+    display: none;
+}
+
+.tasks-archive .task-card:hover {
+    transform: none;
+    opacity: 0.6;
+}
+
 .ref-link-row {
     display: flex;
     gap: 8px;

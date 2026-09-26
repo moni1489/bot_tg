@@ -208,6 +208,16 @@
                 <h2>ЗАДАНИЯ И НАГРАДЫ</h2>
                 <p class="section-desc">Выполняйте задания и получайте дополнительные паки за каждое.</p>
 
+                <!-- Progress Bar -->
+                <div class="tasks-progress">
+                    <div class="tasks-progress-header">
+                        <span id="tasks-progress-text">Выполнено: 0 / 5</span>
+                    </div>
+                    <div class="tasks-progress-bar">
+                        <div class="tasks-progress-fill" id="tasks-progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+
                 <div class="tasks-list" id="tasks-container">
 
                     <!-- Task 1: Telegram -->
@@ -271,6 +281,14 @@
                         <button class="btn-task" id="task-content-btn">Написать нам →</button>
                     </div>
 
+                </div>
+
+                <!-- Completed Tasks Archive -->
+                <div id="tasks-archive" class="tasks-archive hidden">
+                    <div class="tasks-archive-header">
+                        <h3>📁 Выполненные задания</h3>
+                    </div>
+                    <div class="tasks-list" id="tasks-archive-list"></div>
                 </div>
             </div>
         </main>
