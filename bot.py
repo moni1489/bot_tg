@@ -328,6 +328,13 @@ async def claim_task_reward(request):
                     "message": "Отзывы проверяются администратором вручную, награда начисляется после проверки!"
                 })
 
+            # Content task (unboxing video) — manual verification by admin
+            elif task_id == 'content_task':
+                return web.json_response({
+                    "success": False, 
+                    "message": "🎬 Спасибо! Напишите нам в @FunkoStop со ссылкой на ваше видео. Администратор проверит и начислит паки вручную!"
+                })
+
             completed.append(task_id)
             if task_id == 'order_2000':
                 reward_count = 3
@@ -348,6 +355,7 @@ async def claim_task_reward(request):
                 'tg_sub': '«Подписаться на канал»',
                 'join_chat': '«Вступить в беседу FunkoStop»',
                 'order_2000': '«Оформить заказ от 2000 рублей»',
+                'content_task': '«Снимай. Выкладывай. Получай паки!»',
             }
             title = task_titles.get(task_id, '«Задание»')
             try:

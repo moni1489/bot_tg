@@ -348,6 +348,14 @@ function setupTasks() {
             window.open('https://t.me/FunkoStopReviews', '_blank');
         });
     }
+
+    // Content task (unboxing video) — just opens chat, reward given manually by admin
+    const contentBtn = document.getElementById('task-content-btn');
+    if (contentBtn) {
+        contentBtn.addEventListener('click', () => {
+            window.open('https://t.me/FunkoStop', '_blank');
+        });
+    }
 }
 
 function updateTaskButtons() {
@@ -372,6 +380,14 @@ function updateTaskButtons() {
         if (reviewBtn) {
             reviewBtn.textContent = 'ВЫПОЛНЕНО';
             reviewBtn.classList.add('completed');
+        }
+    }
+
+    if (userData.completed_tasks && userData.completed_tasks.includes('content_task')) {
+        const contentBtn = document.getElementById('task-content-btn');
+        if (contentBtn) {
+            contentBtn.textContent = 'ВЫПОЛНЕНО';
+            contentBtn.classList.add('completed');
         }
     }
 
