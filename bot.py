@@ -32,7 +32,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 ADMIN_IDS = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-SCRAPER_API_KEY = os.getenv("SCRAPER_API_KEY")
+SCRAPER_API_KEY = (os.getenv("SCRAPER_API_KEY") or "").strip().strip('"').strip("'")
 
 if not BOT_TOKEN:
     raise ValueError("Не найден BOT_TOKEN в файле .env")
@@ -3242,6 +3242,23 @@ async def check_archive_password(message: Message, state: FSMContext):
             
     await state.clear()
 
+def scraper_error_text(status: int) -> str:
+    """Человекочитаемая причина отказа ScraperAPI вместо голого кода."""
+    if status == 401:
+        return ("❌ Парсер не отвечает: ключ ScraperAPI недействителен или истёк.\n"
+                "Админу: проверьте SCRAPER_API_KEY в .env на dashboard.scraperapi.com.")
+    if status == 403:
+        return ("❌ Парсер не отвечает: на аккаунте ScraperAPI закончились кредиты.\n"
+                "Админу: пополните план на dashboard.scraperapi.com.")
+    if status == 429:
+        return "❌ Парсер перегружен (лимит одновременных запросов). Попробуйте через минуту."
+    if status in (404, 410):
+        return "❌ Страница товара не найдена — возможно, лот уже снят с продажи."
+    if status >= 500:
+        return "❌ Сайт не отдал страницу парсеру. Попробуйте ещё раз через минуту."
+    return f"❌ Ошибка парсера: {status}"
+
+
 @router.message(F.text == "🧮 Калькулятор стоимости", StateFilter("*"))
 async def calculator_prompt(message: Message, state: FSMContext):
     await state.clear()
@@ -3313,19 +3330,26 @@ async def handle_link(message: Message, state: FSMContext):
         
     page_html = ""
     try:
+        # Целевую ссылку обязательно кодируем: иначе её "&" обрывают параметр url
+        from urllib.parse import quote
+        target = quote(url, safe='')
         # Fast mode without render=true is 10x faster and prevents 500 error timeouts
-        scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url}&country_code=us"
+        scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target}&country_code=us"
         timeout = aiohttp.ClientTimeout(total=25)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(scraper_url) as resp:
                 if resp.status == 200:
                     page_html = await resp.text()
                 else:
+                    first_status, first_body = resp.status, (await resp.text())[:300]
+                    logging.warning(f"ScraperAPI fast mode {first_status} for {url}: {first_body}")
                     # Fallback to render=true if basic fetch failed
-                    scraper_url_render = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={url}&country_code=us&render=true"
+                    scraper_url_render = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target}&country_code=us&render=true"
                     async with session.get(scraper_url_render, timeout=aiohttp.ClientTimeout(total=35)) as resp_render:
                         if resp_render.status != 200:
-                            await message.answer(f"❌ Ошибка парсера: {resp_render.status}")
+                            body = (await resp_render.text())[:300]
+                            logging.error(f"ScraperAPI render mode {resp_render.status} for {url}: {body}")
+                            await message.answer(scraper_error_text(resp_render.status))
                             return
                         page_html = await resp_render.text()
     except asyncio.TimeoutError:

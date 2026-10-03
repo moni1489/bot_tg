@@ -3,6 +3,7 @@ import re
 import asyncio
 import logging
 import httpx
+from urllib.parse import quote
 from funko_deal_bot.ebay import EbayClient, parse_item_page_html
 from funko_deal_bot.check import parse_check_item_id
 
@@ -25,7 +26,7 @@ async def fetch_and_parse_ebay(url: str, scraper_api_key: str | None = None) -> 
     if not item_id:
         return None
 
-    api_key = scraper_api_key or os.getenv("SCRAPER_API_KEY", "").strip()
+    api_key = (scraper_api_key or os.getenv("SCRAPER_API_KEY", "")).strip()
 
     # Step 1: Try FunkoDealBot EbayClient (direct and/or configured proxy)
     configured_proxy = os.getenv("PROXY_URL", "").strip()
@@ -72,9 +73,16 @@ async def fetch_and_parse_ebay(url: str, scraper_api_key: str | None = None) -> 
     if api_key:
         try:
             target_url = f"https://www.ebay.com/itm/{item_id}?_stpos=19801"
-            scraper_url = f"http://api.scraperapi.com?api_key={api_key}&url={target_url}&country_code=us"
+            # url обязан быть percent-encoded, иначе ScraperAPI обрежет его по "&"
+            scraper_url = (f"http://api.scraperapi.com?api_key={api_key}"
+                           f"&url={quote(target_url, safe='')}&country_code=us")
             async with httpx.AsyncClient(timeout=25.0) as http_client:
                 resp = await http_client.get(scraper_url)
+                if resp.status_code != 200:
+                    log.error(
+                        "ScraperAPI returned %s for item %s: %s",
+                        resp.status_code, item_id, resp.text[:300]
+                    )
                 if resp.status_code == 200 and resp.text:
                     listing = parse_item_page_html(
                         resp.text,
