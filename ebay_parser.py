@@ -9,6 +9,16 @@ from funko_deal_bot.check import parse_check_item_id
 
 log = logging.getLogger(__name__)
 
+
+def scraper_url(api_key: str, target_url: str, render: bool = False) -> str:
+    """Запрос через Scrape.do (токен лежит в SCRAPER_API_KEY).
+
+    target_url обязан быть percent-encoded, иначе его "&" оборвут параметр url.
+    """
+    url = f"https://api.scrape.do/?token={api_key}&url={quote(target_url, safe='')}&geoCode=us"
+    return url + "&render=true" if render else url
+
+
 def _get_ebay_client(proxy_url: str = "") -> EbayClient:
     return EbayClient(
         site="https://www.ebay.com",
@@ -69,18 +79,15 @@ async def fetch_and_parse_ebay(url: str, scraper_api_key: str | None = None) -> 
                 except Exception:
                     pass
 
-    # Step 2: Fallback to ScraperAPI + FunkoDealBot parse_item_page_html
+    # Step 2: Fallback to Scrape.do + FunkoDealBot parse_item_page_html
     if api_key:
         try:
             target_url = f"https://www.ebay.com/itm/{item_id}?_stpos=19801"
-            # url обязан быть percent-encoded, иначе ScraperAPI обрежет его по "&"
-            scraper_url = (f"http://api.scraperapi.com?api_key={api_key}"
-                           f"&url={quote(target_url, safe='')}&country_code=us")
             async with httpx.AsyncClient(timeout=25.0) as http_client:
-                resp = await http_client.get(scraper_url)
+                resp = await http_client.get(scraper_url(api_key, target_url))
                 if resp.status_code != 200:
                     log.error(
-                        "ScraperAPI returned %s for item %s: %s",
+                        "Scrape.do returned %s for item %s: %s",
                         resp.status_code, item_id, resp.text[:300]
                     )
                 if resp.status_code == 200 and resp.text:
@@ -103,6 +110,6 @@ async def fetch_and_parse_ebay(url: str, scraper_api_key: str | None = None) -> 
                             "currency": listing.currency or "USD",
                         }
         except Exception as e:
-            log.warning(f"ScraperAPI + parse_item_page_html failed for {item_id}: {e}")
+            log.warning(f"Scrape.do + parse_item_page_html failed for {item_id}: {e}")
 
     return None

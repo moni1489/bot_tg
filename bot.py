@@ -24,7 +24,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import aiohttp
 from aiohttp import web
-from ebay_parser import fetch_and_parse_ebay
+from ebay_parser import fetch_and_parse_ebay, scraper_url
 
 load_dotenv()
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bot-tg-uyoe.onrender.com/cards")
@@ -3243,13 +3243,10 @@ async def check_archive_password(message: Message, state: FSMContext):
     await state.clear()
 
 def scraper_error_text(status: int) -> str:
-    """Человекочитаемая причина отказа ScraperAPI вместо голого кода."""
+    """Человекочитаемая причина отказа Scrape.do вместо голого кода."""
     if status == 401:
-        return ("❌ Парсер не отвечает: ключ ScraperAPI недействителен или истёк.\n"
-                "Админу: проверьте SCRAPER_API_KEY в .env на dashboard.scraperapi.com.")
-    if status == 403:
-        return ("❌ Парсер не отвечает: на аккаунте ScraperAPI закончились кредиты.\n"
-                "Админу: пополните план на dashboard.scraperapi.com.")
+        return ("❌ Парсер не отвечает: токен Scrape.do недействителен или закончились кредиты.\n"
+                "Админу: проверьте SCRAPER_API_KEY и баланс на dashboard.scrape.do.")
     if status == 429:
         return "❌ Парсер перегружен (лимит одновременных запросов). Попробуйте через минуту."
     if status in (404, 410):
@@ -3262,21 +3259,32 @@ def scraper_error_text(status: int) -> str:
 @router.message(F.text == "🧮 Калькулятор стоимости", StateFilter("*"))
 async def calculator_prompt(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer("🔗 Просто пришлите мне ссылку на товар с сайта **eBay**, и я автоматически рассчитаю его итоговую стоимость с учетом доставки в РФ!", parse_mode="Markdown")
+    await message.answer("🔗 Просто пришлите мне ссылку на товар с сайта **eBay** или **Funko**, и я автоматически рассчитаю его итоговую стоимость с учетом доставки в РФ!", parse_mode="Markdown")
 
 # --- LINK PARSER ---
-@router.message(F.text.regexp(r'https?://'))
+# Калькулятор отвечает только на ссылки eBay и Funko, остальные игнорирует.
+# (?![\w.-]) не даёт пройти доменам вроде ebay.com.evil.ru или ebay.community
+CALC_LINK_RE = re.compile(
+    r'https?://(?:[\w-]+\.)*(?:ebay\.com|ebay\.io|funko\.com)(?![\w.-])\S*',
+    re.IGNORECASE,
+)
+
+
+def extract_calc_link(text: str | None) -> str | None:
+    m = CALC_LINK_RE.search(text or "")
+    return m.group(0).rstrip('.,;:!?)»"\'') if m else None
+
+
+@router.message(lambda message: extract_calc_link(message.text) is not None)
 async def handle_link(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state is not None:
         return
 
-    url = message.text.strip()
-    if not url.startswith("http"):
-        return
+    url = extract_calc_link(message.text)
 
-    # 1. Expand shortlinks (like ebay.io, bit.ly, etc.)
-    if "ebay.io" in url or "t.co" in url or "bit.ly" in url or "tinyurl" in url:
+    # 1. Expand eBay shortlinks
+    if "ebay.io" in url:
         try:
             async with aiohttp.ClientSession() as s:
                 async with s.get(url, headers={'User-Agent': 'Mozilla/5.0'}, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=8)) as r:
@@ -3295,7 +3303,7 @@ async def handle_link(message: Message, state: FSMContext):
     await message.answer("🔍 Секунду, рассчитываю стоимость товара и доставки в США...")
 
     # 1. Dedicated high-precision eBay parser (ZIP 19801 Delaware delivery + $2.00 surcharge)
-    if "ebay.com" in url or "ebay." in url or re.search(r'\d{9,15}', url):
+    if "ebay." in url:
         try:
             ebay_res = await fetch_and_parse_ebay(url, scraper_api_key=SCRAPER_API_KEY)
             if ebay_res and ebay_res.get("price") is not None:
@@ -3330,25 +3338,21 @@ async def handle_link(message: Message, state: FSMContext):
         
     page_html = ""
     try:
-        # Целевую ссылку обязательно кодируем: иначе её "&" обрывают параметр url
-        from urllib.parse import quote
-        target = quote(url, safe='')
         # Fast mode without render=true is 10x faster and prevents 500 error timeouts
-        scraper_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target}&country_code=us"
         timeout = aiohttp.ClientTimeout(total=25)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(scraper_url) as resp:
+            async with session.get(scraper_url(SCRAPER_API_KEY, url)) as resp:
                 if resp.status == 200:
                     page_html = await resp.text()
                 else:
                     first_status, first_body = resp.status, (await resp.text())[:300]
-                    logging.warning(f"ScraperAPI fast mode {first_status} for {url}: {first_body}")
+                    logging.warning(f"Scrape.do fast mode {first_status} for {url}: {first_body}")
                     # Fallback to render=true if basic fetch failed
-                    scraper_url_render = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target}&country_code=us&render=true"
-                    async with session.get(scraper_url_render, timeout=aiohttp.ClientTimeout(total=35)) as resp_render:
+                    render_url = scraper_url(SCRAPER_API_KEY, url, render=True)
+                    async with session.get(render_url, timeout=aiohttp.ClientTimeout(total=35)) as resp_render:
                         if resp_render.status != 200:
                             body = (await resp_render.text())[:300]
-                            logging.error(f"ScraperAPI render mode {resp_render.status} for {url}: {body}")
+                            logging.error(f"Scrape.do render mode {resp_render.status} for {url}: {body}")
                             await message.answer(scraper_error_text(resp_render.status))
                             return
                         page_html = await resp_render.text()
@@ -3839,15 +3843,12 @@ async def _fetch_funko_availability(pid: str, session: aiohttp.ClientSession) ->
 
     if not data and SCRAPER_API_KEY:
         try:
-            from urllib.parse import quote
-            scraper_url = (f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}"
-                           f"&url={quote(api_url, safe='')}&country_code=us")
             timeout = aiohttp.ClientTimeout(total=20)
-            async with session.get(scraper_url, timeout=timeout) as resp:
+            async with session.get(scraper_url(SCRAPER_API_KEY, api_url), timeout=timeout) as resp:
                 if resp.status == 200:
                     data = await resp.json(content_type=None)
         except Exception as e:
-            logging.warning(f"Funko availability via ScraperAPI failed for PID {pid}: {e}")
+            logging.warning(f"Funko availability via Scrape.do failed for PID {pid}: {e}")
 
     if not data:
         return None
