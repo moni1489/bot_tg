@@ -318,8 +318,18 @@ async def claim_task_reward(request):
                 except Exception as chat_err:
                     logging.warning(f"Chat check warning: {chat_err}")
                     return web.json_response({
-                        "success": False, 
+                        "success": False,
                         "message": "❌ Не удалось проверить участие в беседе. Вступите в @FunkoStopChat и попробуйте снова."
+                    })
+
+                # Пак только за пройденную капчу: пока висит запись в group_captcha, эмодзи 🛑 не отправлен
+                captcha_pending = await db.fetchval(
+                    "SELECT 1 FROM group_captcha WHERE user_id = $1", tg_id
+                )
+                if captcha_pending:
+                    return web.json_response({
+                        "success": False,
+                        "message": "Отправьте в беседе эмодзи 🛑 — пак начислится автоматически!"
                     })
 
             # Review task — manual verification by admin
