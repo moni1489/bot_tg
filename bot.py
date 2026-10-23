@@ -1900,6 +1900,7 @@ async def process_check_code(message: Message, state: FSMContext):
     try:
         async with pool.acquire() as db:
             record = await db.fetchrow("SELECT telegram_id, series_slug, created_at FROM series_codes WHERE code = $1", code)
+            usage = (await site_promo_usage(db, [code])).get(code) if record else None
             
         if record:
             tg_id = record['telegram_id']
@@ -1912,7 +1913,8 @@ async def process_check_code(message: Message, state: FSMContext):
                 f"✅ **Код действителен!**\n\n"
                 f"👤 Игрок: [ID: {tg_id}](tg://user?id={tg_id})\n"
                 f"🎁 Серия: **{series}**\n"
-                f"📅 Сгенерирован: {date}",
+                f"📅 Сгенерирован: {date}\n"
+                f"{site_promo_line(record['series_slug'], usage)}",
                 parse_mode="Markdown",
                 reply_markup=get_game_admin_kb(message.from_user.id)
             )
@@ -2484,6 +2486,49 @@ async def give_duplicates_process(message: Message, state: FSMContext):
         )
     await state.clear()
 
+# --- SITE PROMO STATUS ---
+# funkostop.org accepts the money prizes (300/500/1000 ₽) at checkout and records them in promo_redemptions
+# (same database). The bot only reads that table; it appears once the site has started with the promo feature.
+SITE_PROMO_RE = re.compile(r"^\s*Приз:\s*Скидка\s*(300|500|1000)\s*₽", re.I)
+SITE_URL = "funkostop.org"
+
+
+def site_accepts_prize(series_slug: str) -> bool:
+    return bool(SITE_PROMO_RE.match(series_slug or ""))
+
+
+async def site_promo_usage(db, codes):
+    """{code: (used, order_id)} for codes the site has taken; empty when the site table does not exist yet."""
+    try:
+        rows = await db.fetch("SELECT code, used, order_id FROM promo_redemptions WHERE code = ANY($1::text[])",
+                              [c.upper() for c in codes])
+    except asyncpg.UndefinedTableError:
+        return {}
+    except Exception as e:
+        logging.error(f"site promo status read failed: {e}")
+        return {}
+    return {r["code"]: (r["used"], r["order_id"]) for r in rows}
+
+
+def site_promo_line(series_slug, usage):
+    """One line for admins: whether the site will take this code and what happened to it there."""
+    if not site_accepts_prize(series_slug):
+        return "🌐 На сайте: не принимается (только скидки 300/500/1000 ₽)"
+    if not usage:
+        return "🌐 На сайте: ✅ не использован"
+    used, order_id = usage
+    order = f" (заказ #{order_id})" if order_id else ""
+    return f"🌐 На сайте: ❌ использован{order}" if used else f"🌐 На сайте: ⏳ применён к заказу{order}, ждёт оплаты"
+
+
+def prize_player_hint(c_name: str) -> str:
+    """What the player should do with the code: money discounts go straight into the site's checkout."""
+    if site_accepts_prize(f"Приз: {c_name}"):
+        return (f"Введите промокод при оформлении заказа на {SITE_URL} в поле «Промокод» — скидка применится сразу. "
+                f"Код одноразовый.")
+    return "Сделайте скриншот и отправьте его менеджеру @Funko_Stop."
+
+
 # --- ADMIN: ALL CODES ---
 @router.message(F.text.contains("Все промокоды"), StateFilter("*"))
 async def all_codes(message: Message, state: FSMContext):
@@ -2503,9 +2548,13 @@ async def all_codes(message: Message, state: FSMContext):
         return
         
     import html as html_mod
-    
+
+    async with pool.acquire() as db:
+        usage = await site_promo_usage(db, [r['code'] for r in codes])
+
     chunks = []
-    current_chunk = f"🏷 <b>Все промокоды</b> ({len(codes)} шт):\n\n"
+    current_chunk = (f"🏷 <b>Все промокоды</b> ({len(codes)} шт):\n"
+                     f"🌐 на сайте: ✅ можно использовать · ⏳ ждёт оплаты · ❌ использован\n\n")
     
     for row in codes:
         parts = []
@@ -2518,7 +2567,11 @@ async def all_codes(message: Message, state: FSMContext):
         name = " ".join(parts) + f" [{id_link}]" if parts else id_link
         
         date = row['created_at'].strftime('%d.%m %H:%M')
-        line = f"<code>{html_mod.escape(row['code'])}</code> — <b>{html_mod.escape(row['series_slug'].upper())}</b> — {name} ({date})\n"
+        mark = ""
+        if site_accepts_prize(row['series_slug']):
+            u = usage.get((row['code'] or '').upper())
+            mark = "🌐✅ " if not u else ("🌐❌ " if u[0] else "🌐⏳ ")
+        line = f"{mark}<code>{html_mod.escape(row['code'])}</code> — <b>{html_mod.escape(row['series_slug'].upper())}</b> — {name} ({date})\n"
         
         if len(current_chunk) + len(line) > 3800:
             chunks.append(current_chunk)
@@ -3607,7 +3660,7 @@ async def process_give_prize(callback: CallbackQuery):
         )
     
     try:
-        await bot.send_message(target_id, f"🎁 Поздравляем! Ваша бонусная карта обменена на приз!\nВы выиграли: **{c_name}**\n\nВаш промокод: `{promo_code}`\n\nСделайте скриншот и покажите его администратору или в магазине.", parse_mode="Markdown")
+        await bot.send_message(target_id, f"🎁 Поздравляем! Ваша бонусная карта обменена на приз!\nВы выиграли: **{c_name}**\n\nВаш промокод: `{promo_code}`\n\n{prize_player_hint(c_name)}", parse_mode="Markdown")
         await callback.message.edit_text(f"✅ Карта '{c_name}' успешно сожжена.\nПромокод `{promo_code}` отправлен пользователю {target_id}.", parse_mode="Markdown")
     except Exception as e:
         await callback.message.edit_text(f"⚠️ Карта списана, но не удалось отправить сообщение пользователю. Промокод: `{promo_code}`. Ошибка: {e}", parse_mode="Markdown")
@@ -3664,7 +3717,7 @@ async def claim_prize_api(request):
                 f"🎁 Поздравляем! Вы активировали бонусную карту!\n"
                 f"Вы выиграли: **{c_name}**\n\n"
                 f"Ваш промокод: `{promo_code}`\n\n"
-                f"Сделайте скриншот и отправьте его менеджеру @Funko_Stop.",
+                f"{prize_player_hint(c_name)}",
                 parse_mode="Markdown"
             )
         except Exception:
