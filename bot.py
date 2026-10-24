@@ -1340,13 +1340,45 @@ async def check_client(client_id: int) -> bool:
         row = await db.fetchrow("SELECT id FROM clients WHERE id = $1", client_id)
         return row is not None
 
+ORDER_PACKS_MIN_TOTAL = 2000  # same rule as on funkostop.org: an order from 2000 ₽ gives 3 game packs
+ORDER_PACKS = 3
+
+
+async def give_order_packs(order_id: int):
+    """Once per order (orders.packs_given): +3 packs to the client's game account and a message about it."""
+    try:
+        async with pool.acquire() as db:
+            row = await db.fetchrow(
+                "SELECT o.total_price, COALESCE(o.packs_given, 0) AS packs_given, c.user_tg_id "
+                "FROM orders o JOIN clients c ON c.id = o.client_id WHERE o.id = $1", order_id)
+            if not row or row["packs_given"] or not row["user_tg_id"] or (row["total_price"] or 0) < ORDER_PACKS_MIN_TOTAL:
+                return
+            claimed = await db.fetchval(
+                "UPDATE orders SET packs_given = $1 WHERE id = $2 AND COALESCE(packs_given, 0) = 0 RETURNING id",
+                ORDER_PACKS, order_id)
+            if not claimed:
+                return
+            await db.execute(
+                "INSERT INTO card_users (telegram_id, packs_count) VALUES ($1, $2) "
+                "ON CONFLICT (telegram_id) DO UPDATE SET packs_count = card_users.packs_count + $2",
+                row["user_tg_id"], ORDER_PACKS)
+        try:
+            await bot.send_message(row["user_tg_id"], f"🎁 За заказ #{order_id} вам начислено {ORDER_PACKS} пака в игре! Откройте их в коллекции карточек.")
+        except Exception as e:
+            logging.error(f"order packs message for #{order_id} failed: {e}")
+    except Exception as e:
+        logging.error(f"order packs for #{order_id} failed: {e}")
+
+
 async def create_order(client_id: int, items: str, total_price: int, paid_amount: int, photo_id: str) -> int:
     async with pool.acquire() as db:
         order_date = datetime.now().strftime("%d.%m.%Y")
-        return await db.fetchval(
+        order_id = await db.fetchval(
             "INSERT INTO orders (client_id, items, total_price, paid_amount, status, photo_id, archived, order_date) VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7) RETURNING id",
             client_id, items, total_price, paid_amount, "Заказ принят в обработку", photo_id, order_date
         )
+    await give_order_packs(order_id)
+    return order_id
 
 async def get_all_orders():
     async with pool.acquire() as db:
