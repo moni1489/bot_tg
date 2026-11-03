@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+import time
+import uuid
 import random
 import string
 import asyncpg
@@ -13,6 +15,8 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F, Router, BaseMiddleware
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
 from aiogram.types import (
     Message, CallbackQuery, ReplyKeyboardMarkup,
     KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton,
@@ -39,7 +43,9 @@ if not BOT_TOKEN:
 if not DATABASE_URL:
     raise ValueError("Не найден DATABASE_URL в файле .env (нужна ссылка на PostgreSQL)")
 
-bot = Bot(token=BOT_TOKEN)
+# On a server in Russia Telegram is reached through a relay abroad; without the setting the bot talks to Telegram directly
+TELEGRAM_API_BASE = os.getenv("TELEGRAM_API_BASE", "").strip().rstrip("/")
+bot = Bot(token=BOT_TOKEN, session=AiohttpSession(api=TelegramAPIServer.from_base(TELEGRAM_API_BASE)) if TELEGRAM_API_BASE else None)
 dp = Dispatcher()
 router = Router()
 dp.include_router(router)
@@ -3338,6 +3344,39 @@ def extract_calc_link(text: str | None) -> str | None:
     return m.group(0).rstrip('.,;:!?)»"\'') if m else None
 
 
+
+GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "").strip()
+GIGACHAT_TOKEN = {"value": "", "expires": 0.0}
+
+
+async def gigachat_json(system, user):
+    """Groq does not answer a server in Russia, GigaChat does. The parsed JSON object, or None."""
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=45)) as s:
+            if not GIGACHAT_TOKEN["value"] or time.time() > GIGACHAT_TOKEN["expires"] - 60:
+                async with s.post("https://ngw.devices.sberbank.ru:9443/api/v2/oauth", data={"scope": "GIGACHAT_API_PERS"},
+                                  headers={"Authorization": f"Basic {GIGACHAT_AUTH_KEY}", "RqUID": str(uuid.uuid4()), "Accept": "application/json"}) as r:
+                    d = await r.json()
+                GIGACHAT_TOKEN.update(value=d["access_token"], expires=d["expires_at"] / 1000)
+            for model in ("GigaChat-2-Pro", "GigaChat-2"):
+                payload = {"model": model, "temperature": 0.1, "max_tokens": 400,
+                           "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+                async with s.post("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", json=payload,
+                                  headers={"Authorization": f"Bearer {GIGACHAT_TOKEN['value']}"}) as r:
+                    d = await r.json()
+                    if r.status != 200:
+                        logging.warning(f"GigaChat {model} error {r.status}: {str(d)[:200]}")
+                        continue
+                found = re.search(r"\{.*\}", d["choices"][0]["message"]["content"], re.S)
+                if found:
+                    obj = json.loads(found.group(0))
+                    if isinstance(obj, dict):
+                        return {str(k).strip(): v for k, v in obj.items()}
+    except Exception as e:
+        logging.warning(f"GigaChat failed: {e}")
+    return None
+
+
 @router.message(lambda message: extract_calc_link(message.text) is not None)
 async def handle_link(message: Message, state: FSMContext):
     current_state = await state.get_state()
@@ -3451,6 +3490,8 @@ async def handle_link(message: Message, state: FSMContext):
     last_err = ""
     
     groq_api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if GIGACHAT_AUTH_KEY:
+        result = await gigachat_json(prompt, text_content[:5000])
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -3460,7 +3501,7 @@ async def handle_link(message: Message, state: FSMContext):
                 "HTTP-Referer": "https://t.me/Funko_Stop",
                 "X-Title": "FunkoBot"
             }
-            for model_name in models_to_try:
+            for model_name in ([] if result else models_to_try):
                 try:
                     payload = {
                         "model": model_name,
