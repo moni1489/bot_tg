@@ -3,6 +3,9 @@ import logging
 import os
 import time
 import uuid
+import hmac
+import hashlib
+from urllib.parse import parse_qsl
 import random
 import string
 import asyncpg
@@ -148,6 +151,48 @@ def safe_int(val, default=0):
         return int(s)
     except Exception:
         return default
+
+CARDS_INIT_MAX_AGE = 7 * 86400
+
+
+def telegram_user_from_init_data(init_data, bot_token, now=None):
+    """The user id from the mini app's initData when Telegram's signature matches, else None.
+    Without this check anyone could open the game in a browser with somebody else's id and take their packs and prizes."""
+    if not init_data or not bot_token:
+        return None
+    fields = dict(parse_qsl(init_data, keep_blank_values=True))
+    received = fields.pop("hash", "")
+    check = "\n".join(f"{k}={v}" for k, v in sorted(fields.items()))
+    secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    if not received or not hmac.compare_digest(hmac.new(secret, check.encode(), hashlib.sha256).hexdigest(), received):
+        return None
+    if (now or time.time()) - safe_int(fields.get("auth_date")) > CARDS_INIT_MAX_AGE:
+        return None
+    try:
+        return int(json.loads(fields.get("user", "{}")).get("id"))
+    except (TypeError, ValueError):
+        return None
+
+
+@web.middleware
+async def cards_auth_middleware(request, handler):
+    """Every game request must come from the Telegram user it names."""
+    if request.path.startswith("/api/cards/"):
+        user_id = telegram_user_from_init_data(request.headers.get("X-Telegram-Init-Data", ""), BOT_TOKEN)
+        if not user_id:
+            return web.json_response({"error": "Откройте игру через бота в Telegram"}, status=401)
+        claimed = [request.query.get("tg_id"), request.query.get("telegram_id")]
+        if request.can_read_body:
+            try:
+                body = await request.json()
+                if isinstance(body, dict):
+                    claimed += [body.get("tg_id"), body.get("telegram_id")]
+            except Exception:
+                pass
+        if any(c not in (None, "") and safe_int(c) != user_id for c in claimed):
+            return web.json_response({"error": "Нельзя играть за другого пользователя"}, status=403)
+    return await handler(request)
+
 
 async def get_card_profile(request):
     try:
@@ -937,7 +982,7 @@ async def start_webserver():
         except Exception as e:
             logging.error(f"Frame slicing error: {e}")
 
-    app = web.Application()
+    app = web.Application(middlewares=[cards_auth_middleware])
     app.router.add_get('/', health_check)
     app.router.add_get('/cards', serve_cards_app)
     app.router.add_get('/cards/', serve_cards_app)

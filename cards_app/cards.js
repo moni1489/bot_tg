@@ -1,4 +1,27 @@
 const tg = window.Telegram?.WebApp;
+
+// The server trusts only Telegram's signature: every game request carries it, and outside Telegram the game does not start
+const TG_INIT_DATA = tg?.initData || '';
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (url, options = {}) => {
+    if (String(url).startsWith('/api/cards/')) {
+        const headers = new Headers(options.headers || {});
+        headers.set('X-Telegram-Init-Data', TG_INIT_DATA);
+        options = { ...options, headers };
+    }
+    return nativeFetch(url, options);
+};
+if (!TG_INIT_DATA) {
+    const showTelegramOnly = () => {
+        document.body.innerHTML = '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;background:#000;color:#fff;font-family:Arial,sans-serif;text-align:center">'
+            + '<div style="font-size:20px;font-weight:700">Игра открывается только в Telegram</div>'
+            + '<div style="opacity:.75;max-width:320px">Откройте бота и нажмите «START THE GAME»</div>'
+            + '<a href="https://t.me/funkostop_bot" style="padding:14px 22px;border-radius:12px;background:#e50914;color:#fff;text-decoration:none;font-weight:700">Открыть бота</a></div>';
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showTelegramOnly);
+    else showTelegramOnly();
+    throw new Error('FunkoStop Cards runs only inside Telegram');
+}
 if (tg) {
     try {
         if (typeof tg.expand === 'function') tg.expand();
