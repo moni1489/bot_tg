@@ -1684,6 +1684,24 @@ async def start_handler(message: Message, state: FSMContext):
     # Handle Referral deep link (e.g. /start ref_12345)
     args = message.text.split()
     is_referral = False
+
+    # /start link_<code>: the site's cabinet ties this Telegram to the client, and order statuses come here
+    if len(args) > 1 and args[1].startswith("link_"):
+        try:
+            async with pool.acquire() as db:
+                client_id = await db.fetchval(
+                    "UPDATE clients SET user_tg_id = $1, "
+                    "tg_username = CASE WHEN COALESCE(tg_username, '') = '' THEN $2 ELSE tg_username END, "
+                    "tg_link_code = NULL WHERE tg_link_code = $3 AND tg_link_expires > now() RETURNING id",
+                    message.from_user.id, f"@{message.from_user.username}" if message.from_user.username else "", args[1][5:])
+            if client_id:
+                await message.answer(f"✅ Telegram привязан к личному кабинету #{client_id} на funkostop.org.\n"
+                                     "Сюда будут приходить статусы ваших заказов с сайта.")
+            else:
+                await message.answer("⚠️ Ссылка устарела. Откройте личный кабинет на funkostop.org и нажмите «Привязать Telegram» ещё раз.")
+        except Exception as e:
+            logging.error(f"Telegram link failed: {e}")
+            await message.answer("⚠️ Не получилось привязать Telegram, попробуйте ещё раз чуть позже.")
     
     if len(args) > 1 and args[1].startswith("ref_"):
         try:
