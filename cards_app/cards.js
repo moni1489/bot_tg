@@ -277,7 +277,31 @@ function setupRefLink() {
     }
 }
 
+// When the profile does not come (the player's internet, a VPN, a block on the way), the game must not
+// look like an empty fresh account: it says there is no connection and keeps trying on its own.
+let offlineRetry = null;
+function showOffline(show) {
+    let el = document.getElementById('offline-screen');
+    if (!show) {
+        if (el) el.remove();
+        if (offlineRetry) { clearTimeout(offlineRetry); offlineRetry = null; }
+        return;
+    }
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'offline-screen';
+        el.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;color:#fff;font-family:Montserrat,sans-serif;background:radial-gradient(circle at center,#1a0000 0%,#000 100%)';
+        el.innerHTML = '<h1 style="margin:0;color:var(--neon-red);font-size:1.8rem;text-shadow:0 0 20px var(--neon-red-glow)">НЕТ СВЯЗИ С ИГРОЙ</h1>'
+            + '<p style="margin:0;font-size:1.05rem;opacity:.85;max-width:360px;line-height:1.5">Ваши паки и карточки на месте. Проверьте интернет или VPN: игра подключится сама, как только связь появится.</p>'
+            + '<button type="button" id="offline-retry-btn" style="margin-top:6px;padding:12px 26px;background:var(--neon-red);color:#fff;border:0;border-radius:8px;font-weight:700;font-size:1rem;box-shadow:0 0 15px rgba(255,0,50,.5)">ПОВТОРИТЬ</button>';
+        document.body.appendChild(el);
+        document.getElementById('offline-retry-btn').onclick = () => fetchProfile();
+    }
+    if (!offlineRetry) offlineRetry = setTimeout(() => { offlineRetry = null; fetchProfile(); }, 5000);
+}
+
 async function fetchProfile() {
+    let offline = false;
     try {
         const timestamp = new Date().getTime();
         const params = new URLSearchParams({
@@ -302,6 +326,7 @@ async function fetchProfile() {
                 botUsername = data.bot_username;
                 setupRefLink();
             }
+            showOffline(false);
         } else if (res.status === 403) {
             const data = await res.json();
             document.body.innerHTML = `
@@ -314,12 +339,15 @@ async function fetchProfile() {
             throw new Error("Access denied (Not subscribed)");
         } else {
             console.error("Server returned non-200 status for profile:", res.status);
+            offline = res.status !== 401;
         }
     } catch (e) {
         console.log("Profile fetch warning / error:", e);
+        offline = !String(e && e.message).includes("Not subscribed");
     } finally {
         checkDailyTimer();
         updateUI();
+        if (offline) showOffline(true);
     }
 }
 
