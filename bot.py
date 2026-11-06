@@ -1527,10 +1527,10 @@ def get_admin_kb(user_id=None):
     )
 
 def get_game_admin_kb(user_id=None):
-    url = f"{WEBAPP_URL}?tg_id={user_id}" if user_id else WEBAPP_URL
+    # a plain button: Telegram does not sign the game opened from a keyboard button, so it answers with an inline one
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🎴 Играть в Funko Cards", web_app=WebAppInfo(url=url))],
+            [KeyboardButton(text="🎴 Играть в Funko Cards")],
             [KeyboardButton(text="📊 Статистика Игры"), KeyboardButton(text="🔍 Проверить Игрока")],
             [KeyboardButton(text="🎲 Шансы дропа"), KeyboardButton(text="🎫 Проверить код")],
             [KeyboardButton(text="🎁 Выдать паки"), KeyboardButton(text="📤 Забрать паки")],
@@ -1969,6 +1969,13 @@ async def game_admin_menu(message: Message, state: FSMContext):
     if not await is_admin(message.from_user.id):
         return
     await message.answer("Добро пожаловать в админку игры Funko Cards!", reply_markup=get_game_admin_kb(message.from_user.id))
+
+@router.message(F.text == "🎴 Играть в Funko Cards", StateFilter("*"))
+async def game_admin_play(message: Message, state: FSMContext):
+    await state.clear()
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎴 Открыть игру", web_app=WebAppInfo(url=WEBAPP_URL))]])
+    await message.answer("Игра открывается этой кнопкой или кнопкой «START THE GAME» слева от поля ввода:", reply_markup=kb)
+
 
 @router.message(F.text == "🔙 Назад в гл. меню", StateFilter("*"))
 async def back_to_main_admin(message: Message, state: FSMContext):
