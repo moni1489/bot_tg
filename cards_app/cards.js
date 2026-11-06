@@ -253,7 +253,7 @@ function setupNavigation() {
             // Hide floating daily gift button on Collection & Tasks tabs
             const dailyBtn = document.getElementById('daily-gift-btn');
             if (dailyBtn) {
-                if (targetId === 'view-home') {
+                if (targetId === 'view-home' && !seasonIsOver()) {
                     dailyBtn.classList.remove('hidden');
                 } else {
                     dailyBtn.classList.add('hidden');
@@ -326,6 +326,8 @@ async function fetchProfile() {
                 botUsername = data.bot_username;
                 setupRefLink();
             }
+            seasonEnd = data.season_end ? new Date(data.season_end) : null;
+            renderSeason();
             showOffline(false);
         } else if (res.status === 403) {
             const data = await res.json();
@@ -349,6 +351,44 @@ async function fetchProfile() {
         updateUI();
         if (offline) showOffline(true);
     }
+}
+
+// Season countdown: the server sends the season end; after it the pack button is off and the box says the season is over
+let seasonEnd = null;
+let seasonTimer = null;
+const seasonIsOver = () => !!seasonEnd && Date.now() >= seasonEnd.getTime();
+
+function renderSeason() {
+    const box = document.getElementById('season-box');
+    if (!box) return;
+    if (seasonTimer) { clearInterval(seasonTimer); seasonTimer = null; }
+    const home = document.getElementById('view-home');
+    if (!seasonEnd || isNaN(seasonEnd.getTime())) { box.classList.add('hidden'); home?.classList.remove('has-season'); return; }
+    box.classList.remove('hidden');
+    home?.classList.add('has-season');
+    const dateText = seasonEnd.toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
+    const pad = n => String(n).padStart(2, '0');
+    const tick = () => {
+        const left = Math.max(0, Math.floor((seasonEnd.getTime() - Date.now()) / 1000));
+        if (!left) {
+            box.classList.add('over');
+            document.getElementById('season-title').textContent = '1 СЕЗОН ЗАВЕРШЁН';
+            document.getElementById('season-note').textContent = 'Паки больше не открываются. Коллекция и призы остаются у вас — ждите 2 сезон!';
+            openPackBtn.classList.add('season-over');
+            document.getElementById('daily-gift-btn')?.classList.add('hidden');
+            if (seasonTimer) { clearInterval(seasonTimer); seasonTimer = null; }
+            return;
+        }
+        box.classList.remove('over');
+        openPackBtn.classList.remove('season-over');
+        document.getElementById('season-d').textContent = pad(Math.floor(left / 86400));
+        document.getElementById('season-h').textContent = pad(Math.floor(left % 86400 / 3600));
+        document.getElementById('season-m').textContent = pad(Math.floor(left % 3600 / 60));
+        document.getElementById('season-s').textContent = pad(left % 60);
+        document.getElementById('season-note').textContent = `Закрытие ${dateText} МСК`;
+    };
+    tick();
+    if (!seasonIsOver()) seasonTimer = setInterval(tick, 1000);
 }
 
 // Tasks System
@@ -667,6 +707,10 @@ let fastOpen = false;
 
 openPackBtn.addEventListener('click', async () => {
     if (isOpening) return;
+    if (seasonIsOver()) {
+        alert("1 сезон завершён: паки больше не открываются. Коллекция и призы остаются у вас.");
+        return;
+    }
 
     let hasSeenFaq = false;
     try {

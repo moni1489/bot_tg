@@ -7,7 +7,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>FunkoStop Cards</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/cards/cards.css?v=117">
+    <link rel="stylesheet" href="/cards/cards.css?v=118">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -158,6 +158,21 @@
                     </svg>
                     КАК ЭТО РАБОТАЕТ?
                 </button>
+            </div>
+
+            <!-- Season countdown: shown only when the server sets a season end -->
+            <div class="season-box hidden" id="season-box">
+                <div class="season-title" id="season-title">ДО КОНЦА 1 СЕЗОНА</div>
+                <div class="season-clock" id="season-clock">
+                    <div><b id="season-d">00</b><span>ДНЕЙ</span></div>
+                    <i>:</i>
+                    <div><b id="season-h">00</b><span>ЧАСОВ</span></div>
+                    <i>:</i>
+                    <div><b id="season-m">00</b><span>МИНУТ</span></div>
+                    <i>:</i>
+                    <div><b id="season-s">00</b><span>СЕКУНД</span></div>
+                </div>
+                <div class="season-note" id="season-note"></div>
             </div>
         </main>
 
@@ -467,7 +482,7 @@
         </div>
     </div>
 
-    <script src="/cards/cards.js?v=119"></script>
+    <script src="/cards/cards.js?v=120"></script>
 
     <!-- Inventory Modal for Trade-in -->
     <div id="inventory-modal" class="modal hidden" onclick="if(event.target === this) closeInventoryModal()">

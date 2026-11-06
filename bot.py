@@ -14,7 +14,7 @@ import math
 import re
 import xml.etree.ElementTree as ET
 import html
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F, Router, BaseMiddleware
@@ -155,6 +155,25 @@ def safe_int(val, default=0):
 CARDS_INIT_MAX_AGE = 7 * 86400
 
 
+def parse_season_end(value):
+    """SEASON_END like 2026-12-14T20:00 (Moscow time unless an offset is given); empty or wrong means no season end."""
+    try:
+        moment = datetime.fromisoformat((value or "").strip())
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone(timedelta(hours=3)))
+
+
+# When the season ends the game shows it is over: packs can no longer be opened or earned, the collection stays visible
+SEASON_END = parse_season_end(os.getenv("SEASON_END"))
+SEASON_CLOSED_PATHS = {"/api/cards/open", "/api/cards/claim_daily", "/api/cards/craft",
+                       "/api/cards/tasks/claim", "/api/cards/claim_bonus_packs"}
+
+
+def season_closed(now=None):
+    return SEASON_END is not None and (now or datetime.now(timezone.utc)) >= SEASON_END
+
+
 def telegram_user_from_init_data(init_data, bot_token, now=None):
     """The user id from the mini app's initData when Telegram's signature matches, else None.
     Without this check anyone could open the game in a browser with somebody else's id and take their packs and prizes."""
@@ -191,6 +210,8 @@ async def cards_auth_middleware(request, handler):
                 pass
         if any(c not in (None, "") and safe_int(c) != user_id for c in claimed):
             return web.json_response({"error": "Нельзя играть за другого пользователя"}, status=403)
+        if request.path in SEASON_CLOSED_PATHS and season_closed():
+            return web.json_response({"error": "season_closed", "message": "1 сезон завершён"}, status=403)
     return await handler(request)
 
 
@@ -294,7 +315,8 @@ async def get_card_profile(request):
             "ref_count": ref_count,
             "bot_username": bot_username,
             "is_admin": is_adm,
-            "drop_settings": drop_settings
+            "drop_settings": drop_settings,
+            "season_end": SEASON_END.isoformat() if SEASON_END else None,
         })
     except Exception as e:
         logging.error(f"get_card_profile error: {e}")
@@ -1014,6 +1036,8 @@ async def daily_notification_task():
     while True:
         try:
             await asyncio.sleep(60)  # Check every 60 seconds
+            if season_closed():
+                continue  # no "your daily pack is ready" once the season is over
             async with pool.acquire() as db:
                 users = await db.fetch("""
                     SELECT telegram_id FROM card_users
