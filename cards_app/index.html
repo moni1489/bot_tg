@@ -6,7 +6,8 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>FunkoStop Cards</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- telegram.org is blocked in Russia, so the script comes through the game's own address -->
+    <script src="/cards/telegram-web-app.js"></script>
     <link rel="stylesheet" href="/cards/cards.css?v=118">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -482,7 +483,7 @@
         </div>
     </div>
 
-    <script src="/cards/cards.js?v=120"></script>
+    <script src="/cards/cards.js?v=121"></script>
 
     <!-- Inventory Modal for Trade-in -->
     <div id="inventory-modal" class="modal hidden" onclick="if(event.target === this) closeInventoryModal()">

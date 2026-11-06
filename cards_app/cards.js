@@ -1,7 +1,15 @@
 const tg = window.Telegram?.WebApp;
 
 // The server trusts only Telegram's signature: every game request carries it, and outside Telegram the game does not start
-const TG_INIT_DATA = tg?.initData || '';
+// Telegram also puts the signed launch data into the page address (#tgWebAppData=...): the game still knows the player
+// when Telegram's script did not load
+const TG_HASH_INIT_DATA = (() => {
+    try { return new URLSearchParams(window.location.hash.slice(1)).get('tgWebAppData') || ''; } catch (e) { return ''; }
+})();
+const TG_INIT_DATA = tg?.initData || TG_HASH_INIT_DATA;
+const TG_USER = (() => {
+    try { return tg?.initDataUnsafe?.user || JSON.parse(new URLSearchParams(TG_INIT_DATA).get('user') || 'null'); } catch (e) { return null; }
+})();
 const nativeFetch = window.fetch.bind(window);
 window.fetch = (url, options = {}) => {
     if (String(url).startsWith('/api/cards/')) {
@@ -36,8 +44,8 @@ if (tg) {
 // Get user ID from Telegram WebApp, URL params, or generate unique localStorage ID
 function getEffectiveUserId() {
     try {
-        if (tg?.initDataUnsafe?.user?.id) {
-            return tg.initDataUnsafe.user.id;
+        if (TG_USER?.id) {
+            return TG_USER.id;
         }
         const urlParams = new URLSearchParams(window.location.search);
         const paramId = urlParams.get('tg_id');
@@ -65,8 +73,8 @@ const effectiveTgId = getEffectiveUserId();
 // User state
 let userData = {
     telegram_id: effectiveTgId,
-    first_name: tg?.initDataUnsafe?.user?.first_name || '👤',
-    username: tg?.initDataUnsafe?.user?.username || 'player',
+    first_name: TG_USER?.first_name || '👤',
+    username: TG_USER?.username || 'player',
     packs_count: 0, // Starts at 0 until fetchProfile completes
     last_daily_pack: null,
     completed_tasks: [],
@@ -1958,7 +1966,7 @@ async function craftCards() {
     let craftResult = null;
     try {
         const payload = {
-            telegram_id: tg?.initDataUnsafe?.user?.id || userData.telegram_id,
+            telegram_id: TG_USER?.id || userData.telegram_id,
             cards: tradeinSlots
         };
         const res = await fetch('/api/cards/craft', {
