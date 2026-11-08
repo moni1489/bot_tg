@@ -939,10 +939,7 @@ async def notify_order_status_api(request):
             order_details['status'] = new_status
             notify_msg = format_status_notification(order_details)
             
-            if order_details.get('photo_id'):
-                await bot.send_photo(chat_id=client_tg_id, photo=order_details['photo_id'], caption=notify_msg, parse_mode="Markdown")
-            else:
-                await bot.send_message(chat_id=client_tg_id, text=notify_msg, parse_mode="Markdown")
+            await send_order_notice(client_tg_id, notify_msg, order_details.get('photo_id'))
                 
             return web.json_response({"success": True, "message": f"Notified user {client_tg_id}"})
         else:
@@ -1605,6 +1602,24 @@ STATUS_METADATA = {
         "desc": "Заказ успешно вручен! Спасибо, что выбираете FunkoSTOP!"
     }
 }
+
+async def send_order_notice(chat_id, text, photo_id=None):
+    """Order news for the client. Product photos are mostly stored as documents, which send_photo refuses and the whole
+    message used to be lost: a document goes as a document with the caption, and the text goes when all else fails."""
+    if photo_id:
+        for send in (bot.send_photo, bot.send_document):
+            try:
+                field = "photo" if send is bot.send_photo else "document"
+                await send(chat_id=chat_id, caption=text, parse_mode="Markdown", **{field: photo_id})
+                return
+            except Exception as e:
+                logging.warning(f"order notice {field} failed for {chat_id}: {e}")
+    try:
+        await bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
+    except Exception as e:
+        logging.warning(f"order notice with Markdown failed for {chat_id}: {e}")
+        await bot.send_message(chat_id=chat_id, text=text.replace("**", "").replace("*", "").replace("_", ""))
+
 
 def format_status_notification(order: dict) -> str:
     status_name = order['status']
@@ -3041,10 +3056,7 @@ async def add_order_photo(message: Message, state: FSMContext):
     if client_tg_id:
         try:
             notify_msg = f"🎉 **У вас новый заказ!**\n\n🆔 Заказ #{order_id}\n🛒 Позиции:\n{data['items']}\n\n💰 Стоимость: {data['total_price']}\n✅ Оплачено: {data['paid_amount']}"
-            if photo_id:
-                await bot.send_photo(chat_id=client_tg_id, photo=photo_id, caption=notify_msg, parse_mode="Markdown")
-            else:
-                await bot.send_message(chat_id=client_tg_id, text=notify_msg, parse_mode="Markdown")
+            await send_order_notice(client_tg_id, notify_msg, photo_id)
         except Exception as e:
             logging.error(f"Не удалось уведомить пользователя о новом заказе: {e}")
 
@@ -3093,10 +3105,7 @@ async def set_order_status(callback: CallbackQuery):
         logging.info(f"[NOTIFY] Sending to {client_tg_id}, status: {new_status}")
         try:
             notify_msg = format_status_notification(order_details)
-            if order_details.get('photo_id'):
-                await bot.send_photo(chat_id=client_tg_id, photo=order_details['photo_id'], caption=notify_msg, parse_mode="Markdown")
-            else:
-                await bot.send_message(chat_id=client_tg_id, text=notify_msg, parse_mode="Markdown")
+            await send_order_notice(client_tg_id, notify_msg, order_details.get('photo_id'))
             logging.info(f"[NOTIFY] Sent OK to {client_tg_id}")
         except Exception as e:
             logging.error(f"[NOTIFY] FAILED for {client_tg_id}: {e}")
@@ -3144,10 +3153,7 @@ async def update_payment_value(message: Message, state: FSMContext):
         client_tg_id = order_details['user_tg_id']
         try:
             notify_msg = format_status_notification(order_details)
-            if order_details.get('photo_id'):
-                await bot.send_photo(chat_id=client_tg_id, photo=order_details['photo_id'], caption=notify_msg, parse_mode="Markdown")
-            else:
-                await bot.send_message(chat_id=client_tg_id, text=notify_msg, parse_mode="Markdown")
+            await send_order_notice(client_tg_id, notify_msg, order_details.get('photo_id'))
         except Exception as e:
             logging.error(f"Не удалось отправить уведомление об оплате клиенту {client_tg_id}: {e}")
 
