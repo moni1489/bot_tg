@@ -3314,10 +3314,7 @@ async def check_status_start(message: Message, state: FSMContext):
                 response += f"✅ **Оплачено:** {paid_amount}\n"
                 response += f"❗️ **Осталось доплатить:** {debt if debt > 0 else 0}\n\n"
                 response += f"🚚 **Текущий статус:**\n_{status}_"
-                if photo_id:
-                    await message.answer_photo(photo=photo_id, caption=response, parse_mode="Markdown")
-                else:
-                    await message.answer(response, parse_mode="Markdown")
+                await send_order_notice(message.chat.id, response, photo_id)
         return
     
     # Not linked yet — ask for ID and password (one-time login)
@@ -3375,10 +3372,7 @@ async def check_status_password(message: Message, state: FSMContext):
             response += f"❗️ **Осталось доплатить:** {debt if debt > 0 else 0}\n\n"
             response += f"🚚 **Текущий статус:**\n_{status}_"
             
-            if photo_id:
-                await message.answer_photo(photo=photo_id, caption=response, parse_mode="Markdown")
-            else:
-                await message.answer(response, parse_mode="Markdown")
+            await send_order_notice(message.chat.id, response, photo_id)
                 
         await message.answer("Все активные заказы загружены.", reply_markup=get_start_kb())
             
@@ -3411,10 +3405,7 @@ async def check_archive_start(message: Message, state: FSMContext):
                 response += f"💵 **Общая стоимость:** {total_price}\n"
                 response += f"✅ **Оплачено:** {paid_amount}\n\n"
                 response += f"🚚 **Финальный статус:**\n_{status}_"
-                if photo_id:
-                    await message.answer_photo(photo=photo_id, caption=response, parse_mode="Markdown")
-                else:
-                    await message.answer(response, parse_mode="Markdown")
+                await send_order_notice(message.chat.id, response, photo_id)
         return
     
     # Not linked — ask for credentials
@@ -3453,10 +3444,7 @@ async def check_archive_password(message: Message, state: FSMContext):
             response += f"✅ **Оплачено:** {paid_amount}\n\n"
             response += f"🚚 **Финальный статус:**\n_{status}_"
             
-            if photo_id:
-                await message.answer_photo(photo=photo_id, caption=response, parse_mode="Markdown")
-            else:
-                await message.answer(response, parse_mode="Markdown")
+            await send_order_notice(message.chat.id, response, photo_id)
                 
         await message.answer("Все архивные заказы загружены.", reply_markup=get_start_kb())
             
