@@ -1697,26 +1697,18 @@ GROUP_KEYBOARD_CLEARED = {}  # chat id -> when the keyboard was last taken away
 
 
 async def clear_group_keyboard(chat_id, force=False):
-    """Takes a bot keyboard away from everyone in a group: a short message with ReplyKeyboardRemove, deleted soon after.
-    At most once a minute per chat, unless forced (the bot was just added)."""
+    """Takes a bot keyboard away from everyone in a group with a message carrying ReplyKeyboardRemove.
+    The message must stay: Telegram shows the keyboard of the latest bot message that has one, so deleting it
+    brings the old menu back. At most once an hour per chat, unless forced (the bot was just added)."""
     now = time.time()
-    if not force and now - GROUP_KEYBOARD_CLEARED.get(chat_id, 0) < 60:
+    if not force and now - GROUP_KEYBOARD_CLEARED.get(chat_id, 0) < 3600:
         return
     GROUP_KEYBOARD_CLEARED[chat_id] = now
     try:
-        note = await bot.send_message(chat_id, "Меню бота работает только в личке @funkostop_bot. Здесь — расчёт цены по ссылке на eBay или Funko.",
-                                      reply_markup=ReplyKeyboardRemove())
+        await bot.send_message(chat_id, "Меню бота работает только в личке @funkostop_bot. Здесь — расчёт цены по ссылке на eBay или Funko.",
+                               reply_markup=ReplyKeyboardRemove())
     except Exception as e:
         logging.warning(f"Could not clear the keyboard in {chat_id}: {e}")
-        return
-
-    async def drop_later():
-        await asyncio.sleep(15)
-        try:
-            await bot.delete_message(chat_id, note.message_id)
-        except Exception:
-            pass
-    asyncio.create_task(drop_later())
 
 
 @router.message(F.new_chat_members)
