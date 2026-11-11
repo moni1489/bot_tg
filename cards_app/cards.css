@@ -2825,45 +2825,45 @@ body {
     user-select: none;
 }
 
-/* Season countdown on the home screen */
-.season-box {
-    margin: 14px 20px 6px;
-    padding: 10px 10px 9px;
-    border: 1px solid var(--neon-red);
-    border-radius: 14px;
-    background: linear-gradient(180deg, rgba(40, 0, 6, 0.85) 0%, rgba(0, 0, 0, 0.8) 100%);
+/* Season countdown: a tile next to "Призы"; "Как это работает?" moves to the top-left corner */
+.faq-corner { left: 15px; right: auto; display: none; }
+body.has-season .faq-corner { display: flex; }
+body.has-season .faq-corner.hidden { display: none; }
+body.has-season #faq-btn { display: none !important; }
+.season-tile {
+    flex: 1;
+    min-width: 0;
+    background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(4px);
-    box-shadow: 0 0 18px rgba(255, 0, 34, 0.25), inset 0 0 22px rgba(255, 0, 34, 0.12);
+    border: 1px solid var(--neon-red);
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(255, 0, 34, 0.2);
+    padding: 10px 4px 9px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     text-align: center;
-    animation: slideUpFade 0.6s backwards;
-    animation-delay: 0.3s;
-}
-.season-box.hidden { display: none; }
-/* with the countdown the home screen may scroll a little, so the box never hides under the bottom menu */
-#view-home.tab-view.has-season { overflow-y: auto; justify-content: safe center; padding-bottom: 84px; }
-.season-title {
-    font-family: 'Montserrat', sans-serif;
-    font-weight: 900;
-    font-size: 0.72rem;
-    letter-spacing: 2px;
     color: #fff;
-    margin-bottom: 4px;
 }
-.season-clock { display: flex; justify-content: center; align-items: flex-start; gap: 6px; }
-.season-clock > div { min-width: 52px; }
+.season-tile.hidden { display: none; }
+.season-title { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 0.58rem; letter-spacing: 1px; color: #fff; }
+.season-clock { display: flex; justify-content: center; align-items: flex-start; gap: 2px; }
+.season-clock > div { min-width: 26px; }
 .season-clock b {
     display: block;
     font-family: 'Montserrat', sans-serif;
     font-weight: 900;
-    font-size: 1.5rem;
+    font-size: 1.15rem;
     line-height: 1.1;
     color: var(--neon-red);
-    text-shadow: 0 0 12px rgba(255, 0, 34, 0.75);
+    text-shadow: 0 0 10px rgba(255, 0, 34, 0.75);
     font-variant-numeric: tabular-nums;
 }
-.season-clock span { display: block; font-size: 0.55rem; font-weight: 800; letter-spacing: 1px; color: rgba(255, 255, 255, 0.55); margin-top: 2px; }
-.season-clock i { font-style: normal; font-weight: 900; font-size: 1.4rem; color: rgba(255, 0, 34, 0.6); line-height: 1.2; }
-.season-note { margin-top: 5px; font-size: 0.66rem; color: rgba(255, 255, 255, 0.6); letter-spacing: 0.5px; }
-.season-box.over .season-clock { display: none; }
-.season-box.over .season-title { font-size: 1.05rem; color: var(--neon-red); text-shadow: 0 0 12px rgba(255, 0, 34, 0.75); margin-bottom: 4px; }
+.season-clock span { display: block; font-size: 0.45rem; font-weight: 800; letter-spacing: 0.5px; color: rgba(255, 255, 255, 0.55); margin-top: 1px; }
+.season-clock i { font-style: normal; font-weight: 900; font-size: 1rem; color: rgba(255, 0, 34, 0.6); line-height: 1.25; }
+.season-note { font-size: 0.5rem; color: rgba(255, 255, 255, 0.6); letter-spacing: 0.3px; }
+.season-tile.over .season-clock { display: none; }
+.season-tile.over .season-title { font-size: 0.8rem; font-weight: 900; color: var(--neon-red); text-shadow: 0 0 10px rgba(255, 0, 34, 0.75); }
 .btn-neon-open.season-over { opacity: 0.45 !important; filter: grayscale(0.6); }

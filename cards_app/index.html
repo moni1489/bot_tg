@@ -8,7 +8,7 @@
     <title>FunkoStop Cards</title>
     <!-- telegram.org is blocked in Russia, so the script comes through the game's own address -->
     <script src="/cards/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/cards/cards.css?v=118">
+    <link rel="stylesheet" href="/cards/cards.css?v=119">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -57,6 +57,20 @@
     </div>
 
     <div class="app-container">
+        <!-- "How it works" in the top-left corner: shown while the season timer takes its place under the pack -->
+        <div class="daily-gift-floating faq-corner" id="faq-corner-btn" onclick="openFAQ()">
+            <svg class="daily-gift-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff0022"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <div class="daily-gift-text">
+                <span class="daily-gift-text-main">КАК ЭТО</span>
+                <span class="daily-gift-timer">РАБОТАЕТ?</span>
+            </div>
+        </div>
+
         <!-- Floating Daily Gift Tab (Right Side) -->
         <div class="daily-gift-floating" id="daily-gift-btn">
             <svg class="daily-gift-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff0022"
@@ -159,21 +173,16 @@
                     </svg>
                     КАК ЭТО РАБОТАЕТ?
                 </button>
-            </div>
-
-            <!-- Season countdown: shown only when the server sets a season end -->
-            <div class="season-box hidden" id="season-box">
-                <div class="season-title" id="season-title">ДО КОНЦА 1 СЕЗОНА</div>
-                <div class="season-clock" id="season-clock">
-                    <div><b id="season-d">00</b><span>ДНЕЙ</span></div>
-                    <i>:</i>
-                    <div><b id="season-h">00</b><span>ЧАСОВ</span></div>
-                    <i>:</i>
-                    <div><b id="season-m">00</b><span>МИНУТ</span></div>
-                    <i>:</i>
-                    <div><b id="season-s">00</b><span>СЕКУНД</span></div>
+                <div class="season-tile hidden" id="season-box">
+                    <div class="season-title" id="season-title">ДО КОНЦА 1 СЕЗОНА</div>
+                    <div class="season-clock" id="season-clock">
+                        <div><b id="season-d">00</b><span>ДН</span></div><i>:</i>
+                        <div><b id="season-h">00</b><span>ЧАС</span></div><i>:</i>
+                        <div><b id="season-m">00</b><span>МИН</span></div><i>:</i>
+                        <div><b id="season-s">00</b><span>СЕК</span></div>
+                    </div>
+                    <div class="season-note" id="season-note"></div>
                 </div>
-                <div class="season-note" id="season-note"></div>
             </div>
         </main>
 
@@ -483,7 +492,7 @@
         </div>
     </div>
 
-    <script src="/cards/cards.js?v=121"></script>
+    <script src="/cards/cards.js?v=122"></script>
 
     <!-- Inventory Modal for Trade-in -->
     <div id="inventory-modal" class="modal hidden" onclick="if(event.target === this) closeInventoryModal()">

@@ -261,6 +261,7 @@ function setupNavigation() {
             // Hide floating daily gift button on Collection & Tasks tabs
             const dailyBtn = document.getElementById('daily-gift-btn');
             if (dailyBtn) {
+                document.getElementById('faq-corner-btn')?.classList.toggle('hidden', targetId !== 'view-home');
                 if (targetId === 'view-home' && !seasonIsOver()) {
                     dailyBtn.classList.remove('hidden');
                 } else {
@@ -370,18 +371,17 @@ function renderSeason() {
     const box = document.getElementById('season-box');
     if (!box) return;
     if (seasonTimer) { clearInterval(seasonTimer); seasonTimer = null; }
-    const home = document.getElementById('view-home');
-    if (!seasonEnd || isNaN(seasonEnd.getTime())) { box.classList.add('hidden'); home?.classList.remove('has-season'); return; }
+    if (!seasonEnd || isNaN(seasonEnd.getTime())) { box.classList.add('hidden'); document.body.classList.remove('has-season'); return; }
     box.classList.remove('hidden');
-    home?.classList.add('has-season');
-    const dateText = seasonEnd.toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
+    document.body.classList.add('has-season');
+    const dateText = seasonEnd.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' }).replace(',', ' ·');
     const pad = n => String(n).padStart(2, '0');
     const tick = () => {
         const left = Math.max(0, Math.floor((seasonEnd.getTime() - Date.now()) / 1000));
         if (!left) {
             box.classList.add('over');
             document.getElementById('season-title').textContent = '1 СЕЗОН ЗАВЕРШЁН';
-            document.getElementById('season-note').textContent = 'Паки больше не открываются. Коллекция и призы остаются у вас — ждите 2 сезон!';
+            document.getElementById('season-note').textContent = 'Коллекция и призы остаются у вас';
             openPackBtn.classList.add('season-over');
             document.getElementById('daily-gift-btn')?.classList.add('hidden');
             if (seasonTimer) { clearInterval(seasonTimer); seasonTimer = null; }
@@ -393,7 +393,7 @@ function renderSeason() {
         document.getElementById('season-h').textContent = pad(Math.floor(left % 86400 / 3600));
         document.getElementById('season-m').textContent = pad(Math.floor(left % 3600 / 60));
         document.getElementById('season-s').textContent = pad(left % 60);
-        document.getElementById('season-note').textContent = `Закрытие ${dateText} МСК`;
+        document.getElementById('season-note').textContent = `закрытие ${dateText} МСК`;
     };
     tick();
     if (!seasonIsOver()) seasonTimer = setInterval(tick, 1000);
