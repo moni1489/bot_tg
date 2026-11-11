@@ -135,8 +135,14 @@ class CaptchaMiddleware(BaseMiddleware):
                     except Exception as e:
                         logging.error(f"Failed to delete spam msg: {e}")
                     return # Stop propagation
-            # In groups the bot only runs the newcomers' captcha: /start, menu buttons and the rest answer only in a private chat,
-            # otherwise the client keyboard pops up for everyone in the chat and order details could be shown there
+            # In groups the bot only runs the newcomers' captcha and the price calculator by an eBay/Funko link (with its
+            # weight question): /start, menu buttons and the rest answer only in a private chat, otherwise the client keyboard
+            # pops up for everyone in the chat and order details could be shown there
+            if extract_calc_link(event.text or "") is not None:
+                return await handler(event, data)
+            fsm = data.get("state")
+            if fsm is not None and await fsm.get_state() == ParseLink.waiting_for_weight.state:
+                return await handler(event, data)
             return
         return await handler(event, data)
 
