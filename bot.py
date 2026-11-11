@@ -135,6 +135,9 @@ class CaptchaMiddleware(BaseMiddleware):
                     except Exception as e:
                         logging.error(f"Failed to delete spam msg: {e}")
                     return # Stop propagation
+            # In groups the bot only runs the newcomers' captcha: /start, menu buttons and the rest answer only in a private chat,
+            # otherwise the client keyboard pops up for everyone in the chat and order details could be shown there
+            return
         return await handler(event, data)
 
 router.message.outer_middleware(CaptchaMiddleware())
