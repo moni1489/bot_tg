@@ -143,6 +143,13 @@ class CaptchaMiddleware(BaseMiddleware):
             fsm = data.get("state")
             if fsm is not None and await fsm.get_state() == ParseLink.waiting_for_weight.state:
                 return await handler(event, data)
+            # someone pressed a button of a bot keyboard left in the chat: take the keyboard away from everybody
+            if (event.text or "") in menu_button_texts():
+                try:
+                    await event.delete()
+                except Exception:
+                    pass
+                await clear_group_keyboard(event.chat.id)
             return
         return await handler(event, data)
 
@@ -1680,8 +1687,43 @@ def generate_random_password(length=6):
     return ''.join(random.choice(characters) for _ in range(length))
 
 # --- HANDLERS ---
+def menu_button_texts():
+    """Texts of every button of the bot's own reply keyboards (client, admin, game admin)."""
+    kbs = (get_start_kb(), get_admin_kb(), get_game_admin_kb(), get_cancel_kb())
+    return {b.text for kb in kbs for row in kb.keyboard for b in row}
+
+
+GROUP_KEYBOARD_CLEARED = {}  # chat id -> when the keyboard was last taken away
+
+
+async def clear_group_keyboard(chat_id, force=False):
+    """Takes a bot keyboard away from everyone in a group: a short message with ReplyKeyboardRemove, deleted soon after.
+    At most once a minute per chat, unless forced (the bot was just added)."""
+    now = time.time()
+    if not force and now - GROUP_KEYBOARD_CLEARED.get(chat_id, 0) < 60:
+        return
+    GROUP_KEYBOARD_CLEARED[chat_id] = now
+    try:
+        note = await bot.send_message(chat_id, "Меню бота работает только в личке @funkostop_bot. Здесь — расчёт цены по ссылке на eBay или Funko.",
+                                      reply_markup=ReplyKeyboardRemove())
+    except Exception as e:
+        logging.warning(f"Could not clear the keyboard in {chat_id}: {e}")
+        return
+
+    async def drop_later():
+        await asyncio.sleep(15)
+        try:
+            await bot.delete_message(chat_id, note.message_id)
+        except Exception:
+            pass
+    asyncio.create_task(drop_later())
+
+
 @router.message(F.new_chat_members)
 async def welcome_new_member(message: Message):
+    # the bot itself was added (back) to the chat: first take away any bot keyboard left there
+    if any(m.id == bot.id for m in message.new_chat_members):
+        await clear_group_keyboard(message.chat.id, force=True)
     async with pool.acquire() as db:
         for new_member in message.new_chat_members:
             if new_member.is_bot:
