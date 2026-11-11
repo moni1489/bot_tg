@@ -1623,9 +1623,8 @@ async def send_order_notice(chat_id, text, photo_id=None):
     """Order news for the client. Product photos are mostly stored as documents, which send_photo refuses and the whole
     message used to be lost: a document goes as a document with the caption, and the text goes when all else fails."""
     if photo_id:
-        for send in (bot.send_photo, bot.send_document):
+        for send, field in ((bot.send_photo, "photo"), (bot.send_document, "document")):
             try:
-                field = "photo" if send is bot.send_photo else "document"
                 await send(chat_id=chat_id, caption=text, parse_mode="Markdown", **{field: photo_id})
                 return
             except Exception as e:
