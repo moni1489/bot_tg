@@ -1,4 +1,5 @@
 import asyncio
+import io
 import logging
 import os
 import time
@@ -24,7 +25,7 @@ from aiogram.types import (
     Message, CallbackQuery, ReplyKeyboardMarkup,
     KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton,
     ReplyKeyboardRemove, WebAppInfo, MenuButtonWebApp, MenuButtonDefault,
-    FSInputFile
+    FSInputFile, BufferedInputFile
 )
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -1620,15 +1621,31 @@ STATUS_METADATA = {
 }
 
 async def send_order_notice(chat_id, text, photo_id=None):
-    """Order news for the client. Product photos are mostly stored as documents, which send_photo refuses and the whole
-    message used to be lost: a document goes as a document with the caption, and the text goes when all else fails."""
+    """Order news for the client with the product picture. Site photos are stored as documents, which send_photo refuses
+    and a document shows as a 'photo.bin' file: such a picture is downloaded and sent again as a JPEG photo.
+    The text goes when all else fails."""
     if photo_id:
-        for send, field in ((bot.send_photo, "photo"), (bot.send_document, "document")):
-            try:
-                await send(chat_id=chat_id, caption=text, parse_mode="Markdown", **{field: photo_id})
-                return
-            except Exception as e:
-                logging.warning(f"order notice {field} failed for {chat_id}: {e}")
+        try:
+            await bot.send_photo(chat_id=chat_id, photo=photo_id, caption=text, parse_mode="Markdown")
+            return
+        except Exception as e:
+            logging.info(f"order notice photo id refused for {chat_id}: {e}")
+        try:
+            from PIL import Image
+            raw = (await bot.download(photo_id)).read()
+            img = Image.open(io.BytesIO(raw))
+            if img.mode in ("RGBA", "LA", "P"):
+                img = img.convert("RGBA")
+                white = Image.new("RGB", img.size, (255, 255, 255))
+                white.paste(img, mask=img.split()[-1])
+                img = white
+            out = io.BytesIO()
+            img.convert("RGB").save(out, "JPEG", quality=90)
+            await bot.send_photo(chat_id=chat_id, photo=BufferedInputFile(out.getvalue(), "order.jpg"),
+                                 caption=text, parse_mode="Markdown")
+            return
+        except Exception as e:
+            logging.warning(f"order notice picture upload failed for {chat_id}: {e}")
     try:
         await bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
     except Exception as e:
