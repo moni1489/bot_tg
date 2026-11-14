@@ -945,16 +945,32 @@ def parse_item_shipping_html(html: str) -> tuple[float | None, str]:
     the page must not wipe an SRP ``+$9.67 delivery`` snippet.
     """
     soup = BeautifulSoup(html or "", "html.parser")
-    chunks: list[str] = []
-    for sel in _ITEM_SHIP_SELS:
-        for node in soup.select(sel):
-            text = node.get_text(" ", strip=True)
-            if text:
-                chunks.append(text)
+
+    def texts(selectors) -> list[str]:
+        out: list[str] = []
+        for sel in selectors:
+            for node in soup.select(sel):
+                text = node.get_text(" ", strip=True)
+                if text:
+                    out.append(text)
+        return out
+
+    # 1. the shipping row itself ("Shipping: Free UPS Ground Saver", "Shipping: US $12.11 ...")
+    precise = texts(_ITEM_SHIP_SELS[:2])
+    if precise:
+        found = parse_shipping(" ".join(precise))
+        if found[0] is not None:
+            return found
+    # 2. the wider blocks; the price summary "Item price US $499.00 Shipping FREE" sits in one of them and its
+    # "$499.00 Shipping" was read as the shipping cost, so the item price is cut out first
+    chunks = texts(_ITEM_SHIP_SELS[2:])
     if chunks:
-        return parse_shipping(" ".join(chunks))
+        return parse_shipping(_ITEM_PRICE_RE.sub(" ", " ".join(chunks)))
     body = soup.get_text(" ", strip=True) if soup else (html or "")
-    return parse_shipping_amount(body)
+    return parse_shipping_amount(_ITEM_PRICE_RE.sub(" ", body))
+
+
+_ITEM_PRICE_RE = re.compile(r"(?i)item\s+price\s*:?\s*(?:US\s*)?[$£€]\s*[\d,]+(?:\.\d+)?")
 
 
 def looks_like_proxy_timeout(err: str | None, status: int = 0) -> bool:
